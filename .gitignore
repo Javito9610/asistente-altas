@@ -1,0 +1,8 @@
+build/
+target/
+registros/
+captura.png
+*.log
+clave.txt
+.idea/
+*.iml
