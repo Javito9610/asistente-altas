@@ -1,7 +1,7 @@
 @echo off
 rem Asistente Altas (pruebas): compila si hace falta y ejecuta. Necesita el JDK 21 (java y javac en el PATH o JAVA_HOME).
 setlocal
-chcp 65001 >nul
+"%SystemRoot%\System32\chcp.com" 65001 >nul
 cd /d "%~dp0"
 set "JBIN="
 if defined JAVA_HOME set "JBIN=%JAVA_HOME%\bin\"
@@ -15,7 +15,7 @@ if exist build rmdir /s /q build
 mkdir build\main build\test
 dir /s /b src\main\java\*.java > build\fuentes.txt
 "%JBIN%javac" -encoding UTF-8 -d build\main @build\fuentes.txt || goto fallo
-xcopy /e /q /y src\main\resources build\main\ >nul
+"%SystemRoot%\System32\xcopy.exe" /e /q /y /i src\main\resources build\main >nul || goto fallo
 dir /s /b src\test\java\*.java > build\pruebas.txt
 "%JBIN%javac" -encoding UTF-8 -cp build\main -d build\test @build\pruebas.txt || goto fallo
 "%JBIN%java" -Dstdout.encoding=UTF-8 -cp build\main;build\test es.amagna.asistente.Comprobaciones || goto fallo

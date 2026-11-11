@@ -79,14 +79,17 @@ public final class App {
         System.out.println(peor <= 1 ? "   BIEN: desvío máximo " + peor + " px." : "   OJO: desvío máximo " + peor + " px (revisar la escala de pantalla).");
         m.mover(e.anchoImagen() / 2, e.altoImagen() / 2);
 
-        System.out.println("2) Tecleo: abre el Bloc de notas y escribe un texto con ñ y acentos.");
-        new ProcessBuilder("notepad.exe").start();
+        System.out.println("2) Tecleo: abre un fichero NUEVO en el Bloc de notas y escribe un texto con ñ y acentos.");
+        Path prueba = Path.of("build", "prueba-tecleo.txt").toAbsolutePath(); // siempre un fichero propio y vacío, nunca otra pestaña
+        Files.createDirectories(prueba.getParent());
+        Files.writeString(prueba, "");
+        new ProcessBuilder("notepad.exe", prueba.toString()).start();
         m.esperar(2.5);
         m.escribir("Prueba del Asistente Altas 123");
         m.tecla("Return", 1);
         m.escribir("Ñandú, camión, pingüino: áéíóú ÁÉÍÓÚ ¿¡ @ # € / \\ 00000000T");
         m.tecla("Return", 1);
-        System.out.println("   Mira el Bloc de notas: tienen que salir las dos líneas exactas. Ciérralo sin guardar.");
+        System.out.println("   Mira la pestaña «prueba-tecleo.txt»: tienen que salir las dos líneas exactas. Ciérrala sin guardar.");
     }
 
     private static void guardarClave() throws IOException {
