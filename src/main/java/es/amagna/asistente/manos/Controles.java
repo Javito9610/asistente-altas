@@ -330,6 +330,27 @@ public final class Controles {
         }
     }
 
+    /** ¿Se encuentra este control ahora mismo? (no lo toca). */
+    public boolean existe(String ventana, String apodo) {
+        Encontrado f = buscar(ventana, apodo);
+        if (f.elemento() == null) {
+            return false;
+        }
+        f.elemento().close();
+        return true;
+    }
+
+    /** El valor de un control, tal cual, para compararlo; null si no lo encuentra o no tiene valor que leer. */
+    public String valorDe(String ventana, String apodo) {
+        Encontrado f = buscar(ventana, apodo);
+        if (f.elemento() == null) {
+            return null;
+        }
+        try (Uia.Elemento e = f.elemento()) {
+            return e.valor();
+        }
+    }
+
     public String leer(String ventana, String apodo) {
         Encontrado f = buscar(ventana, apodo);
         if (f.elemento() == null) {

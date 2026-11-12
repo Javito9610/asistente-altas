@@ -281,6 +281,62 @@ public final class PruebasWindows {
         ok(ctrl.esperar(mia, null, es.amagna.asistente.manos.Controles.Que.DESAPAREZCA, null, 10).startsWith("Ya está"),
                 "y se queda cerrada de verdad");
 
+        System.out.println("12) El guion: la tarea entera sin IA, comprobada dos veces y sin repetirse");
+        String vent = "prueba-guion";
+        Path dirG = Files.createTempDirectory("guion-prueba");
+        Path fMapa = dirG.resolve("mapa.json");
+        Path fGuion = dirG.resolve("guion.json");
+        String exeJava = Path.of(System.getProperty("java.home"), "bin", "java").toString().replace("\\", "\\\\");
+        String cp = System.getProperty("java.class.path").replace("\\", "\\\\");
+        Files.writeString(fMapa, """
+                {
+                  "nombre": "Ficha de prueba",
+                  "ventana": "%s",
+                  "programa": {"ejecutable": "%s", "argumentos": ["-cp", "%s", "es.amagna.asistente.VentanaDePrueba", "%s", "formulario"]},
+                  "controles": {
+                    "nif":     ["#noExisteYa", "campo junto a NIF"],
+                    "importe": ["campo junto a Importe"],
+                    "guardar": ["boton:Guardar"]
+                  }
+                }""".formatted(vent, exeJava, cp, vent), java.nio.charset.StandardCharsets.UTF_8);
+        String clave = "prueba-" + System.nanoTime();
+        Files.writeString(fGuion, """
+                {
+                  "clave": "%s",
+                  "pasos": [
+                    {"hacer": "esperar",   "control": "nif", "que": "aparezca", "segundos": 30},
+                    {"hacer": "escribir",  "control": "nif", "valor": "00000000T"},
+                    {"hacer": "escribir",  "control": "importe", "valor": "1.234,56 €"},
+                    {"hacer": "comprobar", "control": "nif", "valor": "00000000T"},
+                    {"hacer": "pulsar",    "control": "guardar", "toca": true}
+                  ]
+                }""".formatted(clave), java.nio.charset.StandardCharsets.UTF_8);
+
+        es.amagna.asistente.guion.Mapa mapa = es.amagna.asistente.guion.Mapa.leer(fMapa);
+        es.amagna.asistente.guion.Guion gui = new es.amagna.asistente.guion.Guion(ctrl, (VentanasNativas) v, mapa, l -> System.out.println("   " + l));
+        System.out.println("   " + gui.abrirSiHaceFalta());
+        ok(v.abiertas().contains(vent), "el guion abre solo el programa que dice su mapa");
+
+        // Ensayo: lo recorre entero y encuentra todo, pero no escribe nada.
+        var ensayo = gui.ejecutar(fGuion, true);
+        ok(ensayo.bien(), "ensayo: recorre el guion entero y encuentra todos los controles");
+        ok("".equals(ctrl.valorDe(vent, "campo junto a NIF")), "ensayo: y NO ha escrito nada de verdad");
+        ok(ensayo.avisos() >= 1, "ensayo: avisa de que «#noExisteYa» ya no vale y ha tirado del siguiente apodo");
+
+        // De verdad: escribe, comprueba cada paso y hace la doble lectura final.
+        var hecho = gui.ejecutar(fGuion, false);
+        ok(hecho.bien(), "el guion hace la tarea entera y la da por buena: " + hecho.resumen());
+        ok("00000000T".equals(ctrl.valorDe(vent, "campo junto a NIF"))
+                && "1.234,56 €".equals(ctrl.valorDe(vent, "campo junto a Importe")), "y los datos están escritos EXACTOS");
+        ok(hecho.lineas().stream().anyMatch(l -> l.contains("doble lectura")), "hace la comprobación final de todo lo escrito");
+
+        // Y no se repite: esto es lo que impide dar dos veces la misma alta.
+        var otra = gui.ejecutar(fGuion, false);
+        System.out.println("   al repetirlo: " + otra.resumen());
+        ok(!otra.bien() && otra.resumen().startsWith("NO SE REPITE"), "un trabajo ya hecho NO se vuelve a hacer");
+        Files.deleteIfExists(es.amagna.asistente.guion.Guion.carpetaHechos().resolve(clave + ".txt"));
+        ((VentanasNativas) v).cerrarSiEsNuestra(vent);
+
         terminar(manos, v);
     }
 

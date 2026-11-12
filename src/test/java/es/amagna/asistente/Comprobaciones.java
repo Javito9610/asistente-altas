@@ -238,6 +238,38 @@ public final class Comprobaciones {
         } catch (java.io.IOException e) {
             ok(false, "el expediente se puede escribir: " + e.getMessage());
         }
+
+        // --- El mapa del programa: varias formas de encontrar cada control ---
+        try {
+            java.nio.file.Path m = java.nio.file.Files.createTempFile("mapa", ".json");
+            java.nio.file.Files.writeString(m, """
+                    {"nombre": "Ficha MN", "ventana": "MN program",
+                     "programa": {"ejecutable": "mn.exe", "argumentos": ["/empresa", "1"]},
+                     "controles": {"nif": ["#txtNif", "campo junto a NIF"], "guardar": "boton:Guardar"}}""");
+            es.amagna.asistente.guion.Mapa mapa = es.amagna.asistente.guion.Mapa.leer(m);
+            ok(mapa.ventana().equals("MN program") && mapa.ejecutable().equals("mn.exe") && mapa.argumentos().size() == 2,
+                    "el mapa dice en qué ventana está el programa y con qué se abre");
+            ok(mapa.apodos("nif").equals(List.of("#txtNif", "campo junto a NIF")),
+                    "cada control lleva sus formas de encontrarlo, por orden de preferencia");
+            ok(mapa.apodos("guardar").equals(List.of("boton:Guardar")), "y también vale poner una sola");
+            try {
+                mapa.apodos("telefono");
+                ok(false, "pedir un control que no está en el mapa avisa");
+            } catch (IllegalArgumentException e) {
+                ok(e.getMessage().contains("nif") && e.getMessage().contains("guardar"),
+                        "pedir un control que no está en el mapa dice cuáles hay");
+            }
+            java.nio.file.Path malo = java.nio.file.Files.createTempFile("mapa-malo", ".json");
+            java.nio.file.Files.writeString(malo, "{\"controles\": {\"a\": [\"b\"]}}");
+            try {
+                es.amagna.asistente.guion.Mapa.leer(malo);
+                ok(false, "un mapa sin ventana se rechaza");
+            } catch (IllegalArgumentException e) {
+                ok(e.getMessage().contains("ventana"), "un mapa sin ventana se rechaza diciendo qué le falta");
+            }
+        } catch (java.io.IOException e) {
+            ok(false, "se puede leer un mapa: " + e.getMessage());
+        }
     }
 
     static int ids = 0;

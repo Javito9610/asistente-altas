@@ -44,6 +44,7 @@ public final class App {
                 case "controles" -> controles(Arrays.asList(args).subList(1, args.length));
                 case "probar-windows" -> PruebasWindows.main(new String[0]);
                 case "agente" -> agente(Arrays.asList(args).subList(1, args.length));
+                case "guion" -> guion(Arrays.asList(args).subList(1, args.length));
                 default -> System.out.println("""
                         Asistente Altas (pruebas)
                           asistente mirar
@@ -54,6 +55,9 @@ public final class App {
                           asistente controles "<ventana>" [--hondo N]   (los controles por dentro, sin IA)
                           asistente probar-windows      (pruebas de manos y ventanas en el Bloc de notas, sin IA)
                           asistente agente "tarea" [--vista] [--pasos 20] [--tope-tokens 200000] [--modelo claude-sonnet-5-5] [--sin-expediente]
+                          asistente guion <mapa.json> <guion.json> [--ensayo] [--abrir]
+                                                        (hace la tarea sin IA, siempre igual y comprobándola;
+                                                         --ensayo = lo recorre entero sin tocar nada)
                         Freno de emergencia: ratón a la esquina superior izquierda.""");
             }
         } catch (FrenoDeEmergencia e) {
@@ -173,6 +177,23 @@ public final class App {
             registro.accept("Expediente (lo que hizo, con capturas): " + ag.expediente().carpeta().resolve("informe.html"));
         }
         System.exit(r.terminado() ? 0 : 1);
+    }
+
+    /** El guion: hacer una tarea de forma determinista con el mapa del programa, sin gastar un token. */
+    private static void guion(List<String> a) throws IOException {
+        if (a.size() < 2) {
+            throw new IllegalArgumentException("Uso: asistente guion <mapa.json> <guion.json> [--ensayo] [--abrir]");
+        }
+        boolean ensayo = a.contains("--ensayo");
+        es.amagna.asistente.guion.Mapa mapa = es.amagna.asistente.guion.Mapa.leer(Path.of(a.get(0)));
+        VentanasNativas ventanas = new VentanasNativas(false);
+        var guion = new es.amagna.asistente.guion.Guion(new Controles(ventanas), ventanas, mapa, System.out::println);
+        System.out.println("Mapa: " + mapa.nombre() + " · ventana «" + mapa.ventana() + "»" + (ensayo ? "   [ENSAYO: no se toca nada]" : ""));
+        if (a.contains("--abrir")) {
+            System.out.println(guion.abrirSiHaceFalta());
+        }
+        var parte = guion.ejecutar(Path.of(a.get(1)), ensayo);
+        System.exit(parte.bien() ? 0 : 1);
     }
 
     static String instrucciones(String nombre) throws IOException {
