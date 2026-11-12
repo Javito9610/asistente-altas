@@ -96,6 +96,7 @@ public final class Guion {
 
         // Lo escrito se apunta para la doble lectura del final.
         Map<String, String[]> escrito = new LinkedHashMap<>(); // control -> {apodo que funcionó, valor}
+        java.util.Set<String> yaAvisado = new java.util.HashSet<>();
         int hechos = 0;
 
         for (Object o : pasos) {
@@ -117,7 +118,7 @@ public final class Guion {
                 return parte(false, "PARADO en «" + hacer + " " + control + "»: " + f.getMessage(), lineas, hechos, avisos, clave, ensayo);
             }
             List<String> todos = mapa.apodos(control);
-            if (!apodo.equals(todos.get(0))) {
+            if (!apodo.equals(todos.get(0)) && yaAvisado.add(control)) {
                 avisos++;
                 lineas.add("AVISO  «" + control + "»: «" + todos.get(0) + "» ya no vale; ha funcionado «" + apodo
                         + "». Conviene actualizar el mapa.");
@@ -168,6 +169,12 @@ public final class Guion {
                     }
                 }
                 case "comprobar" -> {
+                    if (ensayo) {
+                        lineas.add("ENSAYO comprobar " + control + " (" + apodo + "): encontrado; su valor no se mira, "
+                                + "porque en ensayo no se ha escrito nada");
+                        hechos++;
+                        continue;
+                    }
                     String hay = controles.valorDe(mapa.ventana(), apodo);
                     if (valor != null && !valor.equals(hay)) {
                         lineas.add("FALLA  comprobar " + control + ": se esperaba «" + valor + "» y hay «" + hay + "»");
