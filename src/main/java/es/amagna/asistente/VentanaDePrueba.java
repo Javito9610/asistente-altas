@@ -35,7 +35,7 @@ public final class VentanaDePrueba {
                 }
             });
             d.setVisible(true); // bloquea aquí hasta que se cierre
-            Thread.sleep(700);
+            Thread.sleep(1500);
         }
         f.dispose();
         System.exit(0);

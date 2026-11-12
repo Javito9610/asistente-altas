@@ -61,6 +61,46 @@ public final class VentanasNativas implements Ventanas {
                 .map(c -> Path.of(c).getFileName().toString().replaceFirst("(?i)\\.exe$", "")).orElse("pid " + pid);
     }
 
+    /**
+     * Qué ventana está bloqueando a esta: la que le pertenece (su diálogo), o si no, cualquier otra ventana suelta de
+     * su mismo programa que sí responda. De la más reciente a la más antigua: si hay varios diálogos encadenados, el
+     * que bloquea es el último.
+     */
+    private static Pointer culpableDe(Pointer presa) {
+        long pid = Win32.pid(presa);
+        List<Pointer> candidatas = new ArrayList<>();
+        for (Pointer d : visibles()) {
+            if (!d.equals(presa) && !bloqueada(d) && Win32.pid(d) == pid) {
+                candidatas.add(d);
+            }
+        }
+        for (Pointer d : candidatas) { // primero, una que sea suya de verdad
+            if (presa.equals(Win32.User32.I.GetAncestor(d, Win32.GA_ROOTOWNER))) {
+                return d;
+            }
+        }
+        for (Pointer d : candidatas) { // si no, un diálogo estándar del mismo programa
+            if ("#32770".equals(Win32.clase(d))) {
+                return d;
+            }
+        }
+        return candidatas.isEmpty() ? null : candidatas.get(0);
+    }
+
+    /** Cancela una ventana de diálogo: IDCANCEL si es un diálogo estándar de Windows y, si no se va, su aspa. */
+    private static String cancelar(Pointer d) {
+        String t = Win32.titulo(d);
+        if ("#32770".equals(Win32.clase(d))) {
+            Win32.mandar(d, Win32.WM_COMMAND, Win32.IDCANCEL, 0);
+            if (esperarCierre(d)) {
+                return t;
+            }
+        }
+        Win32.cerrar(d);
+        esperarCierre(d);
+        return t;
+    }
+
     /** Los diálogos visibles: ventanas propiedad de otra o de la clase estándar de diálogo. */
     static List<Pointer> dialogos() {
         List<Pointer> r = new ArrayList<>();
@@ -166,26 +206,12 @@ public final class VentanasNativas implements Ventanas {
             if (presa == null) {
                 return hecho;
             }
-            long pid = Win32.pid(presa);
-            Pointer culpable = null;
-            for (Pointer d : visibles()) { // el diálogo: del mismo programa, no bloqueado y distinto de la presa
-                if (Win32.pid(d) == pid && !d.equals(presa) && !bloqueada(d)
-                        && ("#32770".equals(Win32.clase(d)) || !presa.equals(Win32.User32.I.GetAncestor(d, Win32.GA_ROOTOWNER)))) {
-                    culpable = d;
-                    break;
-                }
-            }
+            Pointer culpable = culpableDe(presa);
             if (culpable == null) {
                 hecho.add("hay una ventana bloqueada («" + Win32.titulo(presa) + "») pero no se ve qué diálogo la bloquea");
                 return hecho;
             }
-            String t = Win32.titulo(culpable);
-            Win32.mandar(culpable, Win32.WM_COMMAND, Win32.IDCANCEL, 0);
-            if (!esperarCierre(culpable)) {
-                Win32.cerrar(culpable);
-                esperarCierre(culpable);
-            }
-            hecho.add("«" + t + "»");
+            hecho.add("«" + cancelar(culpable) + "»");
         }
         return hecho;
     }
@@ -224,14 +250,7 @@ public final class VentanasNativas implements Ventanas {
         if (d == null) {
             return null;
         }
-        String t = Win32.titulo(d);
-        Win32.mandar(d, Win32.WM_COMMAND, Win32.IDCANCEL, 0);
-        if (esperarCierre(d)) {
-            return t;
-        }
-        Win32.cerrar(d);
-        esperarCierre(d);
-        return t;
+        return cancelar(d);
     }
 
     @Override
