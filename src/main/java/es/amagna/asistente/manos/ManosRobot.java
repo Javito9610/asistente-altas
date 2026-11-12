@@ -384,6 +384,7 @@ public final class ManosRobot implements Manos {
         List<Integer> teclas = Teclas.combinacion(combinacion);
         for (int r = 0; r < Math.max(1, repeticiones); r++) {
             teclas.forEach(robot::keyPress);
+            robot.delay(TecladoNativo.MS_MANTENER); // mantener la combinación, como una persona (ver TecladoNativo)
             for (int k = teclas.size() - 1; k >= 0; k--) {
                 robot.keyRelease(teclas.get(k));
             }

@@ -121,6 +121,21 @@ public final class VentanasNativas implements Ventanas {
         return b.toString().strip();
     }
 
+    /** Para diagnosticar: todas las ventanas visibles, sin agrupar, con su clase, programa y dueña. */
+    public static String diagnostico() {
+        StringBuilder b = new StringBuilder();
+        Pointer delante = Win32.User32.I.GetForegroundWindow();
+        b.append("   delante: «").append(delante == null ? "" : Win32.titulo(delante)).append("» clase ").append(delante == null ? "" : Win32.clase(delante))
+                .append(" (").append(delante == null ? "" : programa(delante)).append(")\n");
+        for (Pointer h : visibles()) {
+            Pointer dueno = Win32.User32.I.GetAncestor(h, Win32.GA_ROOTOWNER);
+            b.append("   · «").append(Win32.titulo(h)).append("» clase ").append(Win32.clase(h)).append(" (").append(programa(h)).append(", pid ")
+                    .append(Win32.pid(h)).append(")").append(dueno != null && !dueno.equals(h) ? " dueña «" + Win32.titulo(dueno) + "» clase " + Win32.clase(dueno) : "")
+                    .append('\n');
+        }
+        return b.toString();
+    }
+
     @Override
     public String activa() {
         Pointer h = Win32.User32.I.GetForegroundWindow();

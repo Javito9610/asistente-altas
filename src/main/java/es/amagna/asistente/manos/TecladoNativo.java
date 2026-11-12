@@ -73,22 +73,40 @@ public final class TecladoNativo {
         throw new IllegalArgumentException("Tecla desconocida: «" + nombre + "»");
     }
 
-    /** Pulsa la combinación (en orden) y la suelta (al revés), en una sola entrada a Windows para que no se cuele nada en medio. */
+    /** Cuánto se mantiene pulsada la combinación. Las aplicaciones modernas miran si Ctrl sigue pulsado cuando procesan la
+     *  tecla: si todo se pulsa y se suelta de golpe, ven la «O» sin Ctrl y el atajo no salta (como si una persona soltara
+     *  Ctrl antes de tiempo). */
+    static final int MS_MANTENER = 120;
+    static final int MS_ENTRE_TECLAS = 30;
+
+    /** Pulsa la combinación tecla a tecla (en orden), la mantiene un momento y la suelta (al revés), como una persona. */
     public static void pulsar(List<Integer> vks, Modo modo) {
-        int n = vks.size() * 2;
-        int tam = Native.POINTER_SIZE == 8 ? 40 : 28;
-        Memory m = new Memory((long) n * tam);
-        m.clear();
-        int i = 0;
         for (int vk : vks) {
-            escribir(m, i++ * tam, vk, false, modo);
+            enviar(vk, false, modo);
+            dormir(MS_ENTRE_TECLAS);
         }
+        dormir(MS_MANTENER);
         for (int k = vks.size() - 1; k >= 0; k--) {
-            escribir(m, i++ * tam, vks.get(k), true, modo);
+            enviar(vks.get(k), true, modo);
+            dormir(MS_ENTRE_TECLAS);
         }
-        int enviados = Win32.User32.I.SendInput(n, m, tam);
-        if (enviados != n) {
-            throw new IllegalStateException("Windows no ha aceptado las teclas (" + enviados + " de " + n + ")");
+    }
+
+    private static void enviar(int vk, boolean soltar, Modo modo) {
+        int tam = Native.POINTER_SIZE == 8 ? 40 : 28;
+        Memory m = new Memory(tam);
+        m.clear();
+        escribir(m, 0, vk, soltar, modo);
+        if (Win32.User32.I.SendInput(1, m, tam) != 1) {
+            throw new IllegalStateException("Windows no ha aceptado la tecla (otro programa con más permisos tiene el foco)");
+        }
+    }
+
+    private static void dormir(long ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 

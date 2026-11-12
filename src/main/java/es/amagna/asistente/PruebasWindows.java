@@ -62,6 +62,9 @@ public final class PruebasWindows {
             boolean abre = esperar(() -> hayDialogo(v.abiertas(), clave), 5_000);
             System.out.println("   teclado " + modo + ": " + (abre ? "abre el diálogo" : "no abre nada"));
             if (!abre) {
+                System.out.print(VentanasNativas.diagnostico()); // para saber qué ha pasado si no se ve ningún diálogo
+                manos.tecla("Escape", 1); // por si se abrió algo que no se reconoce
+                manos.esperar(1);
                 continue;
             }
             System.out.println("   " + lineaDe(v.abiertas(), clave));
