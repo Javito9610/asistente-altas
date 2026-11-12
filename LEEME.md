@@ -5,6 +5,19 @@ persona (capturas, ratón y teclado), con Claude como cerebro por la API. Sustit
 MN, que se descartó (respuesta de MN del 10/11/2026). Autorizado por Miguel.
 
 ## Cómo está hecho
+
+El asistente tiene **dos formas de ver y de actuar**, y usa siempre la mejor que haya:
+
+| | Por dentro (lo primero) | Por fuera (cuando no llega lo de dentro) |
+|---|---|---|
+| Ver | los controles del programa: nombre, tipo, valor exacto, activo o no | la captura de pantalla |
+| Actuar | escribir el valor exacto en un campo y pulsar un botón por su nombre | teclado y ratón, como una persona |
+| Falla si | el programa no se deja leer por dentro | nunca, pero es menos exacto |
+
+- **Controles** (`manos/Uia`, `manos/Controles`): UI Automation, lo que usan los lectores de pantalla y las herramientas
+  profesionales de automatización. Llamadas directas a Windows desde Java. Ver el árbol de controles, leer el valor
+  exacto de uno, escribirlo sin teclear (y releerlo para comprobarlo) y pulsarlo por su nombre, sin coordenadas. Si un
+  nombre vale para varios controles, no toca ninguno y lo dice.
 - **Manos** (`manos/`): capturas, clics, tecleo. No deciden nada. Precisión: capturas a resolución real reducidas a 1280×720,
   traducción exacta de coordenadas aunque Windows esté al 125 % o 150 % (`Escala`), texto con ñ y acentos por el portapapeles.
 - **Cerebro** (`cerebro/`): el bucle del agente con la API de Claude y la herramienta de ordenador `computer_toolset_20260801`.
