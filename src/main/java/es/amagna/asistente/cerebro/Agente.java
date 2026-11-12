@@ -3,6 +3,9 @@ package es.amagna.asistente.cerebro;
 import es.amagna.asistente.Json;
 import es.amagna.asistente.manos.FrenoDeEmergencia;
 import es.amagna.asistente.manos.Manos;
+import es.amagna.asistente.manos.Ventanas;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
@@ -20,6 +23,12 @@ import java.util.function.Consumer;
  * Para gastar poco: las instrucciones van en caché y, cuando hay más de 6 capturas, las viejas se sustituyen por un
  * texto («captura antigua») y se dejan las 3 últimas. Al cambiar así el principio de la conversación, los bloques de
  * pensamiento de Claude de después ya no valen (la API los ata a lo que había antes): se quitan, como pide la API.
+ *
+ * Además de la herramienta de ordenador, tres herramientas propias para las ventanas (abrir_programa, activar_ventana,
+ * ventana_activa): el teclado tiene que ir a la ventana que toca.
+ *
+ * Para no gastar en balde: si la pantalla sale idéntica 3 capturas seguidas, se le avisa a Claude de que lo que hace no
+ * surte efecto; a la 5.ª, se para solo. Y hay un tope de gasto en tokens por tarea.
  *
  * El resultado final: Claude acaba con «TERMINADO: …» o «PARADO: …» (lo piden las instrucciones).
  */
@@ -39,14 +48,52 @@ public final class Agente {
     private final String instrucciones;
     private final int pasosMax;
     private final Consumer<String> registro;
+    private final Ventanas ventanas;
+    private final long topeTokens;
+
+    public static final long TOPE_TOKENS_POR_DEFECTO = 200_000;
+    static final int AVISO_SIN_CAMBIOS = 3;
+    static final int PARADA_SIN_CAMBIOS = 5;
 
     public Agente(Cerebro cerebro, Manos manos, String modelo, String instrucciones, int pasosMax, Consumer<String> registro) {
+        this(cerebro, manos, null, modelo, instrucciones, pasosMax, TOPE_TOKENS_POR_DEFECTO, registro);
+    }
+
+    /**
+     * @param topeTokens  gasto máximo por tarea: tokens de entrada + salida + una décima parte de los leídos de caché
+     *                    (que se cobran mucho más baratos). Al pasarlo, se para.
+     */
+    public Agente(Cerebro cerebro, Manos manos, Ventanas ventanas, String modelo, String instrucciones, int pasosMax, long topeTokens,
+            Consumer<String> registro) {
         this.cerebro = cerebro;
         this.manos = manos;
+        this.ventanas = ventanas;
         this.modelo = modelo;
         this.instrucciones = instrucciones;
         this.pasosMax = pasosMax;
+        this.topeTokens = topeTokens;
         this.registro = registro;
+    }
+
+    private List<Object> herramientas() {
+        List<Object> h = new ArrayList<>();
+        if (ventanas != null) {
+            h.add(Json.obj("name", "abrir_programa", "description",
+                    "Abre un programa de Windows directamente (más fiable que buscarlo en el menú Inicio). Ejemplo: programa «notepad.exe».",
+                    "input_schema", Json.obj("type", "object", "properties", Json.obj(
+                            "programa", Json.obj("type", "string", "description", "Ruta o nombre del ejecutable"),
+                            "argumentos", Json.obj("type", "array", "items", Json.obj("type", "string"))), "required", List.of("programa"))));
+            h.add(Json.obj("name", "activar_ventana", "description",
+                    "Pone delante (con el foco del teclado) la ventana cuyo título contiene el texto dado. Devuelve si lo ha conseguido.",
+                    "input_schema", Json.obj("type", "object", "properties", Json.obj(
+                            "titulo", Json.obj("type", "string", "description", "Parte del título de la ventana")), "required", List.of("titulo"))));
+            h.add(Json.obj("name", "ventana_activa", "description",
+                    "Dice el título de la ventana que tiene el foco del teclado (adonde irá lo que escribas o las teclas que pulses).",
+                    "input_schema", Json.obj("type", "object", "properties", Json.obj())));
+        }
+        // La herramienta de ordenador va la última: el cache_control cubre todas las herramientas.
+        h.add(Json.obj("type", HERRAMIENTA, "configs", Json.obj("zoom", Json.obj("enabled", true)), "cache_control", Json.obj("type", "ephemeral")));
+        return h;
     }
 
     @SuppressWarnings("unchecked")
@@ -54,6 +101,8 @@ public final class Agente {
         List<Object> mensajes = new ArrayList<>();
         mensajes.add(Json.obj("role", "user", "content", tarea));
         long ent = 0, sal = 0, cache = 0;
+        String huellaAnterior = null;
+        int iguales = 1;
         for (int paso = 1; paso <= pasosMax; paso++) {
             int cambiado = recortarCapturas(mensajes);
             if (cambiado >= 0) {
@@ -63,13 +112,14 @@ public final class Agente {
                     "model", modelo,
                     "max_tokens", 4096,
                     "system", List.of(Json.obj("type", "text", "text", instrucciones, "cache_control", Json.obj("type", "ephemeral"))),
-                    "tools", List.of(Json.obj("type", HERRAMIENTA, "configs", Json.obj("zoom", Json.obj("enabled", true)), "cache_control", Json.obj("type", "ephemeral"))),
+                    "tools", herramientas(),
                     "messages", mensajes);
             Map<String, Object> r = cerebro.pensar(peticion);
             Map<String, Object> uso = (Map<String, Object>) r.getOrDefault("usage", Map.of());
             ent += num(uso.get("input_tokens"));
             sal += num(uso.get("output_tokens"));
             cache += num(uso.get("cache_read_input_tokens"));
+            long gasto = ent + sal + cache / 10;
             List<Object> contenido = (List<Object>) r.getOrDefault("content", List.of());
             mensajes.add(Json.obj("role", "assistant", "content", contenido));
 
@@ -84,26 +134,50 @@ public final class Agente {
                 } else if ("tool_use".equals(b.get("type"))) {
                     String id = (String) b.get("id");
                     String accion = (String) b.get("name");
+                    boolean ordenador = "computer".equals(b.get("toolset_name"));
                     Map<String, Object> in = (Map<String, Object>) b.getOrDefault("input", Map.of());
                     if (fallo) {
-                        resultados.add(resultado(id, List.of(textoBloque("Not executed: an earlier computer action in this turn failed.")), true));
+                        resultados.add(resultado(id, List.of(textoBloque("Not executed: an earlier computer action in this turn failed.")), true, ordenador));
                         continue;
                     }
                     registro.accept("  paso " + paso + " · " + accion + (in.isEmpty() ? "" : " " + resumen(in)));
                     try {
-                        resultados.add(resultado(id, ejecutarAccion(accion, in), false));
+                        List<Object> salida = ordenador ? ejecutarAccion(accion, in) : ejecutarPropia(accion, in);
+                        if (ordenador && ("screenshot".equals(accion))) {
+                            String huella = huella(salida);
+                            iguales = huella.equals(huellaAnterior) ? iguales + 1 : 1;
+                            huellaAnterior = huella;
+                            if (iguales >= PARADA_SIN_CAMBIOS) {
+                                registro.accept("    sin avances: " + iguales + " capturas idénticas seguidas");
+                                return new Resultado(false, "PARADO: sin avances. La pantalla ha salido idéntica en " + iguales
+                                        + " capturas seguidas: lo que se intentaba no surtía efecto. Se ha parado para no gastar en balde.",
+                                        paso, ent, sal, cache);
+                            }
+                            if (iguales >= AVISO_SIN_CAMBIOS) {
+                                salida = new ArrayList<>(salida);
+                                salida.add(textoBloque("AVISO del programa: la pantalla es idéntica en las " + iguales + " últimas capturas: "
+                                        + "lo que estás haciendo no surte efecto. No lo repitas igual: comprueba con ventana_activa adónde va el "
+                                        + "teclado, cambia de forma de hacerlo o termina con PARADO."));
+                                registro.accept("    aviso: " + iguales + " capturas idénticas seguidas");
+                            }
+                        }
+                        resultados.add(resultado(id, salida, false, ordenador));
                     } catch (FrenoDeEmergencia e) {
                         throw e;
                     } catch (RuntimeException e) {
                         fallo = true;
                         registro.accept("    error: " + e.getMessage());
-                        resultados.add(resultado(id, List.of(textoBloque("Error: " + e.getMessage())), true));
+                        resultados.add(resultado(id, List.of(textoBloque("Error: " + e.getMessage())), true, ordenador));
                     }
                 }
             }
             if (resultados.isEmpty()) { // sin acciones: ha terminado
                 String t = texto.toString().strip();
                 return new Resultado(t.startsWith("TERMINADO"), t.isEmpty() ? "(sin mensaje final)" : t, paso, ent, sal, cache);
+            }
+            if (gasto > topeTokens) {
+                return new Resultado(false, "PARADO: se ha llegado al tope de gasto de la tarea (" + gasto + " de " + topeTokens
+                        + " tokens) sin terminar.", paso, ent, sal, cache);
             }
             mensajes.add(Json.obj("role", "user", "content", resultados));
         }
@@ -154,8 +228,53 @@ public final class Agente {
         return List.of(textoBloque("OK"));
     }
 
-    private static Map<String, Object> resultado(String id, List<Object> contenido, boolean error) {
-        Map<String, Object> m = Json.obj("type", "tool_result", "tool_use_id", id, "toolset_name", "computer", "content", contenido);
+    /** Herramientas propias (ventanas). */
+    List<Object> ejecutarPropia(String accion, Map<String, Object> in) {
+        if (ventanas == null) {
+            throw new IllegalArgumentException("Herramienta no disponible: " + accion);
+        }
+        switch (accion) {
+            case "abrir_programa": {
+                List<String> args = new ArrayList<>();
+                if (in.get("argumentos") instanceof List<?> l) {
+                    l.forEach(a -> args.add(String.valueOf(a)));
+                }
+                ventanas.abrir((String) in.get("programa"), args);
+                return List.of(textoBloque("Abierto. Espera un momento y haz una captura para comprobarlo."));
+            }
+            case "activar_ventana": {
+                boolean ok = ventanas.activar((String) in.get("titulo"));
+                return List.of(textoBloque(ok ? "Hecho: la ventana está delante. Ventana activa: " + ventanas.activa()
+                        : "No se ha encontrado ninguna ventana con ese título."));
+            }
+            case "ventana_activa":
+                return List.of(textoBloque("Ventana activa: «" + ventanas.activa() + "»"));
+            default:
+                throw new IllegalArgumentException("Herramienta desconocida: " + accion);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static String huella(List<Object> salida) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            for (Object o : salida) {
+                Object src = ((Map<String, Object>) o).get("source");
+                if (src instanceof Map<?, ?> m) {
+                    md.update(String.valueOf(m.get("data")).getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+                }
+            }
+            return java.util.HexFormat.of().formatHex(md.digest());
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static Map<String, Object> resultado(String id, List<Object> contenido, boolean error, boolean ordenador) {
+        Map<String, Object> m = Json.obj("type", "tool_result", "tool_use_id", id, "content", contenido);
+        if (ordenador) {
+            m.put("toolset_name", "computer");
+        }
         if (error) {
             m.put("is_error", true);
         }

@@ -5,6 +5,7 @@ import es.amagna.asistente.cerebro.ClaudeApi;
 import es.amagna.asistente.manos.Escala;
 import es.amagna.asistente.manos.FrenoDeEmergencia;
 import es.amagna.asistente.manos.ManosRobot;
+import es.amagna.asistente.manos.VentanasWindows;
 import java.io.Console;
 import java.io.IOException;
 import java.io.InputStream;
@@ -41,7 +42,7 @@ public final class App {
                           asistente mirar
                           asistente probar-manos
                           asistente guardar-clave
-                          asistente agente "tarea" [--vista] [--pasos 40] [--modelo claude-sonnet-5-5]
+                          asistente agente "tarea" [--vista] [--pasos 20] [--tope-tokens 200000] [--modelo claude-sonnet-5-5]
                         Freno de emergencia: ratón a la esquina superior izquierda.""");
             }
         } catch (FrenoDeEmergencia e) {
@@ -112,8 +113,9 @@ public final class App {
         }
         String tarea = a.get(0);
         boolean vista = a.contains("--vista");
-        int pasos = a.contains("--pasos") ? Integer.parseInt(a.get(a.indexOf("--pasos") + 1)) : 40;
+        int pasos = a.contains("--pasos") ? Integer.parseInt(a.get(a.indexOf("--pasos") + 1)) : 20;
         String modelo = a.contains("--modelo") ? a.get(a.indexOf("--modelo") + 1) : MODELO_POR_DEFECTO;
+        long tope = a.contains("--tope-tokens") ? Long.parseLong(a.get(a.indexOf("--tope-tokens") + 1)) : Agente.TOPE_TOKENS_POR_DEFECTO;
 
         Path dir = Path.of("registros");
         Files.createDirectories(dir);
@@ -126,9 +128,9 @@ public final class App {
                 // el registro no debe parar al agente
             }
         };
-        registro.accept("Tarea: " + tarea + (vista ? "   [MODO VISTA: no toca nada]" : "") + "   · modelo " + modelo + " · tope " + pasos + " pasos");
+        registro.accept("Tarea: " + tarea + (vista ? "   [MODO VISTA: no toca nada]" : "") + "   · modelo " + modelo + " · tope " + pasos + " pasos y " + tope + " tokens");
         long t0 = System.currentTimeMillis();
-        Agente ag = new Agente(new ClaudeApi(Clave.leer()), new ManosRobot(vista), modelo, instrucciones("base"), pasos, registro);
+        Agente ag = new Agente(new ClaudeApi(Clave.leer()), new ManosRobot(vista), new VentanasWindows(vista), modelo, instrucciones("base"), pasos, tope, registro);
         Agente.Resultado r = ag.ejecutar(tarea);
         registro.accept("");
         registro.accept(r.mensaje());

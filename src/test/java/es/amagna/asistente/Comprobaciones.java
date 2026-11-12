@@ -88,7 +88,7 @@ public final class Comprobaciones {
         List<String> hecho = new ArrayList<>();
         Manos manos = new Manos() {
             final Escala e = Escala.para(1280, 720);
-            public byte[] captura() { hecho.add("captura"); return new byte[] {1, 2, 3}; }
+            public byte[] captura() { hecho.add("captura"); return new byte[] {1, 2, (byte) hecho.size()}; } // cada captura distinta
             public byte[] zoom(int a, int b, int c, int d) { hecho.add("zoom"); return new byte[] {4}; }
             public Escala escala() { return e; }
             public void mover(int x, int y) { hecho.add("mover"); }
@@ -139,14 +139,68 @@ public final class Comprobaciones {
         int despues = Json.escribir(peticiones.get(9)).split("\"type\":\"thinking\"", -1).length - 1;
         ok(antes == 8 && despues == 1, "al recortar, se quitan los pensamientos posteriores al corte y se conserva el anterior (" + antes + " → " + despues + ")");
         Map<String, Object> sinFin = respuesta(uso("screenshot", Map.of()));
-        Agente.Resultado tope = new Agente(p -> sinFin, manos, "m", "i", 3, s -> { }).ejecutar("bucle");
-        ok(!tope.terminado() && tope.mensaje().startsWith("PARADO"), "con el tope de pasos, se para");
+        Agente.Resultado tope = new Agente(p -> respuesta(uso("screenshot", Map.of())), manos, "m", "i", 3, s -> { }).ejecutar("bucle");
+        ok(!tope.terminado() && tope.mensaje().startsWith("PARADO") && tope.mensaje().contains("tope de 3 pasos"), "con el tope de pasos, se para");
+
+        // Atascado: la pantalla no cambia → aviso a la 3.ª captura igual y parada a la 5.ª (sin seguir gastando).
+        Manos quietas = new Manos() {
+            public byte[] captura() { return new byte[] {9, 9, 9}; }
+            public byte[] zoom(int a, int b, int c, int d) { return new byte[] {9}; }
+            public Escala escala() { return Escala.para(1280, 720); }
+            public void mover(int x, int y) { }
+            public void clic(Integer x, Integer y, int b, int v, String m) { }
+            public void arrastrar(int a, int b, int c, int d, String m) { }
+            public void bajarBotonIzquierdo() { }
+            public void subirBotonIzquierdo() { }
+            public void escribir(String t) { }
+            public void tecla(String c, int r) { }
+            public void mantenerTecla(String c, double s) { }
+            public void rueda(String d, int n, Integer x, Integer y, String m) { }
+            public void esperar(double s) { }
+            public int[] posicion() { return new int[] {0, 0}; }
+        };
+        List<Map<String, Object>> vistas = new ArrayList<>();
+        Agente.Resultado atasco = new Agente(p -> {
+            vistas.add((Map<String, Object>) Json.leer(Json.escribir(p)));
+            return respuesta(uso("key", Map.of("text", "ctrl+n")), uso("screenshot", Map.of()));
+        }, quietas, "m", "i", 20, s -> { }).ejecutar("atasco");
+        ok(!atasco.terminado() && atasco.mensaje().contains("sin avances") && atasco.pasos() == 5, "atascado: se para solo a la 5.ª captura idéntica (paso " + atasco.pasos() + ")");
+        ok(Json.escribir(vistas.get(3)).contains("AVISO del programa") && !Json.escribir(vistas.get(2)).contains("AVISO del programa"),
+                "atascado: a la 3.ª captura idéntica se avisa a Claude");
+
+        // Tope de gasto.
+        Agente.Resultado caro = new Agente(p -> respuesta(uso("screenshot", Map.of())), manos, null, "m", "i", 50, 250, s -> { }).ejecutar("caro");
+        ok(!caro.terminado() && caro.mensaje().contains("tope de gasto") && caro.pasos() == 3, "con el tope de gasto, se para (paso " + caro.pasos() + ")");
+
+        // Herramientas propias de ventanas.
+        List<String> vent = new ArrayList<>();
+        es.amagna.asistente.manos.Ventanas v = new es.amagna.asistente.manos.Ventanas() {
+            public void abrir(String p, List<String> a) { vent.add("abrir " + p + a); }
+            public boolean activar(String t) { vent.add("activar " + t); return true; }
+            public String activa() { return "Sin título: Bloc de notas"; }
+        };
+        List<Map<String, Object>> conV = new ArrayList<>();
+        List<Map<String, Object>> guionV = new ArrayList<>(List.of(
+                respuesta(propia("abrir_programa", Map.of("programa", "notepad.exe")), propia("activar_ventana", Map.of("titulo", "Bloc de notas"))),
+                respuesta(propia("ventana_activa", Map.of())),
+                respuesta(texto("TERMINADO: ok"))));
+        new Agente(p -> { conV.add((Map<String, Object>) Json.leer(Json.escribir(p))); return guionV.remove(0); }, manos, v, "m", "i", 10, 100_000, s -> { }).ejecutar("ventanas");
+        ok(vent.equals(List.of("abrir notepad.exe[]", "activar Bloc de notas")), "abrir_programa y activar_ventana llegan a Windows");
+        String pet = Json.escribir(conV.get(2));
+        ok(pet.contains("Ventana activa: «Sin título: Bloc de notas»") && !Json.escribir(conV.get(1)).contains("\"toolset_name\":\"computer\",\"content\":[{\"type\":\"text\",\"text\":\"Abierto"),
+                "ventana_activa responde; las herramientas propias no llevan toolset_name");
+        List<Object> tools = (List<Object>) conV.get(0).get("tools");
+        ok(tools.size() == 4 && Agente.HERRAMIENTA.equals(((Map<String, Object>) tools.get(3)).get("type")), "con ventanas: 3 herramientas propias + la de ordenador");
     }
 
     static int ids = 0;
 
     static Map<String, Object> uso(String accion, Map<String, Object> in) {
         return Json.obj("type", "tool_use", "id", "toolu_" + (ids++), "name", accion, "toolset_name", "computer", "input", new java.util.LinkedHashMap<>(in));
+    }
+
+    static Map<String, Object> propia(String nombre, Map<String, Object> in) {
+        return Json.obj("type", "tool_use", "id", "toolu_" + (ids++), "name", nombre, "input", new java.util.LinkedHashMap<>(in));
     }
 
     static Map<String, Object> pensar() {
