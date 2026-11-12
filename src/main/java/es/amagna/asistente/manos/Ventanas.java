@@ -36,6 +36,14 @@ public interface Ventanas {
         throw new UnsupportedOperationException("No disponible");
     }
 
+    /**
+     * Cancela los diálogos que estén bloqueando alguna ventana, los encuentre por título o no. Devuelve lo que ha
+     * cancelado. Es lo que hay que llamar cuando una ventana no responde a los atajos.
+     */
+    default java.util.List<String> cancelarBloqueos() {
+        throw new UnsupportedOperationException("No disponible");
+    }
+
     /** Cierra una ventana por su título (como su aspa). Devuelve el título de la que ha cerrado, o null. */
     default String cerrarVentana(String titulo) {
         throw new UnsupportedOperationException("No disponible");

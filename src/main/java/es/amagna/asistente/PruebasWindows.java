@@ -61,7 +61,7 @@ public final class PruebasWindows {
         // Un atajo del propio programa (no del cuadro de texto) cuyo efecto se puede leer EXACTO: F5 escribe la fecha y
         // la hora. Sin diálogos ni esperas, así que dice sin lugar a dudas si las teclas de aplicación llegan.
         System.out.println("4) Teclas de aplicación: F5 escribe la fecha y la hora (se prueba cada forma de mandar teclas)");
-        quitarEstorbos(manos, v);
+        v.cancelarBloqueos(); // si una prueba anterior dejó un diálogo abierto, bloquea los atajos de todo el programa
         ManosRobot.Teclado funciona = null;
         for (ManosRobot.Teclado modo : List.of(ManosRobot.Teclado.VK, ManosRobot.Teclado.SCAN, ManosRobot.Teclado.ROBOT)) {
             v.activar(clave);
@@ -89,34 +89,49 @@ public final class PruebasWindows {
         Files.writeString(ManosRobot.ficheroTeclado(), funciona.name());
         System.out.println("   guardado: este PC usa el teclado " + funciona + " (" + ManosRobot.ficheroTeclado() + ")");
 
-        // Dos vueltas a propósito: si la primera se cancela mal, el programa se queda creyendo que el diálogo sigue
-        // abierto y la segunda no abre nada. Es justo el fallo que apareció en el PC de Javi.
-        System.out.println("5) Diálogos: Ctrl+O abre «Abrir»; se detecta, se cancela y se tiene que poder volver a abrir");
-        for (int vuelta = 1; vuelta <= 2; vuelta++) {
-            v.activar(clave);
-            manos.esperar(0.3);
-            Map<Long, String> antes = VentanasNativas.instantanea();
-            manos.tecla("ctrl+o", 1);
-            String dialogo = esperarNueva(antes, 20_000); // la primera vez, el diálogo de ficheros puede tardar bastante
-            ok(dialogo != null, "vuelta " + vuelta + ": aparece el diálogo" + (dialogo != null ? " «" + dialogo + "»" : " (no en 20 s)"));
-            if (dialogo == null) {
-                System.out.print(VentanasNativas.diagnostico());
-                break;
+        // Diálogos modales, con una ventana de prueba nuestra: siempre igual en cualquier PC. (El diálogo de archivos
+        // de Windows no sirve de prueba: tarda lo que quiere, y con OneDrive puede pasar de medio minuto.)
+        System.out.println("5) Diálogos modales: se ven, no cuelgan, se cancelan y el programa sigue sano");
+        Process ayudante = new ProcessBuilder(
+                Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                "-cp", System.getProperty("java.class.path"),
+                "es.amagna.asistente.VentanaDePrueba", "prueba-dialogos").inheritIO().start();
+        try {
+            ok(esperar(() -> v.abiertas().contains("prueba-dialogos"), 20_000), "la ventana de prueba aparece");
+            for (int vuelta = 1; vuelta <= 2; vuelta++) {
+                String buscado = "Dialogo " + vuelta + " de prueba-dialogos";
+                ok(esperar(() -> VentanasNativas.instantanea().containsValue(buscado), 15_000), "vuelta " + vuelta + ": se ve el diálogo «" + buscado + "»");
+                ok(esperar(() -> v.abiertas().contains("BLOQUEADA"), 5_000), "vuelta " + vuelta + ": la ventana sale marcada como BLOQUEADA");
+                long t0 = System.currentTimeMillis();
+                try {
+                    v.campoConFoco();
+                } catch (IllegalStateException e) {
+                    System.out.println("   (aviso esperado) " + e.getMessage());
+                }
+                ok(System.currentTimeMillis() - t0 < 5_000, "vuelta " + vuelta + ": con el diálogo abierto, leer_campo no se cuelga (" + (System.currentTimeMillis() - t0) + " ms)");
+                List<String> cancelados = v.cancelarBloqueos();
+                System.out.println("   cancelado: " + cancelados);
+                ok(esperar(() -> !VentanasNativas.instantanea().containsValue(buscado), 5_000), "vuelta " + vuelta + ": el diálogo se cierra");
+                ok(esperar(() -> !v.abiertas().contains("BLOQUEADA"), 5_000), "vuelta " + vuelta + ": ya no queda ninguna ventana bloqueada");
             }
-            String lista = v.abiertas();
-            ok(lista.contains("diálogos abiertos dentro") || lista.contains("está el diálogo"), "vuelta " + vuelta + ": ventanas_abiertas lo enseña");
-            long t0 = System.currentTimeMillis();
-            try {
-                v.campoConFoco();
-            } catch (IllegalStateException e) {
-                System.out.println("   (aviso esperado) " + e.getMessage());
-            }
-            ok(System.currentTimeMillis() - t0 < 5_000, "vuelta " + vuelta + ": con el diálogo abierto, leer_campo no se cuelga (" + (System.currentTimeMillis() - t0) + " ms)");
-            String cerrado = v.cancelarDialogo(dialogo);
-            ok(cerrado != null && esperar(() -> !VentanasNativas.instantanea().containsValue(cerrado), 5_000), "vuelta " + vuelta + ": se cancela el diálogo");
-            manos.esperar(0.5);
-            ok(!v.abiertas().contains("BLOQUEADA"), "vuelta " + vuelta + ": ninguna ventana queda bloqueada");
+            // Que la vuelta 2 haya funcionado demuestra que cancelar no deja al programa creyendo que sigue abierto.
+        } finally {
+            ayudante.destroy();
+            ayudante.waitFor();
         }
+
+        // El diálogo de archivos de verdad: solo se informa de cuánto tarda (depende de Windows y de OneDrive, no de nosotros).
+        System.out.println("5b) Diálogo de archivos de Windows (Ctrl+O), solo para saber cuánto tarda en este PC");
+        v.activar(clave);
+        manos.esperar(0.3);
+        Map<Long, String> antesO = VentanasNativas.instantanea();
+        long tO = System.currentTimeMillis();
+        manos.tecla("ctrl+o", 1);
+        String abrir = esperarNueva(antesO, 45_000);
+        System.out.println(abrir != null
+                ? "   tarda " + (System.currentTimeMillis() - tO) / 1000 + " s en abrir «" + abrir + "»"
+                : "   no se ha abierto en 45 s (no cuenta como fallo: en este PC el diálogo de archivos es muy lento)");
+        quitarEstorbos(manos, v);
 
         System.out.println("6) La captura");
         BufferedImage img = ImageIO.read(new ByteArrayInputStream(manos.captura()));
@@ -135,15 +150,13 @@ public final class PruebasWindows {
         terminar(manos, v);
     }
 
-    /** Cancela los diálogos que hayan quedado abiertos de pruebas anteriores: bloquean los atajos de todo el programa. */
+    /** Cancela cualquier diálogo que esté bloqueando una ventana (de esta prueba o de una anterior). */
     private static void quitarEstorbos(ManosRobot manos, Ventanas v) {
-        for (int k = 0; k < 5; k++) {
-            java.util.regex.Matcher m = java.util.regex.Pattern.compile("BLOQUEADA por el diálogo «([^»]*)»").matcher(v.abiertas());
-            if (!m.find()) {
-                return;
-            }
-            String cerrado = v.cancelarDialogo(m.group(1));
-            System.out.println("   había quedado abierto el diálogo «" + m.group(1) + "» de otra ventana: " + (cerrado != null ? "cancelado" : "no se ha podido cerrar"));
+        manos.tecla("Escape", 1); // por si hay un diálogo con el foco: es lo que haría una persona
+        manos.esperar(0.6);
+        List<String> cancelados = v.cancelarBloqueos();
+        if (!cancelados.isEmpty()) {
+            System.out.println("   había diálogos abiertos bloqueando: " + cancelados);
             manos.esperar(0.5);
         }
     }
@@ -151,6 +164,7 @@ public final class PruebasWindows {
     /** Deja el Bloc de notas como estaba: vacía la pestaña de la prueba, la guarda y la cierra (sin preguntar nada). */
     private static void terminar(ManosRobot manos, Ventanas v) {
         try {
+            v.cancelarBloqueos();
             if (!clave.isEmpty() && v.abiertas().contains(clave)) {
                 v.activar(clave);
                 manos.tecla("ctrl+a", 1);

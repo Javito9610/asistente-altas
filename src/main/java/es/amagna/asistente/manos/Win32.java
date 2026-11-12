@@ -33,6 +33,8 @@ public final class Win32 {
 
         boolean IsIconic(Pointer hwnd);
 
+        boolean IsWindowEnabled(Pointer hwnd);
+
         boolean EnumWindows(EnumProc proc, Pointer datos);
 
         int GetWindowThreadProcessId(Pointer hwnd, IntByReference pid);

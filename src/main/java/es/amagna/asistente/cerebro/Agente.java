@@ -102,6 +102,10 @@ public final class Agente {
                     + "diálogos que has abierto tú o que bloquean la ventana en la que trabajas. Devuelve cuál ha cerrado.",
                     "input_schema", Json.obj("type", "object", "properties", Json.obj(
                             "titulo", Json.obj("type", "string", "description", "Parte del título del diálogo")), "required", List.of("titulo"))));
+            h.add(Json.obj("name", "cancelar_bloqueos", "description",
+                    "Cancela lo que esté bloqueando una ventana marcada BLOQUEADA, aunque no se sepa el título del diálogo. "
+                    + "Úsalo cuando una ventana no responda a los atajos. Cancelar no guarda ni confirma nada.",
+                    "input_schema", Json.obj("type", "object", "properties", Json.obj())));
             h.add(Json.obj("name", "ventana_activa", "description",
                     "Dice el título de la ventana que tiene el foco del teclado (adonde irá lo que escribas o las teclas que pulses).",
                     "input_schema", Json.obj("type", "object", "properties", Json.obj())));
@@ -275,6 +279,10 @@ public final class Agente {
             }
             case "ventanas_abiertas":
                 return List.of(textoBloque("Ventanas abiertas:\n" + ventanas.abiertas()));
+            case "cancelar_bloqueos": {
+                List<String> l = ventanas.cancelarBloqueos();
+                return List.of(textoBloque(l.isEmpty() ? "No había ninguna ventana bloqueada." : "Cancelado: " + String.join(", ", l)));
+            }
             case "cancelar_dialogo": {
                 String t = ventanas.cancelarDialogo((String) in.get("titulo"));
                 return List.of(textoBloque(t == null ? "No hay ningún diálogo con ese título." : "Cancelado el diálogo «" + t + "»."));

@@ -61,6 +61,26 @@ public final class VentanasNativas implements Ventanas {
                 .map(c -> Path.of(c).getFileName().toString().replaceFirst("(?i)\\.exe$", "")).orElse("pid " + pid);
     }
 
+    /** Los diálogos visibles: ventanas propiedad de otra o de la clase estándar de diálogo. */
+    static List<Pointer> dialogos() {
+        List<Pointer> r = new ArrayList<>();
+        for (Pointer h : visibles()) {
+            Pointer dueno = Win32.User32.I.GetAncestor(h, Win32.GA_ROOTOWNER);
+            if ((dueno != null && !dueno.equals(h)) || "#32770".equals(Win32.clase(h))) {
+                r.add(h);
+            }
+        }
+        return r;
+    }
+
+    /**
+     * ¿Tiene esta ventana un diálogo modal encima? Windows deshabilita la ventana mientras hay uno, así que es una señal
+     * inmediata y segura: no hace falta encontrar la ventana del diálogo (algunos tardan en aparecer o no se listan).
+     */
+    static boolean bloqueada(Pointer h) {
+        return !Win32.User32.I.IsWindowEnabled(h);
+    }
+
     @Override
     public String abiertas() {
         List<Pointer> todas = visibles();
@@ -75,8 +95,8 @@ public final class VentanasNativas implements Ventanas {
                 principales.add(h);
             }
         }
-        // Cada diálogo, con su ventana: la dueña si está a la vista y, si no (pasa en las aplicaciones modernas, como el Bloc
-        // de notas de Windows 11, donde la dueña es una ventana oculta), la ventana principal de su mismo programa.
+        // Cada diálogo, con su ventana: la dueña si está a la vista y, si no (pasa en las aplicaciones modernas, donde la
+        // dueña es una ventana oculta), la ventana principal de su mismo programa.
         Map<Pointer, List<String>> dialogos = new LinkedHashMap<>();
         List<String> huerfanos = new ArrayList<>();
         for (Pointer d : dialogosSueltos) {
@@ -97,11 +117,6 @@ public final class VentanasNativas implements Ventanas {
                 huerfanos.add("«" + Win32.titulo(d) + "» (" + programa(d) + ")");
             }
         }
-        // Un diálogo (modal) bloquea a todo su programa: en las aplicaciones que abren varias ventanas en el mismo programa
-        // (el Bloc de notas de Windows 11, muchos programas de gestión), las demás ventanas no responden a los atajos mientras
-        // esté abierto. Se marca, para que se sepa por qué una ventana «no hace caso».
-        Map<Long, String> bloqueo = new LinkedHashMap<>();
-        dialogos.forEach((casa, d) -> bloqueo.putIfAbsent(Win32.pid(casa), "«" + d.get(0) + "» de «" + Win32.titulo(casa) + "»"));
         Pointer delante = Win32.User32.I.GetForegroundWindow();
         StringBuilder b = new StringBuilder();
         for (Pointer h : principales) {
@@ -116,8 +131,9 @@ public final class VentanasNativas implements Ventanas {
             if (d != null) {
                 b.append(" — diálogos abiertos dentro: ");
                 d.forEach(t -> b.append("«").append(t).append("» "));
-            } else if (bloqueo.containsKey(Win32.pid(h))) {
-                b.append(" [BLOQUEADA por el diálogo ").append(bloqueo.get(Win32.pid(h))).append(", del mismo programa: ciérralo primero]");
+            }
+            if (bloqueada(h)) {
+                b.append(" [BLOQUEADA: tiene un diálogo encima y no responderá hasta que se cierre]");
             }
             b.append('\n');
         }
@@ -128,16 +144,50 @@ public final class VentanasNativas implements Ventanas {
         return b.toString().strip();
     }
 
-    /** Los diálogos visibles (ventanas propiedad de otra o de la clase estándar de diálogo). */
-    static List<Pointer> dialogos() {
-        List<Pointer> r = new ArrayList<>();
-        for (Pointer h : visibles()) {
-            Pointer dueno = Win32.User32.I.GetAncestor(h, Win32.GA_ROOTOWNER);
-            if ((dueno != null && !dueno.equals(h)) || "#32770".equals(Win32.clase(h))) {
-                r.add(h);
-            }
+    /**
+     * Cancela lo que esté bloqueando cualquier ventana: por cada ventana deshabilitada, busca el diálogo de su mismo
+     * programa (aunque no se sepa su título) y lo cancela. No hace falta saber cómo se llama ni de quién depende.
+     */
+    @Override
+    public List<String> cancelarBloqueos() {
+        List<String> hecho = new ArrayList<>();
+        if (modoVista) {
+            System.out.println("    [modo vista, no se hace] cancelar lo que bloquee alguna ventana");
+            return hecho;
         }
-        return r;
+        for (int vuelta = 0; vuelta < 5; vuelta++) {
+            Pointer presa = null;
+            for (Pointer h : visibles()) {
+                if (bloqueada(h)) {
+                    presa = h;
+                    break;
+                }
+            }
+            if (presa == null) {
+                return hecho;
+            }
+            long pid = Win32.pid(presa);
+            Pointer culpable = null;
+            for (Pointer d : visibles()) { // el diálogo: del mismo programa, no bloqueado y distinto de la presa
+                if (Win32.pid(d) == pid && !d.equals(presa) && !bloqueada(d)
+                        && ("#32770".equals(Win32.clase(d)) || !presa.equals(Win32.User32.I.GetAncestor(d, Win32.GA_ROOTOWNER)))) {
+                    culpable = d;
+                    break;
+                }
+            }
+            if (culpable == null) {
+                hecho.add("hay una ventana bloqueada («" + Win32.titulo(presa) + "») pero no se ve qué diálogo la bloquea");
+                return hecho;
+            }
+            String t = Win32.titulo(culpable);
+            Win32.mandar(culpable, Win32.WM_COMMAND, Win32.IDCANCEL, 0);
+            if (!esperarCierre(culpable)) {
+                Win32.cerrar(culpable);
+                esperarCierre(culpable);
+            }
+            hecho.add("«" + t + "»");
+        }
+        return hecho;
     }
 
     /** Instantánea de las ventanas visibles: identificador → título. Para saber qué ventana es NUEVA tras hacer algo. */

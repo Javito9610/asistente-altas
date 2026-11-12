@@ -193,7 +193,7 @@ public final class Comprobaciones {
         ok(pet.contains("Ventana activa: «Sin título: Bloc de notas»") && !Json.escribir(conV.get(1)).contains("\"toolset_name\":\"computer\",\"content\":[{\"type\":\"text\",\"text\":\"Abierto"),
                 "ventana_activa responde; las herramientas propias no llevan toolset_name");
         List<Object> tools = (List<Object>) conV.get(0).get("tools");
-        ok(tools.size() == 7 && Agente.HERRAMIENTA.equals(((Map<String, Object>) tools.get(6)).get("type")), "con ventanas: 6 herramientas propias + la de ordenador");
+        ok(tools.size() == 8 && Agente.HERRAMIENTA.equals(((Map<String, Object>) tools.get(7)).get("type")), "con ventanas: 7 herramientas propias + la de ordenador");
         String tras = Json.escribir(conV.get(3));
         ok(tras.contains("DISTINTO en el carácter 39") && tras.contains("Editor de texto"), "leer_campo lee el control con el foco y detecta el punto que falta");
         ok(tras.contains("diálogos abiertos dentro: «Abrir»"), "ventanas_abiertas enseña los diálogos que la captura no ve");
