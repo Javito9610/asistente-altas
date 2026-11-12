@@ -225,6 +225,11 @@ public final class VentanasNativas implements Ventanas {
         return m;
     }
 
+    /** La ventana (a la vista) cuyo título contiene el texto: la de más delante que coincide. */
+    public Pointer handleDe(String titulo) {
+        return buscar(titulo, visibles());
+    }
+
     private Pointer buscar(String titulo, List<Pointer> donde) {
         String buscado = titulo.toLowerCase(Locale.ROOT);
         for (Pointer h : donde) {

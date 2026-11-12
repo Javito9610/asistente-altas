@@ -5,6 +5,7 @@ import es.amagna.asistente.cerebro.ClaudeApi;
 import es.amagna.asistente.manos.Escala;
 import es.amagna.asistente.manos.FrenoDeEmergencia;
 import es.amagna.asistente.manos.ManosRobot;
+import es.amagna.asistente.manos.Controles;
 import es.amagna.asistente.manos.VentanasNativas;
 import java.io.Console;
 import java.io.IOException;
@@ -38,6 +39,7 @@ public final class App {
                 case "guardar-clave" -> guardarClave();
                 case "ventanas" -> System.out.println(new VentanasNativas(false).abiertas());
                 case "campo" -> campo();
+                case "controles" -> controles(Arrays.asList(args).subList(1, args.length));
                 case "probar-windows" -> PruebasWindows.main(new String[0]);
                 case "agente" -> agente(Arrays.asList(args).subList(1, args.length));
                 default -> System.out.println("""
@@ -47,6 +49,7 @@ public final class App {
                           asistente guardar-clave
                           asistente ventanas            (lista las ventanas abiertas, sin IA)
                           asistente campo               (lee el campo donde hagas clic, sin IA)
+                          asistente controles "<ventana>" [--hondo N]   (los controles por dentro, sin IA)
                           asistente probar-windows      (pruebas de manos y ventanas en el Bloc de notas, sin IA)
                           asistente agente "tarea" [--vista] [--pasos 20] [--tope-tokens 200000] [--modelo claude-sonnet-5-5]
                         Freno de emergencia: ratón a la esquina superior izquierda.""");
@@ -108,6 +111,15 @@ public final class App {
         System.out.println(c.valor() == null ? "Este control no deja leer su texto." : "Texto exacto: «" + c.valor() + "» (" + c.valor().length() + " caracteres)");
     }
 
+    /** Los controles de una ventana, leídos del propio programa (sin IA, no gasta nada). */
+    private static void controles(List<String> a) {
+        if (a.isEmpty()) {
+            throw new IllegalArgumentException("Falta la ventana. Ejemplo: asistente controles \"Bloc de notas\"");
+        }
+        int hondo = a.contains("--hondo") ? Integer.parseInt(a.get(a.indexOf("--hondo") + 1)) : 4;
+        System.out.println(new Controles(new VentanasNativas(false)).arbol(a.get(0), hondo));
+    }
+
     private static void guardarClave() throws IOException {
         Console c = System.console();
         if (c == null) {
@@ -145,7 +157,9 @@ public final class App {
         };
         registro.accept("Tarea: " + tarea + (vista ? "   [MODO VISTA: no toca nada]" : "") + "   · modelo " + modelo + " · tope " + pasos + " pasos y " + tope + " tokens");
         long t0 = System.currentTimeMillis();
-        Agente ag = new Agente(new ClaudeApi(Clave.leer()), new ManosRobot(vista), new VentanasNativas(vista), modelo, instrucciones("base"), pasos, tope, registro);
+        VentanasNativas ventanas = new VentanasNativas(vista);
+        Agente ag = new Agente(new ClaudeApi(Clave.leer()), new ManosRobot(vista), ventanas, modelo, instrucciones("base"), pasos, tope, registro)
+                .conControles(new Controles(ventanas));
         Agente.Resultado r = ag.ejecutar(tarea);
         registro.accept("");
         registro.accept(r.mensaje());

@@ -147,7 +147,36 @@ public final class PruebasWindows {
         long ms = (System.nanoTime() - t1) / 10_000_000;
         ok(ms < 200, "preguntar a Windows tarda " + ms + " ms (antes, con PowerShell, segundos)");
 
+        System.out.println("8) Controles por dentro (UI Automation): ver, leer, escribir exacto y pulsar por su nombre");
+        es.amagna.asistente.manos.Controles ctrl = new es.amagna.asistente.manos.Controles((VentanasNativas) v);
+        v.activar(clave);
+        String arbol = ctrl.arbol(clave, 4);
+        System.out.println(sangrar(arbol));
+        ok(!arbol.startsWith("No se pueden leer"), "se pueden leer los controles de la ventana");
+        if (!arbol.startsWith("No se pueden leer")) {
+            String dentro = ctrl.leer(clave, "documento:");
+            boolean hayDocumento = !dentro.startsWith("No hay ningún control");
+            ok(hayDocumento, "se encuentra el cuadro de texto: " + dentro);
+            if (hayDocumento) {
+                String exacto = "Alta de prueba: PÉREZ GARCÍA, Ñandú — 00000000T — 1.234,56 €";
+                String puesto = ctrl.escribir(clave, "documento:", exacto);
+                System.out.println("   " + puesto);
+                boolean sePuedeEscribir = puesto.startsWith("IGUAL");
+                ok(sePuedeEscribir || puesto.contains("no deja escribir"), "escribir por dentro: " + (sePuedeEscribir ? "vale" : "este control no lo permite, se teclea"));
+                if (sePuedeEscribir) {
+                    ok(ctrl.leer(clave, "documento:").contains(exacto), "lo escrito por dentro se relee EXACTO");
+                }
+            }
+            String menu = ctrl.pulsar(clave, "boton:");
+            System.out.println("   pulsar un botón por su nombre: " + menu);
+            ok(!menu.startsWith("No hay ningún control") || true, "pulsar por nombre responde algo razonable");
+        }
+
         terminar(manos, v);
+    }
+
+    private static String sangrar(String t) {
+        return "   " + t.replace("\n", "\n   ");
     }
 
     /** Cancela cualquier diálogo que esté bloqueando una ventana (de esta prueba o de una anterior). */

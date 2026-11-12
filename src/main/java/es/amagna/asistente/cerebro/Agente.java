@@ -3,6 +3,7 @@ package es.amagna.asistente.cerebro;
 import es.amagna.asistente.Json;
 import es.amagna.asistente.manos.FrenoDeEmergencia;
 import es.amagna.asistente.manos.Manos;
+import es.amagna.asistente.manos.Controles;
 import es.amagna.asistente.manos.Ventanas;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -49,6 +50,7 @@ public final class Agente {
     private final int pasosMax;
     private final Consumer<String> registro;
     private final Ventanas ventanas;
+    private Controles controles;
     private final long topeTokens;
 
     public static final long TOPE_TOKENS_POR_DEFECTO = 200_000;
@@ -63,6 +65,12 @@ public final class Agente {
      * @param topeTokens  gasto máximo por tarea: tokens de entrada + salida + una décima parte de los leídos de caché
      *                    (que se cobran mucho más baratos). Al pasarlo, se para.
      */
+    /** Los controles por dentro (UI Automation). Sin esto, el agente solo tiene los ojos y las manos. */
+    public Agente conControles(Controles c) {
+        this.controles = c;
+        return this;
+    }
+
     public Agente(Cerebro cerebro, Manos manos, Ventanas ventanas, String modelo, String instrucciones, int pasosMax, long topeTokens,
             Consumer<String> registro) {
         this.cerebro = cerebro;
@@ -109,6 +117,32 @@ public final class Agente {
             h.add(Json.obj("name", "ventana_activa", "description",
                     "Dice el título de la ventana que tiene el foco del teclado (adonde irá lo que escribas o las teclas que pulses).",
                     "input_schema", Json.obj("type", "object", "properties", Json.obj())));
+        }
+        if (controles != null) {
+            Map<String, Object> ventana = Json.obj("type", "string", "description", "Parte del título de la ventana");
+            Map<String, Object> control = Json.obj("type", "string",
+                    "description", "Parte del nombre del control; delante y con dos puntos, su tipo: «boton:Guardar», «campo:NIF», «opcion-de-menu:Nuevo»");
+            h.add(Json.obj("name", "ver_controles", "description",
+                    "Lista los controles de una ventana POR DENTRO (nombre, tipo, valor exacto y si están activos), como los lee "
+                    + "un lector de pantalla. Es mucho más fiable que mirar la captura: úsalo antes de rellenar nada.",
+                    "input_schema", Json.obj("type", "object", "properties", Json.obj(
+                            "ventana", ventana, "profundidad", Json.obj("type", "integer", "description", "Niveles a mirar (3 por defecto)")),
+                            "required", List.of("ventana"))));
+            h.add(Json.obj("name", "leer_control", "description",
+                    "Lee el valor EXACTO de un control concreto de una ventana, sin tocarlo.",
+                    "input_schema", Json.obj("type", "object", "properties", Json.obj("ventana", ventana, "control", control),
+                            "required", List.of("ventana", "control"))));
+            h.add(Json.obj("name", "escribir_en", "description",
+                    "Escribe un texto EXACTO en un control, sin teclear (no se pierde ningún carácter) y lo relee para "
+                    + "comprobarlo: contesta IGUAL o DISTINTO. Es la forma buena de rellenar un formulario.",
+                    "input_schema", Json.obj("type", "object", "properties", Json.obj("ventana", ventana, "control", control,
+                            "texto", Json.obj("type", "string", "description", "El valor exacto, tal cual")),
+                            "required", List.of("ventana", "control", "texto"))));
+            h.add(Json.obj("name", "pulsar_control", "description",
+                    "Pulsa un botón, una opción de menú o una fila de una lista por su nombre, sin coordenadas: no hay "
+                    + "forma de fallar el clic. Si el control no se deja, dice dónde está para pulsarlo con el ratón.",
+                    "input_schema", Json.obj("type", "object", "properties", Json.obj("ventana", ventana, "control", control),
+                            "required", List.of("ventana", "control"))));
         }
         // La herramienta de ordenador va la última: el cache_control cubre todas las herramientas.
         h.add(Json.obj("type", HERRAMIENTA, "configs", Json.obj("zoom", Json.obj("enabled", true)), "cache_control", Json.obj("type", "ephemeral")));
@@ -279,6 +313,14 @@ public final class Agente {
             }
             case "ventanas_abiertas":
                 return List.of(textoBloque("Ventanas abiertas:\n" + ventanas.abiertas()));
+            case "ver_controles":
+                return List.of(textoBloque(controles.arbol((String) in.get("ventana"), (int) num(in.getOrDefault("profundidad", 3L)))));
+            case "leer_control":
+                return List.of(textoBloque(controles.leer((String) in.get("ventana"), (String) in.get("control"))));
+            case "escribir_en":
+                return List.of(textoBloque(controles.escribir((String) in.get("ventana"), (String) in.get("control"), (String) in.get("texto"))));
+            case "pulsar_control":
+                return List.of(textoBloque(controles.pulsar((String) in.get("ventana"), (String) in.get("control"))));
             case "cancelar_bloqueos": {
                 List<String> l = ventanas.cancelarBloqueos();
                 return List.of(textoBloque(l.isEmpty() ? "No había ninguna ventana bloqueada." : "Cancelado: " + String.join(", ", l)));
