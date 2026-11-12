@@ -292,6 +292,49 @@ public final class Comprobaciones {
         } catch (IllegalStateException e) {
             ok(true, "una respuesta sin mapa se rechaza en vez de dar por bueno un mapa vacío");
         }
+
+        // --- Los especialistas: cada uno con lo suyo, y con las manos atadas para lo demás ---
+        try {
+            var carto = es.amagna.asistente.cerebro.Especialista.cargar("cartografo", "modelo-por-defecto", 999);
+            ok(carto.instrucciones().contains("Asistente Altas") && carto.instrucciones().contains("Tu especialidad: cartografo"),
+                    "un especialista hereda las normas comunes y añade las suyas: no empieza de cero");
+            ok(carto.pasos() == 30 && carto.topeTokens() == 150_000, "trae sus propios parámetros (pasos y gasto)");
+            ok(carto.modelo().equals("modelo-por-defecto"), "si no dice modelo, se usa el de la casa");
+            ok(carto.puede().contains("ver_controles") && !carto.puede().contains("escribir_en") && !carto.puede().contains("pulsar_control"),
+                    "el cartógrafo puede mirar pero NO puede escribir ni pulsar");
+            var desa = es.amagna.asistente.cerebro.Especialista.cargar("desatascador", "m", 999);
+            ok(desa.puede().isEmpty() && desa.pasos() == 12, "el desatascador sí puede tocar, pero con poca cuerda");
+            try {
+                es.amagna.asistente.cerebro.Especialista.cargar("el-que-no-existe", "m", 1);
+                ok(false, "pedir un especialista que no existe avisa");
+            } catch (IllegalArgumentException e) {
+                ok(e.getMessage().contains("cartografo"), "pedir un especialista que no existe dice cuáles hay");
+            }
+        } catch (java.io.IOException e) {
+            ok(false, "se pueden leer los especialistas: " + e.getMessage());
+        }
+
+        // Y lo que de verdad importa: que el LÍMITE lo imponga el programa, no las instrucciones.
+        int antesDeNada = hecho.size();
+        List<Map<String, Object>> conS = new ArrayList<>();
+        List<Map<String, Object>> guionS = new ArrayList<>(List.of(
+                respuesta(propia("escribir_en", Map.of("ventana", "x", "control", "nif", "texto", "lo que sea"))),
+                respuesta(uso("left_click", Map.of("coordinate", List.of(10L, 10L)))),
+                respuesta(propia("abrir_programa", Map.of("programa", "notepad.exe"))),
+                respuesta(texto("PARADO: no puedo tocar nada"))));
+        new Agente(p3 -> { conS.add((Map<String, Object>) Json.leer(Json.escribir(p3))); return guionS.remove(0); },
+                manos, v, "m", "i", 10, 100_000, s2 -> { })
+                .conControles(new es.amagna.asistente.manos.Controles(null))
+                .soloPuede(java.util.Set.of("ver_controles", "leer_control", "screenshot"))
+                .ejecutar("solo mirar");
+        String pedido = Json.escribir(conS.get(0));
+        ok(pedido.contains("ver_controles") && !pedido.contains("\"name\":\"escribir_en\"") && !pedido.contains("\"name\":\"pulsar_control\""),
+                "a un especialista de solo mirar ni se le enseñan las herramientas que no puede usar");
+        ok(Json.escribir(conS.get(1)).contains("NO PERMITIDO") && Json.escribir(conS.get(1)).contains("escribir_en"),
+                "y si aun así pide una prohibida, el PROGRAMA se la niega (no vale con decírselo)");
+        ok(Json.escribir(conS.get(2)).contains("NO PERMITIDO"), "tampoco puede saltárselo con el ratón");
+        ok(Json.escribir(conS.get(3)).contains("NO PERMITIDO") && vent.size() == 2 && hecho.size() == antesDeNada,
+                "ni abriendo programas: en toda la tarea no ha tocado nada de nada");
     }
 
     static int ids = 0;

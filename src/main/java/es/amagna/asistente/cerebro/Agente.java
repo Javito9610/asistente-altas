@@ -50,6 +50,7 @@ public final class Agente {
     private final int pasosMax;
     private final Consumer<String> registro;
     private Expediente expediente;
+    private java.util.Set<String> puede = java.util.Set.of();
     private final Ventanas ventanas;
     private Controles controles;
     private final long topeTokens;
@@ -167,12 +168,26 @@ public final class Agente {
                     "input_schema", Json.obj("type", "object", "properties", Json.obj("ventana", ventana, "control", control),
                             "required", List.of("ventana", "control"))));
         }
+        h.removeIf(x -> x instanceof Map<?, ?> t && t.get("name") instanceof String n && !permitido(n));
         // La herramienta de ordenador va la última: el cache_control cubre todas las herramientas.
         h.add(Json.obj("type", HERRAMIENTA, "configs", Json.obj("zoom", Json.obj("enabled", true)), "cache_control", Json.obj("type", "ephemeral")));
         return h;
     }
 
     @SuppressWarnings("unchecked")
+    /**
+     * Le ata las manos: solo podrá usar estas herramientas. Vacío = puede todo. No es un aviso en las instrucciones,
+     * es el programa el que se lo impide: aunque pida una herramienta prohibida, le devuelve un error.
+     */
+    public Agente soloPuede(java.util.Set<String> herramientas) {
+        this.puede = java.util.Set.copyOf(herramientas);
+        return this;
+    }
+
+    private boolean permitido(String accion) {
+        return puede.isEmpty() || puede.contains(accion);
+    }
+
     /** Deja constancia de todo lo que haga en una carpeta propia (pasos, capturas e informe). */
     public Agente conExpediente(boolean si) {
         this.expediente = si ? Expediente.abrir("(pendiente)") : null;
@@ -231,6 +246,14 @@ public final class Agente {
                         continue;
                     }
                     registro.accept("  paso " + paso + " · " + accion + (in.isEmpty() ? "" : " " + resumen(in)));
+                    if (!permitido(accion)) {
+                        String no = "NO PERMITIDO: en esta tarea no puedes usar «" + accion + "». Lo que sí puedes: "
+                                + String.join(", ", puede) + ". Si la tarea no se puede hacer así, termina con PARADO.";
+                        registro.accept("    " + no);
+                        anotar(x -> x.error(no));
+                        resultados.add(resultado(id, List.of(textoBloque(no)), true, ordenador));
+                        continue;
+                    }
                     try {
                         List<Object> salida = ordenador ? ejecutarAccion(accion, in) : ejecutarPropia(accion, in);
                         final int nPaso = paso;

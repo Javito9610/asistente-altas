@@ -46,6 +46,15 @@ public final class App {
                 case "agente" -> agente(Arrays.asList(args).subList(1, args.length));
                 case "guion" -> guion(Arrays.asList(args).subList(1, args.length));
                 case "aprender" -> aprender(Arrays.asList(args).subList(1, args.length));
+                case "agentes" -> es.amagna.asistente.cerebro.Especialista.NOMBRES.forEach(n -> {
+                    try {
+                        var e = es.amagna.asistente.cerebro.Especialista.cargar(n, MODELO_POR_DEFECTO, Agente.TOPE_TOKENS_POR_DEFECTO);
+                        System.out.println("  " + n + "  ·  " + e.pasos() + " pasos, " + e.topeTokens() + " tokens"
+                                + (e.puede().isEmpty() ? ", puede usarlo todo" : ", SOLO mira (" + e.puede().size() + " herramientas)"));
+                    } catch (IOException ex) {
+                        System.out.println("  " + n + "  ·  no se puede leer: " + ex.getMessage());
+                    }
+                });
                 default -> System.out.println("""
                         Asistente Altas (pruebas)
                           asistente mirar
@@ -55,7 +64,9 @@ public final class App {
                           asistente campo               (lee el campo donde hagas clic, sin IA)
                           asistente controles "<ventana>" [--hondo N]   (los controles por dentro, sin IA)
                           asistente probar-windows      (pruebas de manos y ventanas en el Bloc de notas, sin IA)
-                          asistente agente "tarea" [--vista] [--pasos 20] [--tope-tokens 200000] [--modelo claude-sonnet-5-5] [--sin-expediente]
+                          asistente agentes             (los especialistas que hay)
+                          asistente agente "tarea" [--como cartografo] [--vista] [--pasos 20] [--tope-tokens 200000]
+                                                   [--modelo claude-sonnet-5-5] [--sin-expediente]
                           asistente aprender "<ventana>" <mapa.json> [--programa "<exe>"]
                                                         (la IA mira el programa y escribe su mapa; el programa
                                                          comprueba una a una que todas sus formas funcionan)
@@ -150,9 +161,15 @@ public final class App {
         }
         String tarea = a.get(0);
         boolean vista = a.contains("--vista");
-        int pasos = a.contains("--pasos") ? Integer.parseInt(a.get(a.indexOf("--pasos") + 1)) : 20;
-        String modelo = a.contains("--modelo") ? a.get(a.indexOf("--modelo") + 1) : MODELO_POR_DEFECTO;
-        long tope = a.contains("--tope-tokens") ? Long.parseLong(a.get(a.indexOf("--tope-tokens") + 1)) : Agente.TOPE_TOKENS_POR_DEFECTO;
+        // Un especialista trae sus propias instrucciones, sus límites y sus parámetros; --pasos y compañía los pisan.
+        es.amagna.asistente.cerebro.Especialista esp = a.contains("--como")
+                ? es.amagna.asistente.cerebro.Especialista.cargar(a.get(a.indexOf("--como") + 1), MODELO_POR_DEFECTO, Agente.TOPE_TOKENS_POR_DEFECTO)
+                : null;
+        String quienes = esp == null ? instrucciones("base") : esp.instrucciones();
+        int pasos = a.contains("--pasos") ? Integer.parseInt(a.get(a.indexOf("--pasos") + 1)) : esp == null ? 20 : esp.pasos();
+        String modelo = a.contains("--modelo") ? a.get(a.indexOf("--modelo") + 1) : esp == null ? MODELO_POR_DEFECTO : esp.modelo();
+        long tope = a.contains("--tope-tokens") ? Long.parseLong(a.get(a.indexOf("--tope-tokens") + 1))
+                : esp == null ? Agente.TOPE_TOKENS_POR_DEFECTO : esp.topeTokens();
 
         Path dir = Path.of("registros");
         Files.createDirectories(dir);
@@ -165,12 +182,17 @@ public final class App {
                 // el registro no debe parar al agente
             }
         };
-        registro.accept("Tarea: " + tarea + (vista ? "   [MODO VISTA: no toca nada]" : "") + "   · modelo " + modelo + " · tope " + pasos + " pasos y " + tope + " tokens");
+        registro.accept("Tarea: " + tarea + (vista ? "   [MODO VISTA: no toca nada]" : "")
+                + (esp == null ? "" : "   · especialista: " + esp.nombre() + (esp.puede().isEmpty() ? "" : " [SOLO MIRA]"))
+                + "   · modelo " + modelo + " · tope " + pasos + " pasos y " + tope + " tokens");
         long t0 = System.currentTimeMillis();
         VentanasNativas ventanas = new VentanasNativas(vista);
-        Agente ag = new Agente(new ClaudeApi(Clave.leer()), new ManosRobot(vista), ventanas, modelo, instrucciones("base"), pasos, tope, registro)
+        Agente ag = new Agente(new ClaudeApi(Clave.leer()), new ManosRobot(vista), ventanas, modelo, quienes, pasos, tope, registro)
                 .conControles(new Controles(ventanas))
                 .conExpediente(!a.contains("--sin-expediente"));
+        if (esp != null && !esp.puede().isEmpty()) {
+            ag.soloPuede(esp.puede());
+        }
         Agente.Resultado r = ag.ejecutar(tarea);
         registro.accept("");
         registro.accept(r.mensaje());
@@ -206,11 +228,11 @@ public final class App {
 
     /** La IA de guardia: cuando el guion se atasca, le pasa el problema con todo el contexto para que lo resuelva. */
     private static es.amagna.asistente.guion.Guion.Rescate rescateConIa(String ventana) throws IOException {
-        String instrucciones = instrucciones("base");
+        var esp = es.amagna.asistente.cerebro.Especialista.cargar("desatascador", MODELO_POR_DEFECTO, 60_000);
         return (vent, control, queSeQueria, porQue) -> {
             VentanasNativas v = new VentanasNativas(false);
-            Agente ag = new Agente(new ClaudeApi(Clave.leer()), new ManosRobot(false), v, MODELO_POR_DEFECTO,
-                    instrucciones, 12, 60_000, System.out::println)
+            Agente ag = new Agente(new ClaudeApi(Clave.leer()), new ManosRobot(false), v, esp.modelo(),
+                    esp.instrucciones(), esp.pasos(), esp.topeTokens(), System.out::println)
                     .conControles(new Controles(v))
                     .conExpediente(true);
             return ag.ejecutar("""
