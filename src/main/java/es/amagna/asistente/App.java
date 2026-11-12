@@ -45,6 +45,7 @@ public final class App {
                 case "probar-windows" -> PruebasWindows.main(new String[0]);
                 case "agente" -> agente(Arrays.asList(args).subList(1, args.length));
                 case "guion" -> guion(Arrays.asList(args).subList(1, args.length));
+                case "aprender" -> aprender(Arrays.asList(args).subList(1, args.length));
                 default -> System.out.println("""
                         Asistente Altas (pruebas)
                           asistente mirar
@@ -55,7 +56,10 @@ public final class App {
                           asistente controles "<ventana>" [--hondo N]   (los controles por dentro, sin IA)
                           asistente probar-windows      (pruebas de manos y ventanas en el Bloc de notas, sin IA)
                           asistente agente "tarea" [--vista] [--pasos 20] [--tope-tokens 200000] [--modelo claude-sonnet-5-5] [--sin-expediente]
-                          asistente guion <mapa.json> <guion.json> [--ensayo] [--abrir]
+                          asistente aprender "<ventana>" <mapa.json> [--programa "<exe>"]
+                                                        (la IA mira el programa y escribe su mapa; el programa
+                                                         comprueba una a una que todas sus formas funcionan)
+                          asistente guion <mapa.json> <guion.json> [--ensayo] [--abrir] [--con-ia]
                                                         (hace la tarea sin IA, siempre igual y comprobándola;
                                                          --ensayo = lo recorre entero sin tocar nada)
                         Freno de emergencia: ratón a la esquina superior izquierda.""");
@@ -192,8 +196,57 @@ public final class App {
         if (a.contains("--abrir")) {
             System.out.println(guion.abrirSiHaceFalta());
         }
+        if (a.contains("--con-ia") && !ensayo) {
+            guion.conRescate(rescateConIa(mapa.ventana()));
+            System.out.println("IA de guardia: solo entra si el guion se atasca.");
+        }
         var parte = guion.ejecutar(Path.of(a.get(1)), ensayo);
         System.exit(parte.bien() ? 0 : 1);
+    }
+
+    /** La IA de guardia: cuando el guion se atasca, le pasa el problema con todo el contexto para que lo resuelva. */
+    private static es.amagna.asistente.guion.Guion.Rescate rescateConIa(String ventana) throws IOException {
+        String instrucciones = instrucciones("base");
+        return (vent, control, queSeQueria, porQue) -> {
+            VentanasNativas v = new VentanasNativas(false);
+            Agente ag = new Agente(new ClaudeApi(Clave.leer()), new ManosRobot(false), v, MODELO_POR_DEFECTO,
+                    instrucciones, 12, 60_000, System.out::println)
+                    .conControles(new Controles(v))
+                    .conExpediente(true);
+            return ag.ejecutar("""
+                    Una tarea automática se ha atascado en la ventana «%s» y tienes que desatascarla, nada más.
+
+                    Lo que había que hacer: %s
+                    Lo que ha contestado el ordenador: %s
+
+                    Mira qué está pasando de verdad (un aviso encima, otra pantalla, un campo obligatorio sin
+                    rellenar, el programa aún cargando…) y déjalo de forma que ese paso se pueda hacer. NO hagas el
+                    resto de la tarea: de eso se encarga el guion después. No inventes datos. Si lo que pasa no es
+                    cosa tuya o hay que decidir algo que no te corresponde, termina con PARADO explicándolo.
+                    """.formatted(vent, queSeQueria, porQue)).mensaje();
+        };
+    }
+
+    /** Cartografiar un programa: lo mira la IA, lo verifica el programa. */
+    private static void aprender(List<String> a) throws IOException {
+        if (a.size() < 2) {
+            throw new IllegalArgumentException("Uso: asistente aprender \"<ventana>\" <mapa.json> [--programa \"<exe>\"]");
+        }
+        String ventana = a.get(0);
+        Path destino = Path.of(a.get(1));
+        String exe = a.contains("--programa") ? a.get(a.indexOf("--programa") + 1) : "";
+        VentanasNativas ventanas = new VentanasNativas(false);
+        Controles ctrl = new Controles(ventanas);
+        String arbol = ctrl.arbol(ventana, 6);
+        if (arbol.startsWith("No ")) {
+            throw new IllegalStateException(arbol);
+        }
+        System.out.println("Mirando «" + ventana + "»… (" + arbol.lines().count() + " controles)");
+        var propuesta = es.amagna.asistente.guion.Aprendiz.proponer(new ClaudeApi(Clave.leer()), MODELO_POR_DEFECTO, arbol);
+        System.out.println("La IA propone " + propuesta.controles().size() + " controles. Comprobándolos uno a uno…");
+        var buena = es.amagna.asistente.guion.Aprendiz.verificar(ctrl, ventana, propuesta, l -> System.out.println("  " + l));
+        es.amagna.asistente.guion.Aprendiz.guardar(destino, ventana, ventana, exe, List.of(), buena);
+        System.out.println("Mapa escrito en " + destino.toAbsolutePath() + ". Repásalo y corrige los nombres que no te cuadren.");
     }
 
     static String instrucciones(String nombre) throws IOException {

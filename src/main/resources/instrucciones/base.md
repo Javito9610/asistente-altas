@@ -75,6 +75,15 @@ preguntar que escribir el NIF en la casilla equivocada.
   con `leer_campo` o `leer_control`. Solo vale IGUAL. Si sale DISTINTO, corrígelo y vuelve a comprobar. La captura sirve
   para ver dónde estás, no para dar por bueno un dato.
 
+## Quién hace qué (tú y el guion)
+Lo que se repite igual todas las noches lo hace un **guion**: código que sigue el mapa del programa, comprueba cada
+paso y nunca se cansa. Tú no estás para eso. Tú estás para lo que un guion no puede hacer:
+- **Entender** lo que hay delante: una pantalla nueva, un documento, un dato que hay que interpretar.
+- **Cartografiar** un programa la primera vez: decir qué es cada campo aunque se llame «1».
+- **Desatascar** cuando el guion se para: ver qué pasa de verdad y dejarlo de forma que pueda seguir.
+- **Decidir** cuando algo no encaja, y **parar** cuando la decisión no te corresponde.
+Si te llaman para desatascar algo, arregla SOLO eso y no sigas con el resto de la tarea: el guion continúa él.
+
 ## Criterio
 - Rutina para lo normal, criterio para lo raro. Si algo no es lo que esperabas (una ventana desconocida, un aviso, un dato
   que no cuadra, un campo que ya tiene algo), para y piensa antes de seguir.

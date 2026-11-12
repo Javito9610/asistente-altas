@@ -335,6 +335,56 @@ public final class PruebasWindows {
         System.out.println("   al repetirlo: " + otra.resumen());
         ok(!otra.bien() && otra.resumen().startsWith("NO SE REPITE"), "un trabajo ya hecho NO se vuelve a hacer");
         Files.deleteIfExists(es.amagna.asistente.guion.Guion.carpetaHechos().resolve(clave + ".txt"));
+
+        System.out.println("13) Cuando el guion se atasca, entra la IA, lo arregla y el guion sigue");
+        // Un paso imposible a propósito: comprobar un valor que nadie ha puesto. En vez de la IA de verdad se pone
+        // aquí un rescate de mentira que hace lo que haría ella: ver qué falta y dejarlo listo.
+        Path fAtasco = dirG.resolve("atasco.json");
+        Files.writeString(fAtasco, """
+                {
+                  "clave": "atasco-%s",
+                  "pasos": [
+                    {"hacer": "comprobar", "control": "importe", "valor": "999,00 €"},
+                    {"hacer": "comprobar", "control": "nif", "valor": "00000000T"}
+                  ]
+                }""".formatted(System.nanoTime()), java.nio.charset.StandardCharsets.UTF_8);
+        boolean[] llamada = {false};
+        var conIa = new es.amagna.asistente.guion.Guion(ctrl, (VentanasNativas) v, mapa, l -> System.out.println("   " + l))
+                .conRescate((ventanaR, controlR, queria, porQue) -> {
+                    llamada[0] = true;
+                    ctrl.escribir(ventanaR, mapa.apodos(controlR).get(0), "999,00 €");
+                    return "He visto que «" + controlR + "» estaba vacío y lo he dejado como tenía que estar.";
+                });
+        var rescatado = conIa.ejecutar(fAtasco, false);
+        ok(llamada[0], "el guion llama a la IA cuando se atasca, no se rinde");
+        ok(rescatado.bien() && rescatado.rescates() == 1, "la IA lo arregla y el guion sigue por donde iba: " + rescatado.resumen());
+        ok(rescatado.lineas().stream().anyMatch(l -> l.contains("RESCATADO")), "queda escrito que ese paso lo salvó la IA");
+        // Y si la IA tampoco puede, se para: no sigue a ciegas.
+        Path fImposible = dirG.resolve("imposible.json");
+        Files.writeString(fImposible, """
+                {"pasos": [{"hacer": "comprobar", "control": "nif", "valor": "ESTO NO VA A PASAR"}]}""",
+                java.nio.charset.StandardCharsets.UTF_8);
+        var rendido = new es.amagna.asistente.guion.Guion(ctrl, (VentanasNativas) v, mapa, l -> System.out.println("   " + l))
+                .conRescate((a1, b1, c1, d1) -> "no he sabido arreglarlo")
+                .ejecutar(fImposible, false);
+        ok(!rendido.bien(), "si ni la IA puede, para y lo dice (no sigue a ciegas)");
+
+        System.out.println("14) Cartografiar: lo que propone la IA se comprueba uno por uno contra el programa");
+        // Se simula lo que contestaría la IA: unas formas buenas y otras que ya no valen.
+        var propuesta = new es.amagna.asistente.guion.Aprendiz.Propuesta(new java.util.LinkedHashMap<>(Map.of(
+                "nif", List.of("#inventado", "campo junto a NIF"),
+                "guardar", List.of("boton:Guardar"),
+                "telefono", List.of("campo junto a Teléfono", "#tampocoExiste"))), new java.util.ArrayList<>());
+        var verificada = es.amagna.asistente.guion.Aprendiz.verificar(ctrl, vent, propuesta, l -> System.out.println("   " + l));
+        ok(verificada.controles().containsKey("nif") && verificada.controles().get("nif").equals(List.of("campo junto a NIF")),
+                "de un control, se queda solo con las formas que funcionan de verdad");
+        ok(verificada.controles().containsKey("guardar"), "lo que funciona entero se queda tal cual");
+        ok(!verificada.controles().containsKey("telefono"), "lo que la IA se imaginó y no existe se queda fuera del mapa");
+        Path fAprendido = dirG.resolve("aprendido.json");
+        es.amagna.asistente.guion.Aprendiz.guardar(fAprendido, "Ficha aprendida", vent, "", List.of(), verificada);
+        var releido = es.amagna.asistente.guion.Mapa.leer(fAprendido);
+        ok(releido.controles().size() == 2 && releido.ventana().equals(vent), "el mapa aprendido se guarda y se vuelve a leer igual");
+
         ((VentanasNativas) v).cerrarSiEsNuestra(vent);
 
         terminar(manos, v);

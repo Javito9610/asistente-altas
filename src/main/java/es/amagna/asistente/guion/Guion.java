@@ -65,7 +65,23 @@ public final class Guion {
         this.registro = registro;
     }
 
-    public record Parte(boolean bien, String resumen, List<String> lineas, int hechos, int avisos) {
+    public record Parte(boolean bien, String resumen, List<String> lineas, int hechos, int avisos, int rescates) {
+    }
+
+    /**
+     * Lo que se llama cuando el guion se atasca: la inteligencia artificial, con todo el contexto, para que vea qué
+     * pasa y lo resuelva. Devuelve lo que ha hecho. Después el guion vuelve a intentar el paso y sigue por donde iba.
+     */
+    public interface Rescate {
+        String intentar(String ventana, String control, String queSeQueria, String porQueHaFallado);
+    }
+
+    private Rescate rescate;
+
+    /** Pone a la IA de guardia: el guion la llama solo cuando se atasca. */
+    public Guion conRescate(Rescate r) {
+        this.rescate = r;
+        return this;
     }
 
     /** Dónde se apunta lo ya hecho, para no repetirlo nunca. */
@@ -85,19 +101,20 @@ public final class Guion {
             if (Files.isRegularFile(hecho)) {
                 String cuando = Files.readString(hecho, StandardCharsets.UTF_8).strip();
                 return new Parte(false, "NO SE REPITE: «" + clave + "» ya se hizo el " + cuando
-                        + ". Si de verdad hay que rehacerlo, hay que borrar " + hecho + " a mano.", lineas, 0, 0);
+                        + ". Si de verdad hay que rehacerlo, hay que borrar " + hecho + " a mano.", lineas, 0, 0, 0);
             }
         }
 
         List<Object> pasos = g.get("pasos") instanceof List<?> l ? new ArrayList<>(l) : List.of();
         if (pasos.isEmpty()) {
-            return new Parte(false, "El guion no tiene pasos.", lineas, 0, 0);
+            return new Parte(false, "El guion no tiene pasos.", lineas, 0, 0, 0);
         }
 
         // Lo escrito se apunta para la doble lectura del final.
         Map<String, String[]> escrito = new LinkedHashMap<>(); // control -> {apodo que funcionó, valor}
         java.util.Set<String> yaAvisado = new java.util.HashSet<>();
         int hechos = 0;
+        int rescates = 0;
 
         for (Object o : pasos) {
             if (!(o instanceof Map<?, ?> crudo)) {
@@ -115,7 +132,7 @@ public final class Guion {
                 apodo = resolver(control, hacer.equals("esperar") ? segundos : 0);
             } catch (Fallo f) {
                 lineas.add("FALLA  " + hacer + " " + control + ": " + f.getMessage());
-                return parte(false, "PARADO en «" + hacer + " " + control + "»: " + f.getMessage(), lineas, hechos, avisos, clave, ensayo);
+                return parte(false, "PARADO en «" + hacer + " " + control + "»: " + f.getMessage(), lineas, hechos, avisos, rescates, clave, ensayo);
             }
             List<String> todos = mapa.apodos(control);
             if (!apodo.equals(todos.get(0)) && yaAvisado.add(control)) {
@@ -130,63 +147,41 @@ public final class Guion {
                 continue;
             }
 
-            String r;
-            switch (hacer) {
-                case "escribir" -> {
-                    if (valor == null) {
-                        return parte(false, "El paso «escribir " + control + "» no dice qué valor poner.", lineas, hechos, avisos, clave, ensayo);
-                    }
-                    if (ensayo) {
-                        lineas.add("ENSAYO escribir " + control + " (" + apodo + "): encontrado, NO se escribe");
-                        hechos++;
-                        continue;
-                    }
-                    r = controles.escribir(mapa.ventana(), apodo, valor);
-                    if (!r.startsWith("IGUAL")) {
-                        lineas.add("FALLA  escribir " + control + ": " + r);
-                        return parte(false, "PARADO al escribir «" + control + "»: " + r, lineas, hechos, avisos, clave, ensayo);
-                    }
-                    escrito.put(control, new String[] {apodo, valor});
+            // Se hace el paso. Si se atasca y hay IA de guardia, se le pasa el problema con todo el contexto,
+            // y después se vuelve a intentar: la rutina la lleva el guion, lo raro lo resuelve la cabeza.
+            String error = hacerPaso(hacer, control, apodo, valor, segundos, m, ensayo, lineas, escrito);
+            if (error == SALTADO) {
+                hechos++;
+                continue;
+            }
+            if (error != null && rescate != null && !ensayo) {
+                lineas.add("ATASCO " + hacer + " " + control + ": " + error);
+                registro.accept("   … atascado en «" + hacer + " " + control + "»: entra la inteligencia artificial");
+                rescates++;
+                String hizo;
+                try {
+                    hizo = rescate.intentar(mapa.ventana(), control,
+                            hacer + " «" + control + "»" + (valor == null ? "" : " con el valor exacto «" + valor + "»"), error);
+                } catch (RuntimeException e) {
+                    hizo = "no ha podido: " + e.getMessage();
                 }
-                case "pulsar" -> {
-                    r = controles.pulsar(mapa.ventana(), apodo);
-                    if (!r.startsWith("Pulsado") && !r.startsWith("Desplegado")) {
-                        lineas.add("FALLA  pulsar " + control + ": " + r);
-                        return parte(false, "PARADO al pulsar «" + control + "»: " + r, lineas, hechos, avisos, clave, ensayo);
+                lineas.add("IA     " + hizo);
+                try {
+                    apodo = resolver(control, 5); // la pantalla puede haber cambiado
+                    error = hacerPaso(hacer, control, apodo, valor, segundos, m, ensayo, lineas, escrito);
+                    if (error == SALTADO) {
+                        error = null;
                     }
+                } catch (Fallo f) {
+                    error = f.getMessage();
                 }
-                case "esperar" -> {
-                    Controles.Que que = switch (String.valueOf(m.getOrDefault("que", "aparezca"))) {
-                        case "desaparezca" -> Controles.Que.DESAPAREZCA;
-                        case "se active" -> Controles.Que.SE_ACTIVE;
-                        case "valga" -> Controles.Que.VALGA;
-                        default -> Controles.Que.APAREZCA;
-                    };
-                    r = controles.esperar(mapa.ventana(), apodo, que, valor, segundos);
-                    if (!r.startsWith("Ya está")) {
-                        lineas.add("FALLA  esperar " + control + ": " + r);
-                        return parte(false, "PARADO esperando a «" + control + "»: " + r, lineas, hechos, avisos, clave, ensayo);
-                    }
+                if (error == null) {
+                    lineas.add("ok     RESCATADO por la IA: " + hacer + " " + control);
                 }
-                case "comprobar" -> {
-                    if (ensayo) {
-                        lineas.add("ENSAYO comprobar " + control + " (" + apodo + "): encontrado; su valor no se mira, "
-                                + "porque en ensayo no se ha escrito nada");
-                        hechos++;
-                        continue;
-                    }
-                    String hay = controles.valorDe(mapa.ventana(), apodo);
-                    if (valor != null && !valor.equals(hay)) {
-                        lineas.add("FALLA  comprobar " + control + ": se esperaba «" + valor + "» y hay «" + hay + "»");
-                        return parte(false, "PARADO: «" + control + "» tenía que valer «" + valor + "» y vale «" + hay + "».",
-                                lineas, hechos, avisos, clave, ensayo);
-                    }
-                    r = "vale «" + hay + "»";
-                }
-                default -> {
-                    return parte(false, "El guion pide «" + hacer + "», que no se sabe hacer (escribir, pulsar, esperar, comprobar).",
-                            lineas, hechos, avisos, clave, ensayo);
-                }
+            }
+            if (error != null) {
+                lineas.add("FALLA  " + hacer + " " + control + ": " + error);
+                return parte(false, "PARADO en «" + hacer + " " + control + "»: " + error, lineas, hechos, avisos, rescates, clave, ensayo);
             }
             lineas.add("ok     " + hacer + " " + control + (valor == null ? "" : " = «" + valor + "»"));
             hechos++;
@@ -196,12 +191,7 @@ public final class Guion {
                 Map<String, Object> l2 = mapaDe(crudo2);
                 String ctrl2 = String.valueOf(l2.getOrDefault("control", control));
                 double s2 = l2.get("segundos") instanceof Number n2 ? n2.doubleValue() : 20;
-                Controles.Que que2 = switch (String.valueOf(l2.getOrDefault("que", "aparezca"))) {
-                    case "desaparezca" -> Controles.Que.DESAPAREZCA;
-                    case "se active" -> Controles.Que.SE_ACTIVE;
-                    case "valga" -> Controles.Que.VALGA;
-                    default -> Controles.Que.APAREZCA;
-                };
+                Controles.Que que2 = que(l2.get("que"));
                 String v2 = l2.get("valor") == null ? null : String.valueOf(l2.get("valor"));
                 String apodo2;
                 try {
@@ -213,12 +203,12 @@ public final class Guion {
                     }
                     lineas.add("FALLA  después de " + hacer + " " + control + ": " + f.getMessage());
                     return parte(false, "PARADO: después de «" + hacer + " " + control + "» no ha pasado lo que tenía que pasar: "
-                            + f.getMessage(), lineas, hechos, avisos, clave, ensayo);
+                            + f.getMessage(), lineas, hechos, avisos, rescates, clave, ensayo);
                 }
                 String r2 = controles.esperar(mapa.ventana(), apodo2, que2, v2, s2);
                 if (!r2.startsWith("Ya está")) {
                     lineas.add("FALLA  después de " + hacer + " " + control + ": " + r2);
-                    return parte(false, "PARADO: después de «" + hacer + " " + control + "»: " + r2, lineas, hechos, avisos, clave, ensayo);
+                    return parte(false, "PARADO: después de «" + hacer + " " + control + "»: " + r2, lineas, hechos, avisos, rescates, clave, ensayo);
                 }
                 lineas.add("ok     después de " + hacer + " " + control + ": " + r2);
             }
@@ -235,15 +225,66 @@ public final class Guion {
             }
             if (!mal.isEmpty()) {
                 lineas.add("FALLA  doble lectura: " + String.join("; ", mal));
-                return parte(false, "PARADO en la comprobación final: " + String.join("; ", mal), lineas, hechos, avisos, clave, ensayo);
+                return parte(false, "PARADO en la comprobación final: " + String.join("; ", mal), lineas, hechos, avisos, rescates, clave, ensayo);
             }
             lineas.add("ok     doble lectura: los " + escrito.size() + " datos escritos siguen siendo exactos");
         }
 
         String resumen = (ensayo ? "ENSAYO CORRECTO: " : "HECHO: ") + hechos + " pasos"
                 + (escrito.isEmpty() ? "" : ", " + escrito.size() + " datos comprobados dos veces")
-                + (avisos == 0 ? "" : " · " + avisos + " aviso(s) para actualizar el mapa");
-        return parte(true, resumen, lineas, hechos, avisos, clave, ensayo);
+                + (avisos == 0 ? "" : " · " + avisos + " aviso(s) para actualizar el mapa")
+                + (rescates == 0 ? "" : " · " + rescates + " atasco(s) resueltos por la IA");
+        return parte(true, resumen, lineas, hechos, avisos, rescates, clave, ensayo);
+    }
+
+    /** Marca de «este paso no había que hacerlo» (ensayo), para distinguirlo de «ha ido bien». */
+    private static final String SALTADO = new String("saltado");
+
+    /** Hace un paso. Devuelve null si ha ido bien, SALTADO si no tocaba hacerlo, o por qué ha fallado. */
+    private String hacerPaso(String hacer, String control, String apodo, String valor, double segundos,
+            Map<String, Object> m, boolean ensayo, List<String> lineas, Map<String, String[]> escrito) {
+        switch (hacer) {
+            case "escribir":
+                if (valor == null) {
+                    return "el guion no dice qué valor poner";
+                }
+                if (ensayo) {
+                    lineas.add("ENSAYO escribir " + control + " (" + apodo + "): encontrado, NO se escribe");
+                    return SALTADO;
+                }
+                String e = controles.escribir(mapa.ventana(), apodo, valor);
+                if (!e.startsWith("IGUAL")) {
+                    return e;
+                }
+                escrito.put(control, new String[] {apodo, valor});
+                return null;
+            case "pulsar":
+                String p = controles.pulsar(mapa.ventana(), apodo);
+                return p.startsWith("Pulsado") || p.startsWith("Desplegado") ? null : p;
+            case "esperar":
+                String s = controles.esperar(mapa.ventana(), apodo, que(m.get("que")), valor, segundos);
+                return s.startsWith("Ya está") ? null : s;
+            case "comprobar":
+                if (ensayo) {
+                    lineas.add("ENSAYO comprobar " + control + " (" + apodo + "): encontrado; su valor no se mira, "
+                            + "porque en ensayo no se ha escrito nada");
+                    return SALTADO;
+                }
+                String hay = controles.valorDe(mapa.ventana(), apodo);
+                return valor == null || valor.equals(hay) ? null
+                        : "se esperaba «" + valor + "» y hay «" + hay + "»";
+            default:
+                return "«" + hacer + "» no se sabe hacer (escribir, pulsar, esperar, comprobar)";
+        }
+    }
+
+    private static Controles.Que que(Object v) {
+        return switch (String.valueOf(v == null ? "aparezca" : v)) {
+            case "desaparezca" -> Controles.Que.DESAPAREZCA;
+            case "se active" -> Controles.Que.SE_ACTIVE;
+            case "valga" -> Controles.Que.VALGA;
+            default -> Controles.Que.APAREZCA;
+        };
     }
 
     private static Map<String, Object> mapaDe(Map<?, ?> crudo) {
@@ -276,7 +317,7 @@ public final class Guion {
                 + String.join(" / ", apodos) + "). O no estamos en esa pantalla, o el programa ha cambiado y hay que repasar el mapa.");
     }
 
-    private Parte parte(boolean bien, String resumen, List<String> lineas, int hechos, int avisos, String clave, boolean ensayo) {
+    private Parte parte(boolean bien, String resumen, List<String> lineas, int hechos, int avisos, int rescates, String clave, boolean ensayo) {
         lineas.forEach(registro);
         registro.accept(resumen);
         if (bien && !ensayo && !clave.isEmpty()) {
@@ -288,7 +329,7 @@ public final class Guion {
                 registro.accept("AVISO: no se ha podido apuntar que «" + clave + "» ya está hecho: " + e.getMessage());
             }
         }
-        return new Parte(bien, resumen, lineas, hechos, avisos);
+        return new Parte(bien, resumen, lineas, hechos, avisos, rescates);
     }
 
     /** Abre el programa del mapa si no está ya abierto. */

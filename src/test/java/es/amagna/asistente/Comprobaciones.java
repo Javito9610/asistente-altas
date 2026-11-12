@@ -270,6 +270,28 @@ public final class Comprobaciones {
         } catch (java.io.IOException e) {
             ok(false, "se puede leer un mapa: " + e.getMessage());
         }
+
+        // --- El aprendiz: la IA mira y propone, el programa comprueba ---
+        var propuesta = es.amagna.asistente.guion.Aprendiz.proponer(
+                p2 -> respuesta(texto("""
+                        {"controles": {
+                          "nif": ["#txtNif", "campo junto a NIF"],
+                          "importe": ["campo junto a Importe"],
+                          "guardar": "boton:Guardar"
+                        }}""")), "m", "- campo «1»\n- boton «Guardar»");
+        ok(propuesta.controles().size() == 3 && propuesta.controles().get("nif").equals(List.of("#txtNif", "campo junto a NIF")),
+                "del mapa que propone la IA se sacan los controles y sus formas, por orden");
+        ok(propuesta.controles().get("guardar").equals(List.of("boton:Guardar")), "y también si propone una sola forma");
+        var conRuido = es.amagna.asistente.guion.Aprendiz.proponer(
+                p2 -> respuesta(texto("Claro, aquí tienes el mapa:\n```json\n{\"controles\": {\"nif\": [\"#a\"]}}\n```\n¡Espero que sirva!")),
+                "m", "x");
+        ok(conRuido.controles().size() == 1, "si la IA se enrolla antes o después, se saca el mapa igual");
+        try {
+            es.amagna.asistente.guion.Aprendiz.proponer(p2 -> respuesta(texto("No he podido verlo")), "m", "x");
+            ok(false, "una respuesta sin mapa se rechaza");
+        } catch (IllegalStateException e) {
+            ok(true, "una respuesta sin mapa se rechaza en vez de dar por bueno un mapa vacío");
+        }
     }
 
     static int ids = 0;
