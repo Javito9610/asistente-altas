@@ -115,6 +115,12 @@ public final class Agente {
                     "Cancela lo que esté bloqueando una ventana marcada BLOQUEADA, aunque no se sepa el título del diálogo. "
                     + "Úsalo cuando una ventana no responda a los atajos. Cancelar no guarda ni confirma nada.",
                     "input_schema", Json.obj("type", "object", "properties", Json.obj())));
+            h.add(Json.obj("name", "cerrar_ventana", "description",
+                    "Cierra una ventana que HAYAS ABIERTO TÚ en esta tarea (como pulsar su aspa). Si la ventana no la has "
+                    + "abierto tú, el programa no te deja y te lo dice: nunca le cierras a nadie su trabajo. Deja cerrado "
+                    + "al terminar todo lo que hayas abierto.",
+                    "input_schema", Json.obj("type", "object", "properties", Json.obj(
+                            "titulo", Json.obj("type", "string", "description", "Parte del título de la ventana")), "required", List.of("titulo"))));
             h.add(Json.obj("name", "ventana_activa", "description",
                     "Dice el título de la ventana que tiene el foco del teclado (adonde irá lo que escribas o las teclas que pulses).",
                     "input_schema", Json.obj("type", "object", "properties", Json.obj())));
@@ -341,6 +347,10 @@ public final class Agente {
                 return List.of(textoBloque(ok ? "Hecho: la ventana está delante. Ventana activa: " + ventanas.activa()
                         : "No se ha encontrado ninguna ventana con ese título."));
             }
+            case "cerrar_ventana":
+                return List.of(textoBloque(ventanas instanceof es.amagna.asistente.manos.VentanasNativas vn
+                        ? vn.cerrarSiEsNuestra((String) in.get("titulo"))
+                        : "Aquí no se pueden cerrar ventanas."));
             case "ventana_activa":
                 return List.of(textoBloque("Ventana activa: «" + ventanas.activa() + "»"));
             case "leer_campo": {

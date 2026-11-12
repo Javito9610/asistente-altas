@@ -33,11 +33,54 @@ public final class VentanasNativas implements Ventanas {
         List<String> cmd = new ArrayList<>();
         cmd.add(programa);
         cmd.addAll(argumentos);
+        apuntarLasNuestras();
+        yaEstaban.clear();
+        yaEstaban.addAll(instantanea().keySet());
+        cuandoAbrimos = System.currentTimeMillis();
         try {
-            new ProcessBuilder(cmd).start();
+            nuestrosPid.add(new ProcessBuilder(cmd).start().pid());
         } catch (IOException e) {
             throw new IllegalStateException("No se puede abrir «" + programa + "»: " + e.getMessage(), e);
         }
+    }
+
+    // --- Qué ventanas son nuestras (para no cerrar nunca algo de otro) ---
+    private final java.util.Set<Long> nuestrosPid = new java.util.HashSet<>();
+    private final java.util.Set<Long> nuestras = new java.util.HashSet<>();
+    private final java.util.Set<Long> yaEstaban = new java.util.HashSet<>();
+    private long cuandoAbrimos;
+    private static final long MARGEN_MS = 60_000;
+
+    /** Las ventanas que han salido justo después de abrir nosotros un programa se apuntan como nuestras. */
+    private void apuntarLasNuestras() {
+        if (cuandoAbrimos == 0 || System.currentTimeMillis() - cuandoAbrimos > MARGEN_MS) {
+            return;
+        }
+        for (Long h : instantanea().keySet()) {
+            if (!yaEstaban.contains(h)) {
+                nuestras.add(h);
+            }
+        }
+    }
+
+    /**
+     * Cierra una ventana SOLO si la hemos abierto nosotros: o es de un programa que hemos arrancado, o salió justo
+     * después de arrancarlo. Si no, no se toca y se dice por qué. Así el asistente no puede cerrarle a nadie su trabajo.
+     */
+    public String cerrarSiEsNuestra(String titulo) {
+        apuntarLasNuestras();
+        Pointer h = handleDe(titulo);
+        if (h == null) {
+            return "No hay ninguna ventana cuyo título contenga «" + titulo + "».";
+        }
+        String nombre = Win32.titulo(h);
+        boolean mismaApp = nuestrosPid.contains(Win32.pid(h));
+        if (!mismaApp && !nuestras.contains(Pointer.nativeValue(h))) {
+            return "NO SE CIERRA «" + nombre + "»: esa ventana no la has abierto tú, así que no se toca. "
+                    + "Solo puedes cerrar lo que hayas abierto en esta tarea.";
+        }
+        String cerrada = cerrarVentana(nombre);
+        return cerrada == null ? "No se ha podido cerrar «" + nombre + "»." : "Cerrada «" + cerrada + "».";
     }
 
     /** Ventanas visibles y con título, en el orden de Windows (de la de delante a la de detrás). */

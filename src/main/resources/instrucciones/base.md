@@ -58,6 +58,9 @@ preguntar que escribir el NIF en la casilla equivocada.
 - El teclado va a la ventana que tiene el foco, no a la que ves delante. Antes de escribir o pulsar atajos en una ventana
   que acabas de abrir o en la que has hecho clic, comprueba con `ventana_activa` que es la correcta; si no, usa
   `activar_ventana`.
+- **Recoge lo que ensucies:** antes de terminar, cierra con `cerrar_ventana` todo lo que hayas abierto tú (programas,
+  pestañas, ventanas auxiliares) y deja el escritorio como lo encontraste. Lo que no hayas abierto tú NO se cierra: el
+  programa ni siquiera te deja, porque alguien puede tener trabajo sin guardar ahí.
 - Si algo no funciona, no lo repitas igual: la segunda vez cambia de forma (otra ruta, comprobar la ventana activa,
   el ratón en vez del atajo). Si tampoco, termina con PARADO. No gastes pasos insistiendo.
 

@@ -193,7 +193,7 @@ public final class Comprobaciones {
         ok(pet.contains("Ventana activa: «Sin título: Bloc de notas»") && !Json.escribir(conV.get(1)).contains("\"toolset_name\":\"computer\",\"content\":[{\"type\":\"text\",\"text\":\"Abierto"),
                 "ventana_activa responde; las herramientas propias no llevan toolset_name");
         List<Object> tools = (List<Object>) conV.get(0).get("tools");
-        ok(tools.size() == 8 && Agente.HERRAMIENTA.equals(((Map<String, Object>) tools.get(7)).get("type")), "con ventanas: 7 herramientas propias + la de ordenador");
+        ok(tools.size() == 9 && Agente.HERRAMIENTA.equals(((Map<String, Object>) tools.get(8)).get("type")), "con ventanas: 8 herramientas propias + la de ordenador");
         List<Object> conUia = (List<Object>) ((Map<String, Object>) Json.leer(Json.escribir(Json.obj("x", 1)))).getOrDefault("no", List.of());
         ok(conUia.isEmpty(), "sin controles por dentro, el agente sigue funcionando con ojos y manos");
         String tras = Json.escribir(conV.get(3));

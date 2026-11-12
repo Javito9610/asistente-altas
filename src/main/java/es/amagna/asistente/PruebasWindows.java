@@ -264,6 +264,23 @@ public final class PruebasWindows {
         ok(Files.isRegularFile(ex.carpeta().resolve("001-pantalla.png")) && Files.isRegularFile(ex.carpeta().resolve("pasos.jsonl")),
                 "y junto a él la captura y el detalle paso a paso");
 
+        System.out.println("11) Solo cierra lo que ha abierto él (lo demás no se toca)");
+        String mia = "prueba-cerrar";
+        v.abrir(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                List.of("-cp", System.getProperty("java.class.path"), "es.amagna.asistente.VentanaDePrueba", mia, "formulario"));
+        ok(ctrl.esperar(mia, null, es.amagna.asistente.manos.Controles.Que.APAREZCA, null, 25).startsWith("Ya está"),
+                "se abre una ventana nuestra para probarlo");
+        // Un asistente que no la ha abierto no puede cerrarla, por mucho que se lo pidan.
+        String ajena = new VentanasNativas(false).cerrarSiEsNuestra(mia);
+        System.out.println("   otro asistente intenta cerrarla: " + ajena);
+        ok(ajena.startsWith("NO SE CIERRA"), "no se cierra una ventana que no ha abierto él: la deja en paz y lo dice");
+        // La nuestra sí.
+        String propia = ((VentanasNativas) v).cerrarSiEsNuestra(mia);
+        System.out.println("   la que abrió él: " + propia);
+        ok(propia.startsWith("Cerrada"), "la que ha abierto él sí la cierra");
+        ok(ctrl.esperar(mia, null, es.amagna.asistente.manos.Controles.Que.DESAPAREZCA, null, 10).startsWith("Ya está"),
+                "y se queda cerrada de verdad");
+
         terminar(manos, v);
     }
 
@@ -303,7 +320,11 @@ public final class PruebasWindows {
         }
     }
 
-    /** Vacía una pestaña del Bloc de notas, la guarda y la cierra, para que no pregunte si guardar. */
+    /**
+     * Cierra NUESTRA pestaña del Bloc de notas y solo la nuestra. Primero la vacía y la guarda en su fichero (así no
+     * pregunta si guardar) y después cierra la PESTAÑA con Ctrl+W. Cerrar la ventana entera no vale: en el Bloc de notas
+     * de ahora una ventana lleva varias pestañas y se llevaría por delante las de la persona que esté usando el PC.
+     */
     private static boolean cerrarPestana(ManosRobot manos, Ventanas v, String titulo) {
         v.cancelarBloqueos();
         if (!v.activar(titulo)) {
@@ -312,16 +333,27 @@ public final class PruebasWindows {
         manos.tecla("ctrl+a", 1);
         manos.tecla("Delete", 1);
         manos.tecla("ctrl+s", 1);
+        manos.esperar(1.2);
+        manos.tecla("ctrl+w", 1); // cerrar la pestaña (en el Bloc de notas clásico, la ventana: también vale)
         manos.esperar(1);
-        v.cerrarVentana(titulo);
-        manos.esperar(0.6);
-        if (v.abiertas().contains(titulo)) {
-            manos.tecla("Escape", 1); // si pregunta si guardar, se deja como está
-            v.cancelarBloqueos();
-            System.out.println("   (no se ha podido cerrar «" + titulo + "»: ciérrala tú, sin guardar)");
-            return false;
+        if (!v.abiertas().contains(titulo)) {
+            return true;
         }
-        return true;
+        // Si el atajo no llegó, se pulsa el aspa de la pestaña por su nombre, sin coordenadas.
+        try {
+            String r = new es.amagna.asistente.manos.Controles((VentanasNativas) v).pulsar(titulo, "boton:Cerrar pestaña");
+            System.out.println("   cerrar la pestaña por su nombre: " + r);
+            manos.esperar(1);
+        } catch (RuntimeException e) {
+            System.out.println("   (no se ha podido pulsar el aspa de la pestaña: " + e.getMessage() + ")");
+        }
+        if (!v.abiertas().contains(titulo)) {
+            return true;
+        }
+        manos.tecla("Escape", 1); // si pregunta si guardar, se deja como está
+        v.cancelarBloqueos();
+        System.out.println("   (no se ha podido cerrar «" + titulo + "»: ciérrala tú, sin guardar)");
+        return false;
     }
 
     /** Deja el Bloc de notas como estaba: vacía la pestaña de la prueba, la guarda y la cierra (sin preguntar nada). */
