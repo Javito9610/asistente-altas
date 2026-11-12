@@ -8,7 +8,13 @@ on:
 
 jobs:
   windows:
-    runs-on: windows-latest
+    # Varias versiones de Windows: 2022 (núcleo de Windows 10) y 2025 (núcleo de Windows 11 24H2), en inglés.
+    # El PC de Javi (Windows 11 en español, pantalla al 125 %) es la tercera prueba: «asistente probar-windows».
+    strategy:
+      fail-fast: false
+      matrix:
+        sistema: [windows-2022, windows-2025]
+    runs-on: ${{ matrix.sistema }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
@@ -29,6 +35,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v5
         with:
-          name: captura
+          name: captura-${{ matrix.sistema }}
           path: captura-prueba.png
           if-no-files-found: ignore
