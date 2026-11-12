@@ -176,7 +176,7 @@ public final class PruebasWindows {
             }
             // Si un apodo vale para varios controles, no se toca ninguno: antes parar que equivocarse.
             String varios = ctrl.pulsar(clave, "boton:");
-            ok(varios.contains("encaja con") || varios.startsWith("Pulsado") || varios.startsWith("No hay ningún"), "apodo ambiguo: " + varios);
+            ok(varios.contains("encaja igual de bien con") || varios.startsWith("Pulsado") || varios.startsWith("No hay ningún"), "apodo ambiguo: " + varios);
             // Pulsar por nombre, sin coordenadas: el primer menú que haya (en el idioma que sea).
             java.util.regex.Matcher m = java.util.regex.Pattern.compile("opcion-de-menu «([^»]+)»").matcher(arbol);
             String opcion = null;
@@ -243,7 +243,8 @@ public final class PruebasWindows {
 
             // Y la prueba de que no se le escapa el tiempo: algo que no va a pasar.
             long t3 = System.currentTimeMillis();
-            String nunca = ctrl.esperar(ficha, null, es.amagna.asistente.manos.Controles.Que.APAREZCA, null, 2);
+            String nunca = ctrl.esperar("ventana-que-no-existe-jamas-98765", null,
+                    es.amagna.asistente.manos.Controles.Que.APAREZCA, null, 2);
             long espero = System.currentTimeMillis() - t3;
             ok(nunca.startsWith("Se han pasado") && espero >= 1800 && espero < 6000,
                     "esperar_a: si no pasa, avisa al acabarse el tiempo (" + espero + " ms) y dice qué había");

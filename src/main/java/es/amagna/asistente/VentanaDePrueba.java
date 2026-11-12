@@ -66,6 +66,13 @@ public final class VentanaDePrueba {
         for (java.awt.Component c : new java.awt.Component[] {eNif, cNif, eImporte, cImporte, guardar}) {
             f.add(c);
         }
+        f.addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosing(java.awt.event.WindowEvent e) {
+                f.dispose();
+                System.exit(0);
+            }
+        });
         f.setSize(380, 200);
         f.setLocation(80, 80);
         f.setVisible(true);
