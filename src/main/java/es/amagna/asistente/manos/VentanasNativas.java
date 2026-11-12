@@ -128,6 +128,38 @@ public final class VentanasNativas implements Ventanas {
         return b.toString().strip();
     }
 
+    /** Los diálogos visibles (ventanas propiedad de otra o de la clase estándar de diálogo). */
+    static List<Pointer> dialogos() {
+        List<Pointer> r = new ArrayList<>();
+        for (Pointer h : visibles()) {
+            Pointer dueno = Win32.User32.I.GetAncestor(h, Win32.GA_ROOTOWNER);
+            if ((dueno != null && !dueno.equals(h)) || "#32770".equals(Win32.clase(h))) {
+                r.add(h);
+            }
+        }
+        return r;
+    }
+
+    @Override
+    public String cancelarDialogo(String titulo) {
+        if (modoVista) {
+            System.out.println("    [modo vista, no se hace] cancelar diálogo «" + titulo + "»");
+            return null;
+        }
+        String buscado = titulo.toLowerCase(Locale.ROOT);
+        for (Pointer d : dialogos()) {
+            String t = Win32.titulo(d);
+            if (t.toLowerCase(Locale.ROOT).contains(buscado)) {
+                Win32.cerrar(d);
+                for (int k = 0; k < 20 && Win32.User32.I.IsWindowVisible(d); k++) {
+                    dormir(50);
+                }
+                return t;
+            }
+        }
+        return null;
+    }
+
     /** Para diagnosticar: todas las ventanas visibles, sin agrupar, con su clase, programa y dueña. */
     public static String diagnostico() {
         StringBuilder b = new StringBuilder();

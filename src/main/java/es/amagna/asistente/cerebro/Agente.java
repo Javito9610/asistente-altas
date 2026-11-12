@@ -97,6 +97,11 @@ public final class Agente {
                     "Lista todas las ventanas abiertas, también las que están detrás o minimizadas y los diálogos que tienen "
                     + "dentro (Abrir, Guardar, avisos…). La captura solo enseña lo que está encima: usa esto para saber todo lo que hay.",
                     "input_schema", Json.obj("type", "object", "properties", Json.obj())));
+            h.add(Json.obj("name", "cancelar_dialogo", "description",
+                    "Cancela un diálogo abierto (como pulsar Cancelar o su aspa: no guarda ni confirma nada). Solo para "
+                    + "diálogos que has abierto tú o que bloquean la ventana en la que trabajas. Devuelve cuál ha cerrado.",
+                    "input_schema", Json.obj("type", "object", "properties", Json.obj(
+                            "titulo", Json.obj("type", "string", "description", "Parte del título del diálogo")), "required", List.of("titulo"))));
             h.add(Json.obj("name", "ventana_activa", "description",
                     "Dice el título de la ventana que tiene el foco del teclado (adonde irá lo que escribas o las teclas que pulses).",
                     "input_schema", Json.obj("type", "object", "properties", Json.obj())));
@@ -270,6 +275,10 @@ public final class Agente {
             }
             case "ventanas_abiertas":
                 return List.of(textoBloque("Ventanas abiertas:\n" + ventanas.abiertas()));
+            case "cancelar_dialogo": {
+                String t = ventanas.cancelarDialogo((String) in.get("titulo"));
+                return List.of(textoBloque(t == null ? "No hay ningún diálogo con ese título." : "Cancelado el diálogo «" + t + "»."));
+            }
             default:
                 throw new IllegalArgumentException("Herramienta desconocida: " + accion);
         }

@@ -55,14 +55,30 @@ public final class PruebasWindows {
         System.out.println("4) Atajos de teclado y diálogos escondidos: Ctrl+O tiene que abrir un diálogo y verse en la lista");
         System.out.println("   (se prueba cada forma de mandar teclas y se guarda la que funciona en este PC)");
         ManosRobot.Teclado funciona = null;
-        String antes = v.abiertas();
-        if (lineaDe(antes, clave).contains("BLOQUEADA")) {
-            ok(false, "no se puede probar: " + lineaDe(antes, clave).replaceFirst("^- ", "")
-                    + ". Cierra ese diálogo (Cancelar) y repite la prueba.");
-            Files.deleteIfExists(fichero);
-            terminar(manos, v);
-            return;
+        if (ci) { // en GitHub se provoca el caso a propósito: otra ventana del Bloc de notas con un diálogo abierto
+            Path otro = Files.createTempFile("otra-ventana-", ".txt");
+            v.abrir("notepad.exe", List.of(otro.toString()));
+            String claveOtro = otro.getFileName().toString().replace(".txt", "");
+            esperar(() -> v.abiertas().contains(claveOtro), 20_000);
+            v.activar(claveOtro);
+            manos.usarTeclado(ManosRobot.Teclado.VK);
+            manos.tecla("ctrl+o", 1);
+            esperar(() -> hayDialogo(v.abiertas(), claveOtro), 5_000);
+            v.activar(clave);
+            System.out.println("   (GitHub) se ha dejado un diálogo abierto en otra ventana a propósito: " + lineaDe(v.abiertas(), clave));
         }
+        // Si otra ventana del Bloc de notas tiene un diálogo abierto (de una prueba anterior), bloquea a esta: se cancela y ya.
+        for (int intento = 0; intento < 5; intento++) {
+            String linea = lineaDe(v.abiertas(), clave);
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("BLOQUEADA por el diálogo «([^»]*)»").matcher(linea);
+            if (!m.find()) {
+                break;
+            }
+            String cerrado = v.cancelarDialogo(m.group(1));
+            System.out.println("   había quedado abierto el diálogo «" + m.group(1) + "» de otra ventana del Bloc de notas: " + (cerrado != null ? "cancelado" : "no se ha podido cerrar"));
+            manos.esperar(0.5);
+        }
+        ok(!lineaDe(v.abiertas(), clave).contains("BLOQUEADA"), "la ventana no está bloqueada por ningún diálogo");
         for (ManosRobot.Teclado modo : List.of(ManosRobot.Teclado.VK, ManosRobot.Teclado.SCAN, ManosRobot.Teclado.ROBOT)) {
             v.activar(clave);
             manos.usarTeclado(modo);

@@ -28,6 +28,14 @@ public interface Ventanas {
         throw new UnsupportedOperationException("No disponible");
     }
 
+    /**
+     * Cancela un diálogo abierto (como pulsar su aspa o Cancelar: no guarda ni confirma nada). Busca por título entre
+     * los diálogos; devuelve el título del que ha cerrado, o null si no había ninguno.
+     */
+    default String cancelarDialogo(String titulo) {
+        throw new UnsupportedOperationException("No disponible");
+    }
+
     /** valor == null: ese control no deja leer su texto. */
     record Campo(String nombre, String tipo, String valor, String ventana) {
     }

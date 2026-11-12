@@ -85,11 +85,18 @@ public final class Win32 {
     static final int GA_ROOT = 2;
     static final int GA_ROOTOWNER = 3;
     static final int SW_RESTORE = 9;
+    static final int WM_CLOSE = 0x0010;
     static final int WM_GETTEXT = 0x000D;
     static final int WM_GETTEXTLENGTH = 0x000E;
     static final int SMTO_ABORTIFHUNG = 0x0002;
     /** Tope de espera de cada pregunta a un programa: si no contesta en este tiempo, está colgado o bloqueado. */
     static final int MS_TOPE = 2000;
+
+    /** Cierra una ventana como si se pulsara su aspa (en un diálogo equivale a Cancelar: no guarda ni confirma nada). */
+    static boolean cerrar(Pointer hwnd) {
+        PointerByReference r = new PointerByReference();
+        return User32.I.SendMessageTimeoutW(hwnd, WM_CLOSE, null, null, SMTO_ABORTIFHUNG, MS_TOPE, r) != null;
+    }
 
     static String titulo(Pointer hwnd) {
         char[] b = new char[512];

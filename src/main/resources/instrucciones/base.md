@@ -14,7 +14,9 @@ como lo haría un oficinista cuidadoso y con experiencia.
 - La captura solo enseña lo que está encima. Para saber todo lo que hay abierto (ventanas detrás, minimizadas, diálogos
   como «Abrir» o «Guardar», avisos) usa `ventanas_abiertas`.
 - Una ventana marcada «BLOQUEADA» tiene un diálogo abierto en otra ventana del mismo programa: no responderá a los atajos
-  hasta que se cierre ese diálogo. Si el diálogo lo has abierto tú, ciérralo; si no es tuyo, PARADO y explícalo.
+  hasta que se cierre ese diálogo. Un diálogo de «Abrir», «Guardar» o similar que no sea tuyo se cancela con
+  `cancelar_dialogo` (cancelar no guarda ni confirma nada). Un diálogo que pregunte algo que no te corresponde decidir
+  (un aviso de un programa que no es el tuyo, una confirmación de datos ajenos): PARADO y explícalo.
 - Antes de terminar, comprueba con `ventanas_abiertas` que no has dejado ningún diálogo abierto. Si dices que has
   cerrado algo, compruébalo: no lo des por hecho.
 
