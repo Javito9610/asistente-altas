@@ -129,7 +129,7 @@ public final class PruebasWindows {
         manos.tecla("ctrl+o", 1);
         String abrir = esperarNueva(antesO, 45_000);
         System.out.println(abrir != null
-                ? "   tarda " + (System.currentTimeMillis() - tO) / 1000 + " s en abrir «" + abrir + "»"
+                ? "   tarda " + (System.currentTimeMillis() - tO) / 1000 + " s en abrir «" + abrir + "»; se cancela: " + v.cancelarDialogo(abrir)
                 : "   no se ha abierto en 45 s (no cuenta como fallo: en este PC el diálogo de archivos es muy lento)");
         quitarEstorbos(manos, v);
 
@@ -161,23 +161,56 @@ public final class PruebasWindows {
         }
     }
 
+    /** Cierra las ventanas que dejaron abiertas pruebas anteriores de este mismo programa (sus ficheros son nuestros). */
+    private static void limpiarRestos(ManosRobot manos, Ventanas v) {
+        for (int k = 0; k < 6; k++) {
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("prueba-asistente-\\d+").matcher(v.abiertas());
+            String resto = null;
+            while (m.find()) {
+                if (!m.group().equals(clave)) {
+                    resto = m.group();
+                    break;
+                }
+            }
+            if (resto == null) {
+                return;
+            }
+            System.out.println("   cerrando una ventana de una prueba anterior: " + resto);
+            if (!cerrarPestana(manos, v, resto)) {
+                return; // si una no se deja, las demás tampoco: no insistir
+            }
+        }
+    }
+
+    /** Vacía una pestaña del Bloc de notas, la guarda y la cierra, para que no pregunte si guardar. */
+    private static boolean cerrarPestana(ManosRobot manos, Ventanas v, String titulo) {
+        v.cancelarBloqueos();
+        if (!v.activar(titulo)) {
+            return false;
+        }
+        manos.tecla("ctrl+a", 1);
+        manos.tecla("Delete", 1);
+        manos.tecla("ctrl+s", 1);
+        manos.esperar(1);
+        v.cerrarVentana(titulo);
+        manos.esperar(0.6);
+        if (v.abiertas().contains(titulo)) {
+            manos.tecla("Escape", 1); // si pregunta si guardar, se deja como está
+            v.cancelarBloqueos();
+            System.out.println("   (no se ha podido cerrar «" + titulo + "»: ciérrala tú, sin guardar)");
+            return false;
+        }
+        return true;
+    }
+
     /** Deja el Bloc de notas como estaba: vacía la pestaña de la prueba, la guarda y la cierra (sin preguntar nada). */
     private static void terminar(ManosRobot manos, Ventanas v) {
         try {
             v.cancelarBloqueos();
             if (!clave.isEmpty() && v.abiertas().contains(clave)) {
-                v.activar(clave);
-                manos.tecla("ctrl+a", 1);
-                manos.tecla("Delete", 1);
-                manos.tecla("ctrl+s", 1);
-                manos.esperar(1);
-                v.cerrarVentana(clave);
-                manos.esperar(0.5);
-                if (v.abiertas().contains(clave)) {
-                    manos.tecla("Escape", 1); // si pregunta si guardar, no se cierra: se deja como está
-                    System.out.println("   (no se ha podido cerrar la pestaña de la prueba: ciérrala tú, sin guardar)");
-                }
+                cerrarPestana(manos, v, clave);
             }
+            limpiarRestos(manos, v);
             Files.deleteIfExists(fichero);
         } catch (RuntimeException | java.io.IOException e) {
             System.out.println("   (limpieza: " + e.getMessage() + ")");
