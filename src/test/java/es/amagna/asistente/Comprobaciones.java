@@ -197,6 +197,8 @@ public final class Comprobaciones {
         String tras = Json.escribir(conV.get(3));
         ok(tras.contains("DISTINTO en el carácter 39") && tras.contains("Editor de texto"), "leer_campo lee el control con el foco y detecta el punto que falta");
         ok(tras.contains("diálogos abiertos dentro: «Abrir»"), "ventanas_abiertas enseña los diálogos que la captura no ve");
+        ok(es.amagna.asistente.manos.VentanasWindows.json("aviso\r\n[{\"t\":\"a]b\\\"c\"}]\r\n#< CLIXML\r\n<Objs>[x]</Objs>").equals("[{\"t\":\"a]b\\\"c\"}]"),
+                "salida de PowerShell: solo el JSON, aunque haya avisos antes o después");
         ok(Agente.comparar("Hola, soy el Asistente.", "Hola, soy el Asistente.").startsWith("IGUAL"), "comparar: igual");
         String d = Agente.comparar("Hola, soy el Asistente.", "Hola, soy el Asistente");
         ok(d.startsWith("DISTINTO en el carácter 23") && d.contains("se esperaba «.» y hay (fin)"), "comparar: le falta el punto final → DISTINTO y dónde");

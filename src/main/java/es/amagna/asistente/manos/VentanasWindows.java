@@ -120,24 +120,43 @@ public final class VentanasWindows implements Ventanas {
         return o == null ? "" : String.valueOf(o);
     }
 
-    /** La salida de PowerShell desde el primer «[» o «{» (por si sale algún aviso antes). */
-    private static String json(String salida) {
+    /** Solo el JSON de la salida de PowerShell: del primer «[» o «{» hasta su cierre (lo de antes o después, fuera). */
+    public static String json(String salida) {
         int a = salida.indexOf('[');
         int b = salida.indexOf('{');
         int i = a < 0 ? b : b < 0 ? a : Math.min(a, b);
         if (i < 0) {
             throw new IllegalStateException("Windows no ha devuelto datos: " + salida.strip());
         }
-        return salida.substring(i).strip();
+        int nivel = 0;
+        boolean cadena = false;
+        for (int k = i; k < salida.length(); k++) {
+            char c = salida.charAt(k);
+            if (cadena) {
+                if (c == '\\') {
+                    k++;
+                } else if (c == '"') {
+                    cadena = false;
+                }
+            } else if (c == '"') {
+                cadena = true;
+            } else if (c == '[' || c == '{') {
+                nivel++;
+            } else if ((c == ']' || c == '}') && --nivel == 0) {
+                return salida.substring(i, k + 1);
+            }
+        }
+        throw new IllegalStateException("Windows ha devuelto datos cortados.");
     }
 
     private static String powershell(String script) {
         try {
             // -EncodedCommand (UTF-16LE en base64): así las comillas del script no se rompen al pasar por la línea de órdenes.
             String codificado = java.util.Base64.getEncoder().encodeToString(
-                    ("[Console]::OutputEncoding=[Text.Encoding]::UTF8;" + script).getBytes(StandardCharsets.UTF_16LE));
+                    ("$ProgressPreference='SilentlyContinue';$ErrorActionPreference='SilentlyContinue';"
+                            + "[Console]::OutputEncoding=[Text.Encoding]::UTF8;" + script).getBytes(StandardCharsets.UTF_16LE));
             Process p = new ProcessBuilder(PS, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", codificado)
-                    .redirectErrorStream(true).start();
+                    .redirectError(ProcessBuilder.Redirect.DISCARD).start(); // los avisos y el progreso de PowerShell, fuera
             if (!p.waitFor(15, TimeUnit.SECONDS)) {
                 p.destroyForcibly();
                 throw new IllegalStateException("PowerShell no ha respondido");
