@@ -105,12 +105,15 @@ public final class Comprobaciones {
         };
         List<Map<String, Object>> peticiones = new ArrayList<>();
         List<Map<String, Object>> guion = new ArrayList<>(List.of(
-                respuesta(uso("screenshot", Map.of())),
-                respuesta(uso("left_click", Map.of("coordinate", List.of(100L, 200L))), uso("type", Map.of("text", "Ñandú")), uso("key", Map.of("text", "Tab", "repeat", 2L))),
-                respuesta(uso("screenshot", Map.of())),
-                respuesta(uso("key", Map.of("text", "ctrl+inventada")), uso("type", Map.of("text", "no debe escribirse"))),
-                respuesta(uso("screenshot", Map.of())),
-                respuesta(uso("screenshot", Map.of())),
+                respuesta(pensar(), uso("screenshot", Map.of())),
+                respuesta(pensar(), uso("left_click", Map.of("coordinate", List.of(100L, 200L))), uso("type", Map.of("text", "Ñandú")), uso("key", Map.of("text", "Tab", "repeat", 2L))),
+                respuesta(pensar(), uso("screenshot", Map.of())),
+                respuesta(pensar(), uso("key", Map.of("text", "ctrl+inventada")), uso("type", Map.of("text", "no debe escribirse"))),
+                respuesta(pensar(), uso("screenshot", Map.of())),
+                respuesta(pensar(), uso("screenshot", Map.of())),
+                respuesta(pensar(), uso("screenshot", Map.of())),
+                respuesta(pensar(), uso("screenshot", Map.of())),
+                respuesta(pensar(), uso("screenshot", Map.of())),
                 respuesta(texto("TERMINADO: escrito y comprobado."))));
         Cerebro claude = p -> {
             peticiones.add((Map<String, Object>) Json.leer(Json.escribir(p))); // copia, como lo vería la API
@@ -118,7 +121,7 @@ public final class Comprobaciones {
         };
         List<String> log = new ArrayList<>();
         Agente.Resultado r = new Agente(claude, manos, "modelo-prueba", "instrucciones", 20, log::add).ejecutar("Escribe Ñandú");
-        ok(r.terminado() && r.mensaje().startsWith("TERMINADO") && r.pasos() == 7, "el agente termina cuando Claude dice TERMINADO");
+        ok(r.terminado() && r.mensaje().startsWith("TERMINADO") && r.pasos() == 10, "el agente termina cuando Claude dice TERMINADO");
         ok(hecho.contains("clic 100,200 b1 x1") && hecho.contains("escribir Ñandú") && hecho.contains("tecla Tab x2"), "las manos hacen lo que dice Claude, en orden");
         ok(!hecho.contains("escribir no debe escribirse"), "tras una acción que falla, el resto del turno no se ejecuta");
         Map<String, Object> p0 = peticiones.get(0);
@@ -130,8 +133,11 @@ public final class Comprobaciones {
         ok("computer".equals(tr.get("toolset_name")) && Boolean.TRUE.equals(tr.get("is_error")), "el error vuelve a Claude marcado como error");
         Map<String, Object> tr2 = (Map<String, Object>) ((List<Object>) ultimo.get("content")).get(1);
         ok(String.valueOf(tr2.get("content")).contains("Not executed"), "la acción siguiente se marca como no ejecutada");
-        long imagenes = Json.escribir(peticiones.get(6)).split("\"type\":\"image\"", -1).length - 1;
-        ok(imagenes == 3, "solo se mandan las 3 últimas capturas (" + imagenes + ")");
+        int[] imgs = peticiones.stream().mapToInt(p -> Json.escribir(p).split("\"type\":\"image\"", -1).length - 1).toArray();
+        ok(java.util.Arrays.equals(imgs, new int[] {0, 1, 1, 2, 2, 3, 4, 5, 6, 3}), "capturas: se recortan por tandas, de 7 a 3 " + java.util.Arrays.toString(imgs));
+        int antes = Json.escribir(peticiones.get(8)).split("\"type\":\"thinking\"", -1).length - 1;
+        int despues = Json.escribir(peticiones.get(9)).split("\"type\":\"thinking\"", -1).length - 1;
+        ok(antes == 8 && despues == 1, "al recortar, se quitan los pensamientos posteriores al corte y se conserva el anterior (" + antes + " → " + despues + ")");
         Map<String, Object> sinFin = respuesta(uso("screenshot", Map.of()));
         Agente.Resultado tope = new Agente(p -> sinFin, manos, "m", "i", 3, s -> { }).ejecutar("bucle");
         ok(!tope.terminado() && tope.mensaje().startsWith("PARADO"), "con el tope de pasos, se para");
@@ -141,6 +147,10 @@ public final class Comprobaciones {
 
     static Map<String, Object> uso(String accion, Map<String, Object> in) {
         return Json.obj("type", "tool_use", "id", "toolu_" + (ids++), "name", accion, "toolset_name", "computer", "input", new java.util.LinkedHashMap<>(in));
+    }
+
+    static Map<String, Object> pensar() {
+        return Json.obj("type", "thinking", "thinking", "...", "signature", "firma");
     }
 
     static Map<String, Object> texto(String t) {

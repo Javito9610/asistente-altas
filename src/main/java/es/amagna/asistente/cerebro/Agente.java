@@ -17,14 +17,18 @@ import java.util.function.Consumer;
  *   4. se repite hasta que Claude termina (sin más acciones) o se llega al tope de pasos.
  *
  * Herramienta: «computer_toolset_20260801» (la actual de la API de Claude; las coordenadas son las de la captura).
- * Para gastar poco: las instrucciones van en caché y solo se conservan las últimas capturas; las anteriores se
- * sustituyen por un texto («captura antigua»).
+ * Para gastar poco: las instrucciones van en caché y, cuando hay más de 6 capturas, las viejas se sustituyen por un
+ * texto («captura antigua») y se dejan las 3 últimas. Al cambiar así el principio de la conversación, los bloques de
+ * pensamiento de Claude de después ya no valen (la API los ata a lo que había antes): se quitan, como pide la API.
  *
  * El resultado final: Claude acaba con «TERMINADO: …» o «PARADO: …» (lo piden las instrucciones).
  */
 public final class Agente {
     public static final String HERRAMIENTA = "computer_toolset_20260801";
-    private static final int CAPTURAS_QUE_SE_GUARDAN = 3;
+    /** Se recortan las capturas viejas por tandas: al pasar de MAX se dejan las últimas MIN. Así el principio de la
+     *  conversación cambia pocas veces (la caché aguanta y el pensamiento de Claude sigue siendo válido). */
+    private static final int CAPTURAS_MAX = 6;
+    private static final int CAPTURAS_MIN = 3;
 
     public record Resultado(boolean terminado, String mensaje, int pasos, long tokensEntrada, long tokensSalida, long tokensCache) {
     }
@@ -51,7 +55,10 @@ public final class Agente {
         mensajes.add(Json.obj("role", "user", "content", tarea));
         long ent = 0, sal = 0, cache = 0;
         for (int paso = 1; paso <= pasosMax; paso++) {
-            recortarCapturas(mensajes);
+            int cambiado = recortarCapturas(mensajes);
+            if (cambiado >= 0) {
+                quitarPensamientos(mensajes, cambiado);
+            }
             Map<String, Object> peticion = Json.obj(
                     "model", modelo,
                     "max_tokens", 4096,
@@ -163,30 +170,64 @@ public final class Agente {
         return Json.obj("type", "text", "text", t);
     }
 
-    /** Deja solo las últimas capturas; las anteriores pasan a ser un texto. Ahorra mucho en cada paso. */
+    /**
+     * Si hay más de CAPTURAS_MAX capturas, deja las CAPTURAS_MIN últimas y cambia las demás por un texto.
+     * Devuelve el índice del primer mensaje cambiado, o -1 si no ha tocado nada.
+     */
     @SuppressWarnings("unchecked")
-    static void recortarCapturas(List<Object> mensajes) {
-        int vistas = 0;
-        for (int k = mensajes.size() - 1; k >= 0; k--) {
+    static int recortarCapturas(List<Object> mensajes) {
+        int total = 0;
+        for (Object o : mensajes) {
+            total += Json.escribir(o).split("\"type\":\"image\"", -1).length - 1;
+        }
+        if (total <= CAPTURAS_MAX) {
+            return -1;
+        }
+        int quitar = total - CAPTURAS_MIN;
+        int primero = -1;
+        for (int k = 0; k < mensajes.size() && quitar > 0; k++) {
             Map<String, Object> m = (Map<String, Object>) mensajes.get(k);
             if (!"user".equals(m.get("role")) || !(m.get("content") instanceof List<?> partes)) {
                 continue;
             }
             for (Object p : partes) {
                 Map<String, Object> tr = (Map<String, Object>) p;
-                if (!"tool_result".equals(tr.get("type")) || !(tr.get("content") instanceof List<?> cont)) {
+                if (quitar == 0 || !"tool_result".equals(tr.get("type")) || !(tr.get("content") instanceof List<?> cont)) {
                     continue;
                 }
                 List<Object> nuevo = new ArrayList<>();
                 for (Object x : cont) {
                     Map<String, Object> bloque = (Map<String, Object>) x;
-                    if ("image".equals(bloque.get("type")) && ++vistas > CAPTURAS_QUE_SE_GUARDAN) {
+                    if (quitar > 0 && "image".equals(bloque.get("type"))) {
                         nuevo.add(textoBloque("[captura antigua omitida]"));
+                        quitar--;
+                        if (primero < 0) {
+                            primero = k;
+                        }
                     } else {
                         nuevo.add(bloque);
                     }
                 }
                 tr.put("content", nuevo);
+            }
+        }
+        return primero;
+    }
+
+    /** Quita los bloques de pensamiento de las respuestas de Claude posteriores al mensaje «desde» (ya no valen). */
+    @SuppressWarnings("unchecked")
+    static void quitarPensamientos(List<Object> mensajes, int desde) {
+        for (int k = desde + 1; k < mensajes.size(); k++) {
+            Map<String, Object> m = (Map<String, Object>) mensajes.get(k);
+            if ("assistant".equals(m.get("role")) && m.get("content") instanceof List<?> partes) {
+                List<Object> limpio = new ArrayList<>();
+                for (Object p : partes) {
+                    Object tipo = ((Map<String, Object>) p).get("type");
+                    if (!"thinking".equals(tipo) && !"redacted_thinking".equals(tipo)) {
+                        limpio.add(p);
+                    }
+                }
+                m.put("content", limpio);
             }
         }
     }

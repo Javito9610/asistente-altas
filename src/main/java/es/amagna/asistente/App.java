@@ -84,7 +84,7 @@ public final class App {
         Files.createDirectories(prueba.getParent());
         Files.writeString(prueba, "");
         new ProcessBuilder("notepad.exe", prueba.toString()).start();
-        m.esperar(2.5);
+        m.esperar(4); // que el Bloc de notas esté abierto y con el foco antes de escribir
         m.escribir("Prueba del Asistente Altas 123");
         m.tecla("Return", 1);
         m.escribir("Ñandú, camión, pingüino: áéíóú ÁÉÍÓÚ ¿¡ @ # € / \\ 00000000T");
