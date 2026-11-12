@@ -36,12 +36,16 @@ public final class App {
                 case "mirar" -> mirar();
                 case "probar-manos" -> probarManos();
                 case "guardar-clave" -> guardarClave();
+                case "ventanas" -> System.out.println(new VentanasWindows(false).abiertas());
+                case "campo" -> campo();
                 case "agente" -> agente(Arrays.asList(args).subList(1, args.length));
                 default -> System.out.println("""
                         Asistente Altas (pruebas)
                           asistente mirar
                           asistente probar-manos
                           asistente guardar-clave
+                          asistente ventanas            (lista las ventanas abiertas, sin IA)
+                          asistente campo               (lee el campo donde hagas clic, sin IA)
                           asistente agente "tarea" [--vista] [--pasos 20] [--tope-tokens 200000] [--modelo claude-sonnet-5-5]
                         Freno de emergencia: ratón a la esquina superior izquierda.""");
             }
@@ -91,6 +95,15 @@ public final class App {
         m.escribir("Ñandú, camión, pingüino: áéíóú ÁÉÍÓÚ ¿¡ @ # € / \\ 00000000T");
         m.tecla("Return", 1);
         System.out.println("   Mira la pestaña «prueba-tecleo.txt»: tienen que salir las dos líneas exactas. Ciérrala sin guardar.");
+    }
+
+    /** Prueba de lectura sin IA: en 5 segundos, haz clic en un campo de texto; dice qué control es y su texto exacto. */
+    private static void campo() throws InterruptedException {
+        System.out.println("Tienes 5 segundos: haz clic dentro de un campo de texto (por ejemplo, en el Bloc de notas).");
+        Thread.sleep(5000);
+        var c = new VentanasWindows(false).campoConFoco();
+        System.out.println("Control: «" + c.nombre() + "» · tipo " + c.tipo() + " · ventana «" + c.ventana() + "»");
+        System.out.println(c.valor() == null ? "Este control no deja leer su texto." : "Texto exacto: «" + c.valor() + "» (" + c.valor().length() + " caracteres)");
     }
 
     private static void guardarClave() throws IOException {

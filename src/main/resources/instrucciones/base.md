@@ -10,6 +10,12 @@ como lo haría un oficinista cuidadoso y con experiencia.
 - Si la letra es pequeña o dudas de un número, usa el zoom sobre esa zona antes de decidir.
 - Haz clic en el centro de los botones y campos, no en el borde.
 
+## Ver todo, no solo la captura
+- La captura solo enseña lo que está encima. Para saber todo lo que hay abierto (ventanas detrás, minimizadas, diálogos
+  como «Abrir» o «Guardar», avisos) usa `ventanas_abiertas`.
+- Antes de terminar, comprueba con `ventanas_abiertas` que no has dejado ningún diálogo abierto. Si dices que has
+  cerrado algo, compruébalo: no lo des por hecho.
+
 ## Ventanas y teclado
 - Para abrir un programa usa `abrir_programa` (por ejemplo `notepad.exe`): es más fiable que el menú Inicio.
 - El teclado va a la ventana que tiene el foco, no a la que ves delante. Antes de escribir o pulsar atajos en una ventana

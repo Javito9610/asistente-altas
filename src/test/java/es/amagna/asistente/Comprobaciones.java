@@ -178,11 +178,14 @@ public final class Comprobaciones {
             public void abrir(String p, List<String> a) { vent.add("abrir " + p + a); }
             public boolean activar(String t) { vent.add("activar " + t); return true; }
             public String activa() { return "Sin título: Bloc de notas"; }
+            public String abiertas() { return "- «Sin título: Bloc de notas» (Notepad) — diálogos abiertos dentro: «Abrir» "; }
+            public Campo campoConFoco() { return new Campo("Editor de texto", "ControlType.Document", "Hola, soy el Asistente Altas de Amagna", "Sin título: Bloc de notas"); }
         };
         List<Map<String, Object>> conV = new ArrayList<>();
         List<Map<String, Object>> guionV = new ArrayList<>(List.of(
                 respuesta(propia("abrir_programa", Map.of("programa", "notepad.exe")), propia("activar_ventana", Map.of("titulo", "Bloc de notas"))),
                 respuesta(propia("ventana_activa", Map.of())),
+                respuesta(propia("leer_campo", Map.of("esperado", "Hola, soy el Asistente Altas de Amagna.")), propia("ventanas_abiertas", Map.of())),
                 respuesta(texto("TERMINADO: ok"))));
         new Agente(p -> { conV.add((Map<String, Object>) Json.leer(Json.escribir(p))); return guionV.remove(0); }, manos, v, "m", "i", 10, 100_000, s -> { }).ejecutar("ventanas");
         ok(vent.equals(List.of("abrir notepad.exe[]", "activar Bloc de notas")), "abrir_programa y activar_ventana llegan a Windows");
@@ -190,11 +193,14 @@ public final class Comprobaciones {
         ok(pet.contains("Ventana activa: «Sin título: Bloc de notas»") && !Json.escribir(conV.get(1)).contains("\"toolset_name\":\"computer\",\"content\":[{\"type\":\"text\",\"text\":\"Abierto"),
                 "ventana_activa responde; las herramientas propias no llevan toolset_name");
         List<Object> tools = (List<Object>) conV.get(0).get("tools");
-        ok(tools.size() == 5 && Agente.HERRAMIENTA.equals(((Map<String, Object>) tools.get(4)).get("type")), "con ventanas: 4 herramientas propias + la de ordenador");
+        ok(tools.size() == 6 && Agente.HERRAMIENTA.equals(((Map<String, Object>) tools.get(5)).get("type")), "con ventanas: 5 herramientas propias + la de ordenador");
+        String tras = Json.escribir(conV.get(3));
+        ok(tras.contains("DISTINTO en el carácter 39") && tras.contains("Editor de texto"), "leer_campo lee el control con el foco y detecta el punto que falta");
+        ok(tras.contains("diálogos abiertos dentro: «Abrir»"), "ventanas_abiertas enseña los diálogos que la captura no ve");
         ok(Agente.comparar("Hola, soy el Asistente.", "Hola, soy el Asistente.").startsWith("IGUAL"), "comparar: igual");
         String d = Agente.comparar("Hola, soy el Asistente.", "Hola, soy el Asistente");
         ok(d.startsWith("DISTINTO en el carácter 23") && d.contains("se esperaba «.» y hay (fin)"), "comparar: le falta el punto final → DISTINTO y dónde");
-        ok(Agente.comparar("línea 1\nlínea 2", "línea 1\r\nlínea 2").startsWith("IGUAL"), "comparar: saltos de línea de Windows cuentan igual");
+        ok(Agente.comparar("línea 1\nlínea 2", "línea 1\r\nlínea 2").startsWith("IGUAL") && Agente.comparar("a\nb", "a\rb").startsWith("IGUAL"), "comparar: saltos de línea de Windows cuentan igual");
         ok(Agente.comparar("PEREZ", "PÉREZ").startsWith("DISTINTO en el carácter 2"), "comparar: un acento de más → DISTINTO");
     }
 

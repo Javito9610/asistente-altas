@@ -20,6 +20,31 @@ public final class VentanasWindows implements Ventanas {
             + "public class VentanaAA{[DllImport(\"user32.dll\")]public static extern IntPtr GetForegroundWindow();"
             + "[DllImport(\"user32.dll\",CharSet=CharSet.Unicode)]public static extern int GetWindowText(IntPtr h,StringBuilder s,int n);}';";
 
+    private static final String UIA = "Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes;"
+            + "$A=[System.Windows.Automation.AutomationElement];$CT=[System.Windows.Automation.ControlType];"
+            + "$TS=[System.Windows.Automation.TreeScope];";
+
+    /** Ventanas de primer nivel y los diálogos que tienen dentro, con UI Automation (lo que usan los lectores de pantalla). */
+    private static final String LISTA = UIA
+            + "$cond=New-Object System.Windows.Automation.PropertyCondition($A::ControlTypeProperty,$CT::Window);$r=@();"
+            + "foreach($w in $A::RootElement.FindAll($TS::Children,[System.Windows.Automation.Condition]::TrueCondition)){"
+            + "$c=$w.Current;if([string]::IsNullOrWhiteSpace($c.Name)){continue};"
+            + "$p='';try{$p=(Get-Process -Id $c.ProcessId -ErrorAction Stop).ProcessName}catch{};"
+            + "$min=$false;try{$wp=$w.GetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern);"
+            + "$min=($wp.Current.WindowVisualState -eq [System.Windows.Automation.WindowVisualState]::Minimized)}catch{};"
+            + "$d=@();try{foreach($h in $w.FindAll($TS::Children,$cond)){if($h.Current.Name){$d+=$h.Current.Name}}}catch{};"
+            + "$r+=[pscustomobject]@{titulo=$c.Name;programa=$p;minimizada=$min;dialogos=$d}};"
+            + "ConvertTo-Json -InputObject @($r) -Depth 3 -Compress";
+
+    /** El control con el foco: su valor exacto por ValuePattern o, si no tiene, por TextPattern. */
+    private static final String FOCO = UIA
+            + "$e=$A::FocusedElement;$c=$e.Current;$v=$null;$o=$null;"
+            + "if($e.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern,[ref]$o)){$v=$o.Current.Value};"
+            + "if($v -eq $null -and $e.TryGetCurrentPattern([System.Windows.Automation.TextPattern]::Pattern,[ref]$o)){$v=$o.DocumentRange.GetText(-1)};"
+            + "$ven='';try{$x=$e;$tw=[System.Windows.Automation.TreeWalker]::ControlViewWalker;"
+            + "while($x -ne $null -and $x.Current.ControlType -ne $CT::Window){$x=$tw.GetParent($x)};if($x -ne $null){$ven=$x.Current.Name}}catch{};"
+            + "[pscustomobject]@{nombre=$c.Name;tipo=$c.ControlType.ProgrammaticName;valor=$v;ventana=$ven}|ConvertTo-Json -Compress";
+
     private final boolean modoVista;
 
     public VentanasWindows(boolean modoVista) {
@@ -59,6 +84,51 @@ public final class VentanasWindows implements Ventanas {
     public String activa() {
         return powershell(TIPO + "$h=[VentanaAA]::GetForegroundWindow();$s=New-Object Text.StringBuilder 512;"
                 + "[void][VentanaAA]::GetWindowText($h,$s,512);$s.ToString()").trim();
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public String abiertas() {
+        Object j = es.amagna.asistente.Json.leer(json(powershell(LISTA)));
+        List<Object> lista = j instanceof List<?> l ? (List<Object>) l : List.of(j);
+        StringBuilder b = new StringBuilder();
+        for (Object o : lista) {
+            java.util.Map<String, Object> w = (java.util.Map<String, Object>) o;
+            b.append("- «").append(w.get("titulo")).append("» (").append(w.get("programa")).append(")");
+            if (Boolean.TRUE.equals(w.get("minimizada"))) {
+                b.append(" [minimizada]");
+            }
+            Object d = w.get("dialogos");
+            List<Object> dl = d instanceof List<?> x ? (List<Object>) x : d == null ? List.of() : List.of(d);
+            if (!dl.isEmpty()) {
+                b.append(" — diálogos abiertos dentro: ");
+                dl.forEach(n -> b.append("«").append(n).append("» "));
+            }
+            b.append('\n');
+        }
+        return b.toString().strip();
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public Campo campoConFoco() {
+        java.util.Map<String, Object> m = (java.util.Map<String, Object>) es.amagna.asistente.Json.leer(json(powershell(FOCO)));
+        return new Campo(str(m.get("nombre")), str(m.get("tipo")), m.get("valor") == null ? null : String.valueOf(m.get("valor")), str(m.get("ventana")));
+    }
+
+    private static String str(Object o) {
+        return o == null ? "" : String.valueOf(o);
+    }
+
+    /** La salida de PowerShell desde el primer «[» o «{» (por si sale algún aviso antes). */
+    private static String json(String salida) {
+        int a = salida.indexOf('[');
+        int b = salida.indexOf('{');
+        int i = a < 0 ? b : b < 0 ? a : Math.min(a, b);
+        if (i < 0) {
+            throw new IllegalStateException("Windows no ha devuelto datos: " + salida.strip());
+        }
+        return salida.substring(i).strip();
     }
 
     private static String powershell(String script) {

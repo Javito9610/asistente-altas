@@ -88,11 +88,15 @@ public final class Agente {
                     "input_schema", Json.obj("type", "object", "properties", Json.obj(
                             "titulo", Json.obj("type", "string", "description", "Parte del título de la ventana")), "required", List.of("titulo"))));
             h.add(Json.obj("name", "leer_campo", "description",
-                    "Lee el texto EXACTO del campo que tiene el foco (selecciona todo, copia y lo devuelve; no borra nada). "
-                    + "Si das «esperado», lo compara carácter a carácter y dice IGUAL o DISTINTO y dónde. Úsalo siempre para "
-                    + "comprobar lo que has escrito: es más fiable que mirar la captura.",
+                    "Lee de Windows (no de la imagen) el control que tiene el foco: su nombre, tipo, ventana y su texto EXACTO. "
+                    + "No toca nada. Si das «esperado», lo compara carácter a carácter y dice IGUAL o DISTINTO y dónde. Úsalo "
+                    + "siempre para comprobar lo que has escrito: es más fiable que mirar la captura.",
                     "input_schema", Json.obj("type", "object", "properties", Json.obj(
                             "esperado", Json.obj("type", "string", "description", "Texto que debería haber, exacto")))));
+            h.add(Json.obj("name", "ventanas_abiertas", "description",
+                    "Lista todas las ventanas abiertas, también las que están detrás o minimizadas y los diálogos que tienen "
+                    + "dentro (Abrir, Guardar, avisos…). La captura solo enseña lo que está encima: usa esto para saber todo lo que hay.",
+                    "input_schema", Json.obj("type", "object", "properties", Json.obj())));
             h.add(Json.obj("name", "ventana_activa", "description",
                     "Dice el título de la ventana que tiene el foco del teclado (adonde irá lo que escribas o las teclas que pulses).",
                     "input_schema", Json.obj("type", "object", "properties", Json.obj())));
@@ -256,10 +260,16 @@ public final class Agente {
             case "ventana_activa":
                 return List.of(textoBloque("Ventana activa: «" + ventanas.activa() + "»"));
             case "leer_campo": {
-                String hay = manos.leerCampo();
+                Ventanas.Campo c = ventanas.campoConFoco();
+                String donde = "Control con el foco: «" + c.nombre() + "» (" + c.tipo() + ") en la ventana «" + c.ventana() + "». ";
+                if (c.valor() == null) {
+                    return List.of(textoBloque(donde + "Este control no deja leer su texto: no se puede comprobar así."));
+                }
                 Object esperado = in.get("esperado");
-                return List.of(textoBloque(esperado == null ? "Texto del campo: «" + hay + "»" : comparar(String.valueOf(esperado), hay)));
+                return List.of(textoBloque(donde + (esperado == null ? "Texto: «" + c.valor() + "»" : comparar(String.valueOf(esperado), c.valor()))));
             }
+            case "ventanas_abiertas":
+                return List.of(textoBloque("Ventanas abiertas:\n" + ventanas.abiertas()));
             default:
                 throw new IllegalArgumentException("Herramienta desconocida: " + accion);
         }
@@ -267,8 +277,8 @@ public final class Agente {
 
     /** Comparación exacta, carácter a carácter (solo se igualan los saltos de línea de Windows y los demás). */
     public static String comparar(String esperado, String hay) {
-        String e = esperado.replace("\r\n", "\n");
-        String h = hay.replace("\r\n", "\n");
+        String e = esperado.replace("\r\n", "\n").replace('\r', '\n');
+        String h = hay.replace("\r\n", "\n").replace('\r', '\n');
         if (e.equals(h)) {
             return "IGUAL: el campo tiene exactamente «" + h + "» (" + h.length() + " caracteres).";
         }

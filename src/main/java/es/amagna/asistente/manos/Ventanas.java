@@ -14,4 +14,21 @@ public interface Ventanas {
 
     /** Título de la ventana que está delante (la que recibe el teclado). */
     String activa();
+
+    /**
+     * Todas las ventanas abiertas, también las que están detrás o minimizadas y los diálogos que tienen dentro
+     * (lo que una captura no enseña). Texto listo para Claude.
+     */
+    default String abiertas() {
+        throw new UnsupportedOperationException("No disponible");
+    }
+
+    /** El control que tiene el foco del teclado, leído de Windows (no de la imagen): nombre, tipo, valor exacto y ventana. */
+    default Campo campoConFoco() {
+        throw new UnsupportedOperationException("No disponible");
+    }
+
+    /** valor == null: ese control no deja leer su texto. */
+    record Campo(String nombre, String tipo, String valor, String ventana) {
+    }
 }
