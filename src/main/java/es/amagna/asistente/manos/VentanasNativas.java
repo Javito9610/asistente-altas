@@ -97,6 +97,11 @@ public final class VentanasNativas implements Ventanas {
                 huerfanos.add("«" + Win32.titulo(d) + "» (" + programa(d) + ")");
             }
         }
+        // Un diálogo (modal) bloquea a todo su programa: en las aplicaciones que abren varias ventanas en el mismo programa
+        // (el Bloc de notas de Windows 11, muchos programas de gestión), las demás ventanas no responden a los atajos mientras
+        // esté abierto. Se marca, para que se sepa por qué una ventana «no hace caso».
+        Map<Long, String> bloqueo = new LinkedHashMap<>();
+        dialogos.forEach((casa, d) -> bloqueo.putIfAbsent(Win32.pid(casa), "«" + d.get(0) + "» de «" + Win32.titulo(casa) + "»"));
         Pointer delante = Win32.User32.I.GetForegroundWindow();
         StringBuilder b = new StringBuilder();
         for (Pointer h : principales) {
@@ -111,6 +116,8 @@ public final class VentanasNativas implements Ventanas {
             if (d != null) {
                 b.append(" — diálogos abiertos dentro: ");
                 d.forEach(t -> b.append("«").append(t).append("» "));
+            } else if (bloqueo.containsKey(Win32.pid(h))) {
+                b.append(" [BLOQUEADA por el diálogo ").append(bloqueo.get(Win32.pid(h))).append(", del mismo programa: ciérralo primero]");
             }
             b.append('\n');
         }

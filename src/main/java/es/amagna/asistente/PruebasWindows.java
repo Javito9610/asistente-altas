@@ -55,6 +55,14 @@ public final class PruebasWindows {
         System.out.println("4) Atajos de teclado y diálogos escondidos: Ctrl+O tiene que abrir un diálogo y verse en la lista");
         System.out.println("   (se prueba cada forma de mandar teclas y se guarda la que funciona en este PC)");
         ManosRobot.Teclado funciona = null;
+        String antes = v.abiertas();
+        if (lineaDe(antes, clave).contains("BLOQUEADA")) {
+            ok(false, "no se puede probar: " + lineaDe(antes, clave).replaceFirst("^- ", "")
+                    + ". Cierra ese diálogo (Cancelar) y repite la prueba.");
+            Files.deleteIfExists(fichero);
+            terminar(manos, v);
+            return;
+        }
         for (ManosRobot.Teclado modo : List.of(ManosRobot.Teclado.VK, ManosRobot.Teclado.SCAN, ManosRobot.Teclado.ROBOT)) {
             v.activar(clave);
             manos.usarTeclado(modo);
