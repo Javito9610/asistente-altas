@@ -45,6 +45,36 @@ public final class ManosRobot implements Manos {
     private final Escala escala;
     private final boolean modoVista;
 
+    /**
+     * Cómo se mandan las teclas y atajos: con el robot de Java o con SendInput de Windows (VK = tecla virtual + código de
+     * exploración; SCAN = solo código de exploración). «asistente probar-windows» mira cuál funciona en este PC y lo guarda.
+     */
+    public enum Teclado { ROBOT, VK, SCAN }
+
+    private Teclado teclado = tecladoGuardado();
+
+    public static java.nio.file.Path ficheroTeclado() {
+        String base = System.getenv("LOCALAPPDATA");
+        return java.nio.file.Path.of(base != null ? base : System.getProperty("user.home"), "AsistenteAltas", "teclado.txt");
+    }
+
+    /** El modo guardado por la calibración; si no hay, VK en Windows (lo que manda un teclado físico) y ROBOT en lo demás. */
+    public static Teclado tecladoGuardado() {
+        try {
+            return Teclado.valueOf(java.nio.file.Files.readString(ficheroTeclado()).trim());
+        } catch (Exception e) {
+            return System.getProperty("os.name", "").toLowerCase().contains("windows") ? Teclado.VK : Teclado.ROBOT;
+        }
+    }
+
+    public void usarTeclado(Teclado t) {
+        this.teclado = t;
+    }
+
+    public Teclado teclado() {
+        return teclado;
+    }
+
     public ManosRobot(boolean modoVista) {
         if (GraphicsEnvironment.isHeadless()) {
             throw new IllegalStateException("No hay pantalla (entorno sin escritorio).");
@@ -339,6 +369,16 @@ public final class ManosRobot implements Manos {
     public void tecla(String combinacion, int repeticiones) {
         freno();
         if (vista("tecla " + combinacion + (repeticiones > 1 ? " ×" + repeticiones : ""))) {
+            return;
+        }
+        if (teclado != Teclado.ROBOT) {
+            List<Integer> vks = TecladoNativo.combinacion(combinacion);
+            TecladoNativo.Modo modo = teclado == Teclado.SCAN ? TecladoNativo.Modo.SCAN : TecladoNativo.Modo.VK;
+            for (int r = 0; r < Math.max(1, repeticiones); r++) {
+                TecladoNativo.pulsar(vks, modo);
+                robot.delay(30);
+            }
+            pausa();
             return;
         }
         List<Integer> teclas = Teclas.combinacion(combinacion);

@@ -63,14 +63,38 @@ public final class VentanasNativas implements Ventanas {
 
     @Override
     public String abiertas() {
-        Map<Pointer, List<String>> dialogos = new LinkedHashMap<>();
+        List<Pointer> todas = visibles();
         List<Pointer> principales = new ArrayList<>();
-        for (Pointer h : visibles()) {
+        List<Pointer> dialogosSueltos = new ArrayList<>();
+        for (Pointer h : todas) {
             Pointer dueno = Win32.User32.I.GetAncestor(h, Win32.GA_ROOTOWNER);
-            if (dueno != null && !dueno.equals(h)) {
-                dialogos.computeIfAbsent(dueno, k -> new ArrayList<>()).add(Win32.titulo(h));
+            boolean propiedad = dueno != null && !dueno.equals(h);
+            if (propiedad || "#32770".equals(Win32.clase(h))) { // #32770: la clase de los diálogos estándar de Windows
+                dialogosSueltos.add(h);
             } else {
                 principales.add(h);
+            }
+        }
+        // Cada diálogo, con su ventana: la dueña si está a la vista y, si no (pasa en las aplicaciones modernas, como el Bloc
+        // de notas de Windows 11, donde la dueña es una ventana oculta), la ventana principal de su mismo programa.
+        Map<Pointer, List<String>> dialogos = new LinkedHashMap<>();
+        List<String> huerfanos = new ArrayList<>();
+        for (Pointer d : dialogosSueltos) {
+            Pointer dueno = Win32.User32.I.GetAncestor(d, Win32.GA_ROOTOWNER);
+            Pointer casa = principales.contains(dueno) ? dueno : null;
+            if (casa == null) {
+                long pid = Win32.pid(d);
+                for (Pointer p : principales) {
+                    if (Win32.pid(p) == pid) {
+                        casa = p;
+                        break; // la de más delante de ese programa
+                    }
+                }
+            }
+            if (casa != null) {
+                dialogos.computeIfAbsent(casa, k -> new ArrayList<>()).add(Win32.titulo(d));
+            } else {
+                huerfanos.add("«" + Win32.titulo(d) + "» (" + programa(d) + ")");
             }
         }
         Pointer delante = Win32.User32.I.GetForegroundWindow();
@@ -83,15 +107,17 @@ public final class VentanasNativas implements Ventanas {
             if (Win32.User32.I.IsIconic(h)) {
                 b.append(" [minimizada]");
             }
-            List<String> d = dialogos.remove(h);
+            List<String> d = dialogos.get(h);
             if (d != null) {
                 b.append(" — diálogos abiertos dentro: ");
                 d.forEach(t -> b.append("«").append(t).append("» "));
             }
             b.append('\n');
         }
-        // Diálogos cuyo dueño no es visible (raro, pero se enseñan igual).
-        dialogos.forEach((dueno, d) -> d.forEach(t -> b.append("- «").append(t).append("» (diálogo de una ventana oculta)\n")));
+        huerfanos.forEach(t -> b.append("- diálogo ").append(t).append(" sin ventana principal a la vista\n"));
+        if (delante != null && dialogosSueltos.contains(delante)) {
+            b.append("(Delante, con el foco, está el diálogo «").append(Win32.titulo(delante)).append("»)\n");
+        }
         return b.toString().strip();
     }
 

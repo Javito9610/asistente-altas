@@ -50,6 +50,12 @@ public final class Win32 {
         boolean GetGUIThreadInfo(int hilo, GuiThreadInfo info);
 
         Pointer SendMessageTimeoutW(Pointer hwnd, int msg, Pointer wParam, Pointer lParam, int opciones, int msTope, PointerByReference resultado);
+
+        int SendInput(int cuantos, Pointer entradas, int tamano);
+
+        int MapVirtualKeyW(int codigo, int tipo);
+
+        short VkKeyScanW(char c);
     }
 
     public interface Kernel32 extends StdCallLibrary {
