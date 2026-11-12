@@ -52,7 +52,7 @@ public final class PruebasWindows {
         ok(c.valor() != null && Agente.comparar(texto, c.valor()).startsWith("IGUAL"), "lo leído es IGUAL a lo escrito: «" + c.valor() + "»");
         ok(c.valor() != null && Agente.comparar(texto.replace(".", ""), c.valor()).startsWith("DISTINTO"), "y si falta un punto, DISTINTO");
 
-        System.out.println("4) Un diálogo escondido: Ctrl+O abre «Abrir» y tiene que verse");
+        System.out.println("4) Un diálogo escondido: Ctrl+O abre un diálogo («Abrir» o «¿Guardar cambios?») y tiene que verse");
         manos.tecla("ctrl+o", 1);
         boolean dialogo = esperar(() -> lineaDe(v.abiertas(), clave).contains("diálogos abiertos dentro"), 10_000);
         ok(dialogo, "ventanas_abiertas enseña el diálogo dentro del Bloc de notas: " + lineaDe(v.abiertas(), clave));
