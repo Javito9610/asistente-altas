@@ -41,8 +41,9 @@ public final class VentanasWindows implements Ventanas {
             + "$e=$A::FocusedElement;$c=$e.Current;$v=$null;$o=$null;"
             + "if($e.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern,[ref]$o)){$v=$o.Current.Value};"
             + "if($v -eq $null -and $e.TryGetCurrentPattern([System.Windows.Automation.TextPattern]::Pattern,[ref]$o)){$v=$o.DocumentRange.GetText(-1)};"
-            + "$ven='';try{$x=$e;$tw=[System.Windows.Automation.TreeWalker]::ControlViewWalker;"
-            + "while($x -ne $null -and $x.Current.ControlType -ne $CT::Window){$x=$tw.GetParent($x)};if($x -ne $null){$ven=$x.Current.Name}}catch{};"
+            + "$ven='';try{$x=$e;$tw=[System.Windows.Automation.TreeWalker]::ControlViewWalker;$n=0;"
+            + "while($x -ne $null -and $n -lt 25 -and $x.Current.ControlType -ne $CT::Window){$x=$tw.GetParent($x);$n++};"
+            + "if($x -ne $null -and $n -lt 25){$ven=$x.Current.Name}}catch{};"
             + "[pscustomobject]@{nombre=$c.Name;tipo=$c.ControlType.ProgrammaticName;valor=$v;ventana=$ven}|ConvertTo-Json -Compress";
 
     private final boolean modoVista;
@@ -157,9 +158,10 @@ public final class VentanasWindows implements Ventanas {
                             + "[Console]::OutputEncoding=[Text.Encoding]::UTF8;" + script).getBytes(StandardCharsets.UTF_16LE));
             Process p = new ProcessBuilder(PS, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", codificado)
                     .redirectError(ProcessBuilder.Redirect.DISCARD).start(); // los avisos y el progreso de PowerShell, fuera
-            if (!p.waitFor(15, TimeUnit.SECONDS)) {
+            if (!p.waitFor(30, TimeUnit.SECONDS)) {
                 p.destroyForcibly();
-                throw new IllegalStateException("PowerShell no ha respondido");
+                throw new IllegalStateException("Windows no ha contestado en 30 s. Suele pasar cuando el programa tiene un diálogo "
+                        + "abierto que lo bloquea (por ejemplo «Abrir» o «Guardar»): míralo con ventanas_abiertas y ciérralo.");
             }
             return new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException e) {
