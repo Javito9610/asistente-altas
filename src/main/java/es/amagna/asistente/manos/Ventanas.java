@@ -36,6 +36,11 @@ public interface Ventanas {
         throw new UnsupportedOperationException("No disponible");
     }
 
+    /** Cierra una ventana por su título (como su aspa). Devuelve el título de la que ha cerrado, o null. */
+    default String cerrarVentana(String titulo) {
+        throw new UnsupportedOperationException("No disponible");
+    }
+
     /** valor == null: ese control no deja leer su texto. */
     record Campo(String nombre, String tipo, String valor, String ventana) {
     }

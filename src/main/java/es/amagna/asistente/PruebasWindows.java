@@ -9,28 +9,34 @@ import java.io.ByteArrayInputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import javax.imageio.ImageIO;
 
 /**
- * Pruebas en un Windows de verdad, sin IA (no gastan nada): las manos y las ventanas contra el Bloc de notas.
- * Las pasa GitHub en un Windows en cada cambio, y también se pueden pasar en tu PC: «asistente probar-windows».
- * En GitHub (variable CI) se cierra el Bloc de notas al terminar; en tu PC se deja abierto para que lo cierres tú
- * (el Bloc de notas de Windows 11 lleva todas tus pestañas en el mismo programa).
+ * Pruebas en un Windows de verdad, sin IA (no gastan nada). Las pasa GitHub en Windows 2022 y 2025 en cada cambio, y
+ * también se pueden pasar en cualquier PC: «asistente probar-windows». Lo que comprueban, con el Bloc de notas:
+ *   1. abrir el programa y encontrar su ventana;      5. diálogos: abrir, detectar, cancelar y poder volver a abrir;
+ *   2. ponerla delante;                               6. la captura de pantalla;
+ *   3. escribir y leer el texto EXACTO;               7. la velocidad.
+ *   4. teclas de aplicación (F5) con cada forma de mandar teclas, y se guarda la que funciona en este PC;
+ *
+ * Al terminar deja el Bloc de notas como estaba: vacía su pestaña, la guarda y la cierra (así no se acumulan ventanas
+ * de pruebas anteriores, que es lo que bloqueaba los atajos).
  */
 public final class PruebasWindows {
     private static int fallos = 0;
+    private static String clave = "";
+    private static Path fichero;
 
     public static void main(String[] args) throws Exception {
-        boolean ci = System.getenv("CI") != null;
         ManosRobot manos = new ManosRobot(false);
         Ventanas v = new VentanasNativas(false);
-        String nombre = "prueba-asistente-" + System.currentTimeMillis();
-        Path fichero = Files.createTempFile(nombre, ".txt");
-        String clave = fichero.getFileName().toString().replace(".txt", "");
+        fichero = Files.createTempFile("prueba-asistente-", ".txt");
+        clave = fichero.getFileName().toString().replace(".txt", "");
 
         System.out.println("1) Abrir el Bloc de notas con un fichero propio y vacío");
         v.abrir("notepad.exe", List.of(fichero.toString()));
-        boolean aparece = esperar(() -> v.abiertas().contains(clave), 20_000);
+        boolean aparece = esperar(() -> v.abiertas().contains(clave), 25_000);
         ok(aparece, "la ventana «" + clave + "» aparece en ventanas_abiertas");
         if (!aparece) {
             terminar(manos, v);
@@ -52,107 +58,140 @@ public final class PruebasWindows {
         ok(c.valor() != null && Agente.comparar(texto, c.valor()).startsWith("IGUAL"), "lo leído es IGUAL a lo escrito: «" + c.valor() + "»");
         ok(c.valor() != null && Agente.comparar(texto.replace(".", ""), c.valor()).startsWith("DISTINTO"), "y si falta un punto, DISTINTO");
 
-        System.out.println("4) Atajos de teclado y diálogos escondidos: Ctrl+O tiene que abrir un diálogo y verse en la lista");
-        System.out.println("   (se prueba cada forma de mandar teclas y se guarda la que funciona en este PC)");
+        // Un atajo del propio programa (no del cuadro de texto) cuyo efecto se puede leer EXACTO: F5 escribe la fecha y
+        // la hora. Sin diálogos ni esperas, así que dice sin lugar a dudas si las teclas de aplicación llegan.
+        System.out.println("4) Teclas de aplicación: F5 escribe la fecha y la hora (se prueba cada forma de mandar teclas)");
+        quitarEstorbos(manos, v);
         ManosRobot.Teclado funciona = null;
-        if (ci) { // en GitHub se provoca el caso a propósito: otra ventana del Bloc de notas con un diálogo abierto
-            Path otro = Files.createTempFile("otra-ventana-", ".txt");
-            v.abrir("notepad.exe", List.of(otro.toString()));
-            String claveOtro = otro.getFileName().toString().replace(".txt", "");
-            esperar(() -> v.abiertas().contains(claveOtro), 20_000);
-            v.activar(claveOtro);
-            manos.usarTeclado(ManosRobot.Teclado.VK);
-            manos.tecla("ctrl+o", 1);
-            esperar(() -> hayDialogo(v.abiertas(), claveOtro), 5_000);
-            v.activar(clave);
-            System.out.println("   (GitHub) se ha dejado un diálogo abierto en otra ventana a propósito: " + lineaDe(v.abiertas(), clave));
-        }
-        // Si otra ventana del Bloc de notas tiene un diálogo abierto (de una prueba anterior), bloquea a esta: se cancela y ya.
-        for (int intento = 0; intento < 5; intento++) {
-            String linea = lineaDe(v.abiertas(), clave);
-            java.util.regex.Matcher m = java.util.regex.Pattern.compile("BLOQUEADA por el diálogo «([^»]*)»").matcher(linea);
-            if (!m.find()) {
-                break;
-            }
-            String cerrado = v.cancelarDialogo(m.group(1));
-            System.out.println("   había quedado abierto el diálogo «" + m.group(1) + "» de otra ventana del Bloc de notas: " + (cerrado != null ? "cancelado" : "no se ha podido cerrar"));
-            manos.esperar(0.5);
-        }
-        ok(!lineaDe(v.abiertas(), clave).contains("BLOQUEADA"), "la ventana no está bloqueada por ningún diálogo");
         for (ManosRobot.Teclado modo : List.of(ManosRobot.Teclado.VK, ManosRobot.Teclado.SCAN, ManosRobot.Teclado.ROBOT)) {
             v.activar(clave);
             manos.usarTeclado(modo);
-            manos.tecla("ctrl+o", 1);
-            boolean abre = esperar(() -> hayDialogo(v.abiertas(), clave), 5_000);
-            System.out.println("   teclado " + modo + ": " + (abre ? "abre el diálogo" : "no abre nada"));
-            if (!abre) {
-                System.out.print(VentanasNativas.diagnostico()); // para saber qué ha pasado si no se ve ningún diálogo
-                manos.tecla("Escape", 1); // por si se abrió algo que no se reconoce
-                manos.esperar(1);
-                continue;
+            String antes = valor(v);
+            manos.tecla("F5", 1);
+            manos.esperar(0.8);
+            String ahora = valor(v);
+            String puesto = antes != null && ahora != null && ahora.startsWith(antes) ? ahora.substring(antes.length()) : null;
+            boolean vale = puesto != null && puesto.matches(".*\\d.*:.*\\d.*"); // una fecha y una hora, en cualquier idioma
+            System.out.println("   teclado " + modo + ": " + (vale ? "escribe «" + puesto.strip() + "»" : "no hace nada"));
+            if (vale) {
+                funciona = modo;
+                break;
             }
-            System.out.println("   " + lineaDe(v.abiertas(), clave));
+        }
+        ok(funciona != null, "las teclas de aplicación llegan al programa" + (funciona != null ? " (modo " + funciona + ")" : ""));
+        if (funciona == null) {
+            System.out.print(VentanasNativas.diagnostico());
+            terminar(manos, v);
+            return;
+        }
+        manos.usarTeclado(funciona);
+        Files.createDirectories(ManosRobot.ficheroTeclado().getParent());
+        Files.writeString(ManosRobot.ficheroTeclado(), funciona.name());
+        System.out.println("   guardado: este PC usa el teclado " + funciona + " (" + ManosRobot.ficheroTeclado() + ")");
+
+        // Dos vueltas a propósito: si la primera se cancela mal, el programa se queda creyendo que el diálogo sigue
+        // abierto y la segunda no abre nada. Es justo el fallo que apareció en el PC de Javi.
+        System.out.println("5) Diálogos: Ctrl+O abre «Abrir»; se detecta, se cancela y se tiene que poder volver a abrir");
+        for (int vuelta = 1; vuelta <= 2; vuelta++) {
+            v.activar(clave);
+            manos.esperar(0.3);
+            Map<Long, String> antes = VentanasNativas.instantanea();
+            manos.tecla("ctrl+o", 1);
+            String dialogo = esperarNueva(antes, 20_000); // la primera vez, el diálogo de ficheros puede tardar bastante
+            ok(dialogo != null, "vuelta " + vuelta + ": aparece el diálogo" + (dialogo != null ? " «" + dialogo + "»" : " (no en 20 s)"));
+            if (dialogo == null) {
+                System.out.print(VentanasNativas.diagnostico());
+                break;
+            }
+            String lista = v.abiertas();
+            ok(lista.contains("diálogos abiertos dentro") || lista.contains("está el diálogo"), "vuelta " + vuelta + ": ventanas_abiertas lo enseña");
             long t0 = System.currentTimeMillis();
             try {
                 v.campoConFoco();
             } catch (IllegalStateException e) {
-                System.out.println("   (aviso esperado posible) " + e.getMessage());
+                System.out.println("   (aviso esperado) " + e.getMessage());
             }
-            ok(System.currentTimeMillis() - t0 < 5_000, "con un diálogo abierto, leer_campo no se queda colgado (" + (System.currentTimeMillis() - t0) + " ms)");
-            manos.tecla("Escape", 1);
-            ok(esperar(() -> !hayDialogo(v.abiertas(), clave), 10_000), "tras Escape, el diálogo ya no está");
-            funciona = modo;
-            break;
-        }
-        ok(funciona != null, "los atajos de teclado llegan a la aplicación (modo " + funciona + ")");
-        if (funciona != null) {
-            manos.usarTeclado(funciona);
-            Files.createDirectories(ManosRobot.ficheroTeclado().getParent());
-            Files.writeString(ManosRobot.ficheroTeclado(), funciona.name());
-            System.out.println("   guardado: este PC usa el teclado " + funciona + " (" + ManosRobot.ficheroTeclado() + ")");
+            ok(System.currentTimeMillis() - t0 < 5_000, "vuelta " + vuelta + ": con el diálogo abierto, leer_campo no se cuelga (" + (System.currentTimeMillis() - t0) + " ms)");
+            String cerrado = v.cancelarDialogo(dialogo);
+            ok(cerrado != null && esperar(() -> !VentanasNativas.instantanea().containsValue(cerrado), 5_000), "vuelta " + vuelta + ": se cancela el diálogo");
+            manos.esperar(0.5);
+            ok(!v.abiertas().contains("BLOQUEADA"), "vuelta " + vuelta + ": ninguna ventana queda bloqueada");
         }
 
-        System.out.println("5) La captura");
+        System.out.println("6) La captura");
         BufferedImage img = ImageIO.read(new ByteArrayInputStream(manos.captura()));
         ok(img.getWidth() == manos.escala().anchoImagen() && img.getHeight() == manos.escala().altoImagen(), "captura de " + img.getWidth() + "×" + img.getHeight());
         ok(variada(img), "la captura no está en blanco ni negra");
         Files.write(Path.of("captura-prueba.png"), manos.captura());
 
-        System.out.println("6) Velocidad");
+        System.out.println("7) Velocidad");
         long t1 = System.nanoTime();
         for (int k = 0; k < 10; k++) {
             v.activa();
         }
         long ms = (System.nanoTime() - t1) / 10_000_000;
-        ok(ms < 200, "ventana_activa tarda " + ms + " ms (antes, con PowerShell, segundos)");
+        ok(ms < 200, "preguntar a Windows tarda " + ms + " ms (antes, con PowerShell, segundos)");
 
         terminar(manos, v);
-        Files.deleteIfExists(fichero);
-        if (!ci) {
-            System.out.println("\nCierra la pestaña «" + clave + "» del Bloc de notas sin guardar.");
+    }
+
+    /** Cancela los diálogos que hayan quedado abiertos de pruebas anteriores: bloquean los atajos de todo el programa. */
+    private static void quitarEstorbos(ManosRobot manos, Ventanas v) {
+        for (int k = 0; k < 5; k++) {
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("BLOQUEADA por el diálogo «([^»]*)»").matcher(v.abiertas());
+            if (!m.find()) {
+                return;
+            }
+            String cerrado = v.cancelarDialogo(m.group(1));
+            System.out.println("   había quedado abierto el diálogo «" + m.group(1) + "» de otra ventana: " + (cerrado != null ? "cancelado" : "no se ha podido cerrar"));
+            manos.esperar(0.5);
         }
     }
 
+    /** Deja el Bloc de notas como estaba: vacía la pestaña de la prueba, la guarda y la cierra (sin preguntar nada). */
     private static void terminar(ManosRobot manos, Ventanas v) {
-        if (System.getenv("CI") != null) {
-            ProcessHandle.allProcesses().filter(p -> p.info().command().orElse("").toLowerCase().endsWith("notepad.exe")).forEach(ProcessHandle::destroy);
+        try {
+            if (!clave.isEmpty() && v.abiertas().contains(clave)) {
+                v.activar(clave);
+                manos.tecla("ctrl+a", 1);
+                manos.tecla("Delete", 1);
+                manos.tecla("ctrl+s", 1);
+                manos.esperar(1);
+                v.cerrarVentana(clave);
+                manos.esperar(0.5);
+                if (v.abiertas().contains(clave)) {
+                    manos.tecla("Escape", 1); // si pregunta si guardar, no se cierra: se deja como está
+                    System.out.println("   (no se ha podido cerrar la pestaña de la prueba: ciérrala tú, sin guardar)");
+                }
+            }
+            Files.deleteIfExists(fichero);
+        } catch (RuntimeException | java.io.IOException e) {
+            System.out.println("   (limpieza: " + e.getMessage() + ")");
         }
         System.out.println(fallos == 0 ? "\nPRUEBAS EN WINDOWS: TODO BIEN" : "\nPRUEBAS EN WINDOWS: " + fallos + " FALLO(S)");
         System.exit(fallos == 0 ? 0 : 1);
     }
 
-    /** ¿Tiene la ventana un diálogo dentro, o hay un diálogo delante? */
-    private static boolean hayDialogo(String abiertas, String clave) {
-        return lineaDe(abiertas, clave).contains("diálogos abiertos dentro") || abiertas.contains("(Delante, con el foco, está el diálogo");
+    /** El título de la primera ventana que no estaba antes (un diálogo recién abierto), o null. */
+    private static String esperarNueva(Map<Long, String> antes, long msMax) throws InterruptedException {
+        long fin = System.currentTimeMillis() + msMax;
+        do {
+            for (Map.Entry<Long, String> e : VentanasNativas.instantanea().entrySet()) {
+                if (!antes.containsKey(e.getKey()) && !e.getValue().isBlank()) {
+                    return e.getValue();
+                }
+            }
+            Thread.sleep(250);
+        } while (System.currentTimeMillis() < fin);
+        return null;
     }
 
-    private static String lineaDe(String abiertas, String clave) {
-        for (String l : abiertas.split("\n")) {
-            if (l.contains(clave)) {
-                return l;
-            }
+    private static String valor(Ventanas v) {
+        try {
+            return v.campoConFoco().valor();
+        } catch (RuntimeException e) {
+            return null;
         }
-        return "";
     }
 
     private static boolean variada(BufferedImage img) {

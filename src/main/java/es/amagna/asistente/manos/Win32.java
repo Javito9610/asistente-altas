@@ -86,6 +86,8 @@ public final class Win32 {
     static final int GA_ROOTOWNER = 3;
     static final int SW_RESTORE = 9;
     static final int WM_CLOSE = 0x0010;
+    static final int WM_COMMAND = 0x0111;
+    static final int IDCANCEL = 2;
     static final int WM_GETTEXT = 0x000D;
     static final int WM_GETTEXTLENGTH = 0x000E;
     static final int SMTO_ABORTIFHUNG = 0x0002;
@@ -96,6 +98,12 @@ public final class Win32 {
     static boolean cerrar(Pointer hwnd) {
         PointerByReference r = new PointerByReference();
         return User32.I.SendMessageTimeoutW(hwnd, WM_CLOSE, null, null, SMTO_ABORTIFHUNG, MS_TOPE, r) != null;
+    }
+
+    /** Manda un mensaje a una ventana sin quedarse esperando si el programa está colgado. */
+    static boolean mandar(Pointer hwnd, int msg, long wParam, long lParam) {
+        PointerByReference r = new PointerByReference();
+        return User32.I.SendMessageTimeoutW(hwnd, msg, new Pointer(wParam), new Pointer(lParam), SMTO_ABORTIFHUNG, MS_TOPE, r) != null;
     }
 
     static String titulo(Pointer hwnd) {

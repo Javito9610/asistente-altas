@@ -140,24 +140,74 @@ public final class VentanasNativas implements Ventanas {
         return r;
     }
 
+    /** Instantánea de las ventanas visibles: identificador → título. Para saber qué ventana es NUEVA tras hacer algo. */
+    public static Map<Long, String> instantanea() {
+        Map<Long, String> m = new LinkedHashMap<>();
+        for (Pointer h : visibles()) {
+            m.put(Pointer.nativeValue(h), Win32.titulo(h));
+        }
+        return m;
+    }
+
+    private Pointer buscar(String titulo, List<Pointer> donde) {
+        String buscado = titulo.toLowerCase(Locale.ROOT);
+        for (Pointer h : donde) {
+            if (Win32.titulo(h).toLowerCase(Locale.ROOT).contains(buscado)) {
+                return h;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Cancela un diálogo como lo haría una persona con el botón Cancelar: primero IDCANCEL (lo que entiende un diálogo
+     * estándar de Windows) y, si sigue ahí, su aspa. Así el programa se entera de que el diálogo se ha cerrado y vuelve
+     * a funcionar (cerrarlo «a lo bruto» puede dejarlo creyendo que sigue abierto).
+     */
     @Override
     public String cancelarDialogo(String titulo) {
         if (modoVista) {
             System.out.println("    [modo vista, no se hace] cancelar diálogo «" + titulo + "»");
             return null;
         }
-        String buscado = titulo.toLowerCase(Locale.ROOT);
-        for (Pointer d : dialogos()) {
-            String t = Win32.titulo(d);
-            if (t.toLowerCase(Locale.ROOT).contains(buscado)) {
-                Win32.cerrar(d);
-                for (int k = 0; k < 20 && Win32.User32.I.IsWindowVisible(d); k++) {
-                    dormir(50);
-                }
-                return t;
-            }
+        Pointer d = buscar(titulo, dialogos());
+        if (d == null) {
+            return null;
         }
-        return null;
+        String t = Win32.titulo(d);
+        Win32.mandar(d, Win32.WM_COMMAND, Win32.IDCANCEL, 0);
+        if (esperarCierre(d)) {
+            return t;
+        }
+        Win32.cerrar(d);
+        esperarCierre(d);
+        return t;
+    }
+
+    @Override
+    public String cerrarVentana(String titulo) {
+        if (modoVista) {
+            System.out.println("    [modo vista, no se hace] cerrar ventana «" + titulo + "»");
+            return null;
+        }
+        Pointer h = buscar(titulo, visibles());
+        if (h == null) {
+            return null;
+        }
+        String t = Win32.titulo(h);
+        Win32.cerrar(h);
+        esperarCierre(h);
+        return t;
+    }
+
+    private static boolean esperarCierre(Pointer h) {
+        for (int k = 0; k < 30; k++) {
+            if (!Win32.User32.I.IsWindowVisible(h)) {
+                return true;
+            }
+            dormir(50);
+        }
+        return false;
     }
 
     /** Para diagnosticar: todas las ventanas visibles, sin agrupar, con su clase, programa y dueña. */
