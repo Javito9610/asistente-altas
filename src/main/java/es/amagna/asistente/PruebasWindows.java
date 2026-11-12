@@ -154,22 +154,50 @@ public final class PruebasWindows {
         System.out.println(sangrar(arbol));
         ok(!arbol.startsWith("No se pueden leer"), "se pueden leer los controles de la ventana");
         if (!arbol.startsWith("No se pueden leer")) {
-            String dentro = ctrl.leer(clave, "documento:");
-            boolean hayDocumento = !dentro.startsWith("No hay ningún control");
-            ok(hayDocumento, "se encuentra el cuadro de texto: " + dentro);
-            if (hayDocumento) {
-                String exacto = "Alta de prueba: PÉREZ GARCÍA, Ñandú — 00000000T — 1.234,56 €";
-                String puesto = ctrl.escribir(clave, "documento:", exacto);
-                System.out.println("   " + puesto);
-                boolean sePuedeEscribir = puesto.startsWith("IGUAL");
-                ok(sePuedeEscribir || puesto.contains("no deja escribir"), "escribir por dentro: " + (sePuedeEscribir ? "vale" : "este control no lo permite, se teclea"));
-                if (sePuedeEscribir) {
-                    ok(ctrl.leer(clave, "documento:").contains(exacto), "lo escrito por dentro se relee EXACTO");
+            // El cuadro de texto se llama de una forma en el Bloc de notas clásico («campo») y de otra en el de
+            // Windows 11 («documento»): se prueban los dos, que es justo lo que hará el agente con MN.
+            String apodo = null;
+            String dentro = "";
+            for (String t : List.of("documento:", "campo:")) {
+                dentro = ctrl.leer(clave, t);
+                if (!dentro.startsWith("No hay ningún control") && !dentro.startsWith("«")) {
+                    apodo = t;
+                    break;
                 }
             }
-            String menu = ctrl.pulsar(clave, "boton:");
-            System.out.println("   pulsar un botón por su nombre: " + menu);
-            ok(!menu.startsWith("No hay ningún control") || true, "pulsar por nombre responde algo razonable");
+            ok(apodo != null, "se encuentra el cuadro de texto por dentro: " + dentro);
+            if (apodo != null) {
+                ok(dentro.contains("Amagna"), "su valor se lee por dentro y es el que escribimos");
+                String exacto = "Alta de prueba: PÉREZ GARCÍA, Ñandú — 00000000T — 1.234,56 €";
+                String puesto = ctrl.escribir(clave, apodo, exacto);
+                System.out.println("   escribir por dentro: " + puesto);
+                boolean sePuedeEscribir = puesto.startsWith("IGUAL");
+                ok(sePuedeEscribir || puesto.contains("no deja escribir"), "escribir por dentro: " + (sePuedeEscribir ? "vale y se relee EXACTO" : "este control no lo permite; se teclea, que también vale"));
+            }
+            // Si un apodo vale para varios controles, no se toca ninguno: antes parar que equivocarse.
+            String varios = ctrl.pulsar(clave, "boton:");
+            ok(varios.contains("encaja con") || varios.startsWith("Pulsado") || varios.startsWith("No hay ningún"), "apodo ambiguo: " + varios);
+            // Pulsar por nombre, sin coordenadas: el primer menú que haya (en el idioma que sea).
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("opcion-de-menu «([^»]+)»").matcher(arbol);
+            String opcion = null;
+            while (m.find()) {
+                if (!m.group(1).equals("System")) {
+                    opcion = m.group(1);
+                    break;
+                }
+            }
+            if (opcion != null) {
+                Map<Long, String> antesM = VentanasNativas.instantanea();
+                String r = ctrl.pulsar(clave, "opcion-de-menu:" + opcion);
+                System.out.println("   pulsar «" + opcion + "» por su nombre: " + r);
+                ok(r.startsWith("Pulsado") || r.startsWith("Desplegado"), "se pulsa una opción de menú por su nombre, sin coordenadas");
+                String desplegado = esperarNueva(antesM, 4_000);
+                System.out.println("   se ha desplegado: " + (desplegado != null ? "«" + desplegado + "»" : "no se ve una ventana nueva (el menú puede ir dentro de la ventana)"));
+                manos.tecla("Escape", 1);
+                manos.esperar(0.4);
+            } else {
+                System.out.println("   (esta ventana no tiene menús que pulsar: no se prueba)");
+            }
         }
 
         terminar(manos, v);
