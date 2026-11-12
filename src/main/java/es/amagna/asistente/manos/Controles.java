@@ -1,26 +1,37 @@
 package es.amagna.asistente.manos;
 
 import com.sun.jna.Pointer;
+import java.text.Normalizer;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
 /**
- * Los controles de un programa, por dentro (Uia): verlos, leerlos, escribir en ellos y pulsarlos POR SU NOMBRE, sin
- * coordenadas ni teclear a ciegas. Es la forma profesional de manejar un programa de Windows, y la que hará que las
- * altas en MN se rellenen campo a campo y se puedan comprobar una a una.
+ * Los controles de un programa, por dentro (Uia): verlos, leerlos, escribir en ellos, pulsarlos y esperar a que pasen
+ * cosas. POR SU NOMBRE, sin coordenadas. Es la forma en que trabajan las herramientas profesionales de automatización,
+ * y la que hará que las altas en MN se rellenen campo a campo y se comprueben una a una.
  *
- * Un control se busca con un «apodo»: un trozo de su nombre, y si hace falta su tipo delante, separado por dos puntos:
- *   «Guardar»            el primer control que se llame así
- *   «boton:Guardar»      solo botones
- *   «campo:NIF»          solo cuadros de texto
- * Si el apodo vale para varios, se dice y no se toca nada: antes parar que equivocarse.
+ * <h2>Cómo se nombra un control (el «apodo»)</h2>
+ * <pre>
+ *   Guardar                  por su nombre
+ *   boton:Guardar            solo botones (tipos: boton, campo, desplegable, casilla, opcion-de-menu, fila…)
+ *   #txtNif                  por su identificador interno, que es lo que nunca cambia
+ *   campo junto a NIF        el cuadro que hay al lado de la etiqueta «NIF» (para formularios sin nombres)
+ * </pre>
+ * No hace falta acertar con mayúsculas ni acentos. Cada candidato se puntúa (el identificador vale más que el nombre
+ * exacto, y este más que un trozo del nombre) y, si los dos mejores se parecen demasiado, NO se toca ninguno y se
+ * explica: antes parar que equivocarse.
  *
  * @package Amagna\Altas
  */
 public final class Controles {
-    /** Cuántos controles se enseñan como mucho: una ventana de gestión puede tener cientos. */
     private static final int TOPE = 300;
+    private static final int HONDO = 14;
+    /** Por debajo de esto no se da por bueno un parecido. */
+    private static final int MINIMO = 45;
+    /** Si el segundo candidato está a menos de esto del primero, hay empate: no se toca nada. */
+    private static final int EMPATE = 15;
 
     private final VentanasNativas ventanas;
 
@@ -31,6 +42,15 @@ public final class Controles {
     public record Encontrado(Uia.Elemento elemento, String descripcion) {
     }
 
+    /** Un candidato con su puntuación, ya copiados sus datos (para poder ordenar sin ir y venir al programa). */
+    private record Candidato(Uia.Elemento e, int puntos, String tipo, String nombre, String id, int[] recuadro, String etiqueta) {
+        String comoSeLlama() {
+            return tipo + " «" + (nombre.isBlank() ? (id.isBlank() ? "(sin nombre)" : id) : nombre) + "»";
+        }
+    }
+
+    // ---------- ver ----------
+
     /** Lo que el asistente «ve por dentro» de una ventana, en texto. */
     public String arbol(String tituloVentana, int profundidad) {
         Pointer hwnd = ventanas.handleDe(tituloVentana);
@@ -39,8 +59,7 @@ public final class Controles {
         }
         Uia.Elemento raiz = Uia.deVentana(hwnd);
         if (raiz == null) {
-            return "No se pueden leer los controles de esa ventana" + (Uia.noDisponible().isEmpty() ? "" : " (" + Uia.noDisponible() + ")")
-                    + ". Con este programa hay que mirar la pantalla y usar el ratón y el teclado.";
+            return sinUia();
         }
         StringBuilder b = new StringBuilder("Controles de «" + Win32.titulo(hwnd) + "»:\n");
         int[] cuenta = {0};
@@ -53,6 +72,11 @@ public final class Controles {
             b.append("… (hay más; busca uno concreto por su nombre)\n");
         }
         return b.toString().strip();
+    }
+
+    private String sinUia() {
+        return "No se pueden leer los controles de esa ventana" + (Uia.noDisponible().isEmpty() ? "" : " (" + Uia.noDisponible() + ")")
+                + ". Con este programa hay que mirar la pantalla y usar el ratón y el teclado.";
     }
 
     private void pintar(Uia.Elemento e, StringBuilder b, String sangria, int quedan, int[] cuenta) {
@@ -69,8 +93,13 @@ public final class Controles {
                     if (!nombre.isBlank()) {
                         b.append(" «").append(nombre).append("»");
                     }
-                    if (!h.automationId().isBlank() && !h.automationId().equals(nombre)) {
-                        b.append(" (id ").append(h.automationId()).append(")");
+                    String id = h.automationId();
+                    if (!id.isBlank() && !id.equals(nombre)) {
+                        b.append(" (#").append(id).append(")");
+                    }
+                    String eti = h.etiqueta();
+                    if (!eti.isBlank() && !eti.equals(nombre)) {
+                        b.append(" [etiqueta: ").append(eti).append("]");
                     }
                     if (valor != null) {
                         b.append(" = «").append(valor.length() > 120 ? valor.substring(0, 120) + "…" : valor).append("»");
@@ -89,10 +118,14 @@ public final class Controles {
         }
     }
 
-    /**
-     * Busca un control por su apodo dentro de una ventana. Si hay más de uno, no devuelve ninguno y lo explica: el
-     * asistente tiene que afinar el apodo en vez de tocar el que no es.
-     */
+    // ---------- buscar ----------
+
+    /** Quita acentos, símbolos de atajo y los dos puntos del final: «&Nombre:» y «nombre» se parecen. */
+    public static String llano(String s) {
+        String n = Normalizer.normalize(s == null ? "" : s, Normalizer.Form.NFD).replaceAll("\\p{M}", "");
+        return n.replace("&", "").replace("_", "").replaceAll("[:：]\\s*$", "").trim().toLowerCase(Locale.ROOT);
+    }
+
     public Encontrado buscar(String tituloVentana, String apodo) {
         Pointer hwnd = ventanas.handleDe(tituloVentana);
         if (hwnd == null) {
@@ -100,57 +133,179 @@ public final class Controles {
         }
         Uia.Elemento raiz = Uia.deVentana(hwnd);
         if (raiz == null) {
-            return new Encontrado(null, "No se pueden leer los controles de esa ventana" + (Uia.noDisponible().isEmpty() ? "" : " (" + Uia.noDisponible() + ")") + ".");
+            return new Encontrado(null, sinUia());
         }
-        String tipo = null;
-        String nombre = apodo;
-        int dosPuntos = apodo.indexOf(':');
-        if (dosPuntos > 0) {
-            tipo = apodo.substring(0, dosPuntos).trim().toLowerCase(Locale.ROOT);
-            nombre = apodo.substring(dosPuntos + 1).trim();
-        }
-        List<Uia.Elemento> hallados = new ArrayList<>();
-        List<String> comoSonLlamados = new ArrayList<>();
         try {
-            rebuscar(raiz, tipo, nombre.toLowerCase(Locale.ROOT), 12, hallados, comoSonLlamados);
+            return buscarEn(raiz, apodo);
         } finally {
             raiz.close();
         }
-        if (hallados.isEmpty()) {
-            return new Encontrado(null, "No hay ningún control que encaje con «" + apodo + "» en esa ventana. Mira los que hay con ver_controles.");
-        }
-        if (hallados.size() > 1) {
-            hallados.forEach(Uia.Elemento::close);
-            return new Encontrado(null, "«" + apodo + "» encaja con " + hallados.size() + " controles (" + String.join("; ", comoSonLlamados.subList(0, Math.min(6, comoSonLlamados.size())))
-                    + "). Afina el apodo (por ejemplo «boton:Guardar»): no se toca ninguno.");
-        }
-        return new Encontrado(hallados.get(0), comoSonLlamados.get(0));
     }
 
-    private void rebuscar(Uia.Elemento e, String tipo, String nombre, int quedan, List<Uia.Elemento> hallados, List<String> como) {
+    private Encontrado buscarEn(Uia.Elemento raiz, String apodo) {
+        String resto = apodo.trim();
+        String anclaje = null;
+        int junto = llano(resto).indexOf(" junto a ");
+        if (junto > 0) {
+            anclaje = resto.substring(junto + " junto a ".length()).trim();
+            resto = resto.substring(0, junto).trim();
+        }
+        String tipo = null;
+        String nombre = resto;
+        if (resto.startsWith("#")) {
+            tipo = null;
+            nombre = resto.substring(1);
+        } else {
+            int dp = resto.indexOf(':');
+            if (dp > 0) {
+                tipo = llano(resto.substring(0, dp));
+                nombre = resto.substring(dp + 1).trim();
+            }
+        }
+        boolean porId = resto.startsWith("#");
+
+        List<Candidato> todos = new ArrayList<>();
+        recoger(raiz, HONDO, todos);
+        try {
+            if (anclaje != null) {
+                return porAnclaje(todos, tipo, anclaje, apodo);
+            }
+            return porNombre(todos, tipo, nombre, porId, apodo);
+        } finally {
+            todos.forEach(c -> {
+                if (!c.e().equals(guardado)) {
+                    c.e().close();
+                }
+            });
+            guardado = null;
+        }
+    }
+
+    /** El que se devuelve no se cierra aquí: lo cierra quien lo use. */
+    private Uia.Elemento guardado;
+
+    private void recoger(Uia.Elemento e, int quedan, List<Candidato> fuera) {
         for (Uia.Elemento h : e.hijos()) {
-            boolean guardado = false;
-            try {
-                if (hallados.size() > 8) {
-                    return;
-                }
-                String n = h.nombre();
-                String id = h.automationId();
-                boolean coincide = n.toLowerCase(Locale.ROOT).contains(nombre) || id.toLowerCase(Locale.ROOT).contains(nombre);
-                if (coincide && (tipo == null || h.tipo().equals(tipo)) && h.activo()) {
-                    hallados.add(h);
-                    como.add(h.tipo() + " «" + (n.isBlank() ? id : n) + "»");
-                    guardado = true;
-                } else if (quedan > 1) {
-                    rebuscar(h, tipo, nombre, quedan - 1, hallados, como);
-                }
-            } finally {
-                if (!guardado) {
-                    h.close();
-                }
+            if (fuera.size() > 1200) {
+                h.close();
+                return;
+            }
+            fuera.add(new Candidato(h, 0, h.tipo(), h.nombre(), h.automationId(), h.recuadro(), h.etiqueta()));
+            if (quedan > 1) {
+                recoger(h, quedan - 1, fuera);
             }
         }
     }
+
+    private Encontrado porNombre(List<Candidato> todos, String tipo, String nombre, boolean porId, String apodo) {
+        String buscado = llano(nombre);
+        List<Candidato> puntuados = new ArrayList<>();
+        for (Candidato c : todos) {
+            if (tipo != null && !c.tipo().equals(tipo)) {
+                continue;
+            }
+            int p = 0;
+            String n = llano(c.nombre());
+            String id = llano(c.id());
+            String eti = llano(c.etiqueta());
+            if (porId) {
+                p = id.equals(buscado) ? 100 : id.contains(buscado) && !buscado.isEmpty() ? 60 : 0;
+            } else if (buscado.isEmpty()) {
+                p = tipo != null ? 60 : 0; // «boton:» = cualquier botón
+            } else if (id.equals(buscado)) {
+                p = 100;
+            } else if (n.equals(buscado)) {
+                p = 95;
+            } else if (eti.equals(buscado)) {
+                p = 90;
+            } else if (n.startsWith(buscado)) {
+                p = 72;
+            } else if (n.contains(buscado)) {
+                p = 58;
+            } else if (id.contains(buscado) || eti.contains(buscado)) {
+                p = 50;
+            }
+            if (p == 0) {
+                continue;
+            }
+            if (c.recuadro() != null && c.recuadro()[2] > 0) {
+                p += 4; // se ve en pantalla
+            }
+            puntuados.add(new Candidato(c.e(), p, c.tipo(), c.nombre(), c.id(), c.recuadro(), c.etiqueta()));
+        }
+        return elegir(puntuados, apodo);
+    }
+
+    /** El control que está pegado a una etiqueta: a su derecha en la misma línea, o justo debajo. Como en los formularios. */
+    private Encontrado porAnclaje(List<Candidato> todos, String tipo, String anclaje, String apodo) {
+        String buscado = llano(anclaje);
+        Candidato etiqueta = null;
+        int mejor = 0;
+        for (Candidato c : todos) {
+            String n = llano(c.nombre());
+            int p = n.equals(buscado) ? 100 : n.startsWith(buscado) ? 70 : n.contains(buscado) ? 50 : 0;
+            if (p > mejor && c.recuadro() != null && c.recuadro()[2] > 0) {
+                mejor = p;
+                etiqueta = c;
+            }
+        }
+        if (etiqueta == null) {
+            return new Encontrado(null, "No se ve ninguna etiqueta «" + anclaje + "» en esa ventana. Mira las que hay con ver_controles.");
+        }
+        int[] r = etiqueta.recuadro();
+        int centroY = r[1] + r[3] / 2;
+        List<Candidato> cerca = new ArrayList<>();
+        for (Candidato c : todos) {
+            if (c.e().equals(etiqueta.e()) || c.recuadro() == null || c.recuadro()[2] <= 0) {
+                continue;
+            }
+            if (tipo != null ? !c.tipo().equals(tipo) : !List.of("campo", "desplegable", "casilla", "lista").contains(c.tipo())) {
+                continue;
+            }
+            int[] q = c.recuadro();
+            int qY = q[1] + q[3] / 2;
+            int distancia;
+            if (q[0] >= r[0] + r[2] - 4 && Math.abs(qY - centroY) <= Math.max(14, r[3])) {
+                distancia = q[0] - (r[0] + r[2]); // a la derecha, en la misma línea
+            } else if (q[1] >= r[1] + r[3] - 4 && Math.abs(q[0] - r[0]) <= Math.max(30, r[2])) {
+                distancia = 1000 + q[1] - (r[1] + r[3]); // debajo, en la misma columna
+            } else {
+                continue;
+            }
+            cerca.add(new Candidato(c.e(), Math.max(50, 100 - distancia / 8), c.tipo(), c.nombre(), c.id(), q, c.etiqueta()));
+        }
+        if (cerca.isEmpty()) {
+            return new Encontrado(null, "Hay una etiqueta «" + etiqueta.nombre() + "» pero no se ve ningún control a su lado ni debajo.");
+        }
+        cerca.sort(Comparator.comparingInt(Candidato::puntos).reversed());
+        guardado = cerca.get(0).e();
+        return new Encontrado(guardado, cerca.get(0).comoSeLlama() + " (el que está junto a «" + etiqueta.nombre() + "»)");
+    }
+
+    private Encontrado elegir(List<Candidato> puntuados, String apodo) {
+        puntuados.removeIf(c -> c.puntos() < MINIMO);
+        if (puntuados.isEmpty()) {
+            return new Encontrado(null, "No hay ningún control que encaje con «" + apodo + "» en esa ventana. Mira los que hay con ver_controles.");
+        }
+        puntuados.sort(Comparator.comparingInt(Candidato::puntos).reversed());
+        Candidato uno = puntuados.get(0);
+        List<Candidato> empatados = new ArrayList<>();
+        for (Candidato c : puntuados) {
+            if (uno.puntos() - c.puntos() < EMPATE) {
+                empatados.add(c);
+            }
+        }
+        if (empatados.size() > 1) {
+            List<String> como = new ArrayList<>();
+            empatados.stream().limit(6).forEach(c -> como.add(c.comoSeLlama()));
+            return new Encontrado(null, "«" + apodo + "» encaja igual de bien con " + empatados.size() + " controles (" + String.join("; ", como)
+                    + "). Afina el apodo (su tipo delante, «#identificador» o «campo junto a <etiqueta>»): no se toca ninguno.");
+        }
+        guardado = uno.e();
+        return new Encontrado(guardado, uno.comoSeLlama());
+    }
+
+    // ---------- actuar ----------
 
     /** Escribe el valor exacto en un control y lo relee para comprobarlo. */
     public String escribir(String ventana, String apodo, String texto) {
@@ -161,11 +316,14 @@ public final class Controles {
         try (Uia.Elemento e = f.elemento()) {
             e.enfocar();
             if (!e.escribir(texto)) {
-                return "El control " + f.descripcion() + " no deja escribir directamente: hazlo con el teclado (haz clic en él, bórralo y escribe).";
+                int[] r = e.recuadro();
+                return "El control " + f.descripcion() + " no deja escribir directamente: haz clic en él"
+                        + (r == null ? "" : " (está en x=" + (r[0] + r[2] / 2) + ", y=" + (r[1] + r[3] / 2) + " de la pantalla real)")
+                        + ", bórralo con ctrl+a y Delete, y escribe. Luego compruébalo con leer_control.";
             }
             String ahora = e.valor();
             if (ahora == null) {
-                return "Escrito en " + f.descripcion() + ", pero no se puede releer para comprobarlo.";
+                return "Escrito en " + f.descripcion() + ", pero no se puede releer para comprobarlo: míralo en la captura.";
             }
             return ahora.equals(texto) ? "IGUAL: " + f.descripcion() + " vale ahora exactamente «" + ahora + "»."
                     : "DISTINTO: en " + f.descripcion() + " se quería «" + texto + "» y ha quedado «" + ahora + "». Corrígelo.";
@@ -179,7 +337,7 @@ public final class Controles {
         }
         try (Uia.Elemento e = f.elemento()) {
             String v = e.valor();
-            return f.descripcion() + (v == null ? " no tiene un valor que leer." : " vale «" + v + "»" + (e.activo() ? "" : " [desactivado]") + ".");
+            return f.descripcion() + (v == null ? " no tiene un valor que leer." : " vale «" + v + "»") + (e.activo() ? "" : " [desactivado]") + ".";
         }
     }
 
@@ -189,16 +347,88 @@ public final class Controles {
             return f.descripcion();
         }
         try (Uia.Elemento e = f.elemento()) {
+            if (!e.activo()) {
+                return "El control " + f.descripcion() + " está desactivado: no se puede pulsar ahora. Mira qué falta antes.";
+            }
             if (e.pulsar()) {
-                return "Pulsado " + f.descripcion() + ". Comprueba con una captura o con ver_controles qué ha pasado.";
+                return "Pulsado " + f.descripcion() + ".";
             }
             if (e.desplegar()) {
                 return "Desplegado " + f.descripcion() + ".";
             }
             int[] r = e.recuadro();
             return r == null ? "El control " + f.descripcion() + " no se deja pulsar por dentro y no se sabe dónde está: usa el ratón mirando la captura."
-                    : "El control " + f.descripcion() + " no se deja pulsar por dentro. Está en la pantalla real en x=" + r[0] + ", y=" + r[1]
-                      + ", de " + r[2] + "×" + r[3] + " píxeles: haz clic ahí con el ratón.";
+                    : "El control " + f.descripcion() + " no se deja pulsar por dentro. Está en la pantalla real en x=" + (r[0] + r[2] / 2)
+                      + ", y=" + (r[1] + r[3] / 2) + ": haz clic ahí con el ratón.";
+        }
+    }
+
+    // ---------- esperar (lo que hace fiable a una automatización) ----------
+
+    public enum Que { APAREZCA, DESAPAREZCA, SE_ACTIVE, VALGA }
+
+    /**
+     * Espera a que pase algo, mirando de verdad, en vez de dormir un rato a ciegas. Es lo que distingue una
+     * automatización fiable de una que falla el día que el programa va lento.
+     */
+    public String esperar(String ventana, String apodo, Que que, String valor, double segundos) {
+        long fin = System.currentTimeMillis() + (long) (Math.max(0.5, segundos) * 1000);
+        String ultimo = "";
+        while (true) {
+            boolean ventanaHay = ventanas.handleDe(ventana) != null;
+            if (apodo == null || apodo.isBlank()) {
+                if (que == Que.APAREZCA && ventanaHay) {
+                    return "Ya está: la ventana «" + ventana + "» está abierta.";
+                }
+                if (que == Que.DESAPAREZCA && !ventanaHay) {
+                    return "Ya está: la ventana «" + ventana + "» ha desaparecido.";
+                }
+                ultimo = ventanaHay ? "la ventana está abierta" : "la ventana no está";
+            } else if (!ventanaHay) {
+                ultimo = "todavía no hay ninguna ventana «" + ventana + "»";
+            } else {
+                Encontrado f = buscar(ventana, apodo);
+                if (f.elemento() == null) {
+                    if (que == Que.DESAPAREZCA && f.descripcion().startsWith("No hay ningún control")) {
+                        return "Ya está: " + apodo + " ha desaparecido.";
+                    }
+                    ultimo = f.descripcion();
+                } else {
+                    try (Uia.Elemento e = f.elemento()) {
+                        switch (que) {
+                            case APAREZCA:
+                                return "Ya está: " + f.descripcion() + (e.activo() ? "" : " (pero está desactivado)") + ".";
+                            case SE_ACTIVE:
+                                if (e.activo()) {
+                                    return "Ya está: " + f.descripcion() + " está activo.";
+                                }
+                                ultimo = f.descripcion() + " sigue desactivado";
+                                break;
+                            case VALGA:
+                                String v = e.valor();
+                                if (v != null && v.equals(valor)) {
+                                    return "Ya está: " + f.descripcion() + " vale «" + v + "».";
+                                }
+                                ultimo = f.descripcion() + " vale ahora «" + v + "»";
+                                break;
+                            case DESAPAREZCA:
+                                ultimo = f.descripcion() + " sigue ahí";
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                }
+            }
+            if (System.currentTimeMillis() >= fin) {
+                return "Se han pasado los " + (long) segundos + " s esperando y no ha ocurrido: " + ultimo + ".";
+            }
+            try {
+                Thread.sleep(300);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return "Interrumpido.";
+            }
         }
     }
 }

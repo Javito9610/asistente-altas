@@ -200,6 +200,69 @@ public final class PruebasWindows {
             }
         }
 
+        System.out.println("9) Lo profesional: esperar a que pase algo de verdad, y encontrar un cuadro por su etiqueta");
+        String ficha = "prueba-ficha";
+        Process form = new ProcessBuilder(
+                Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                "-cp", System.getProperty("java.class.path"),
+                "es.amagna.asistente.VentanaDePrueba", ficha, "formulario").inheritIO().start();
+        try {
+            // Esperar a que APAREZCA, en vez de dormir un rato a ciegas.
+            long t2 = System.currentTimeMillis();
+            String salio = ctrl.esperar(ficha, null, es.amagna.asistente.manos.Controles.Que.APAREZCA, null, 25);
+            long tardo = System.currentTimeMillis() - t2;
+            System.out.println("   esperar a que aparezca: " + salio + " (" + tardo + " ms)");
+            ok(salio.startsWith("Ya está"), "esperar_a: espera a que aparezca la ventana y sigue en cuanto está");
+
+            v.activar(ficha);
+            // Un cuadro SIN nombre propio, encontrado por la etiqueta que tiene al lado: así son las fichas de MN.
+            String nif = "00000000T";
+            String puesto = ctrl.escribir(ficha, "campo junto a NIF", nif);
+            System.out.println("   escribir junto a la etiqueta «NIF»: " + puesto);
+            boolean anclaje = puesto.startsWith("IGUAL");
+            if (anclaje) {
+                ok(true, "se encuentra un cuadro por la etiqueta que tiene al lado y se escribe EXACTO");
+                String ya = ctrl.esperar(ficha, "campo junto a NIF", es.amagna.asistente.manos.Controles.Que.VALGA, nif, 5);
+                ok(ya.startsWith("Ya está"), "esperar_a: espera a que un campo valga un valor exacto");
+                String otro = ctrl.leer(ficha, "campo junto a Importe");
+                System.out.println("   el cuadro de al lado de «Importe»: " + otro);
+                ok(!otro.startsWith("No hay") && !otro.startsWith("No se ve"), "cada etiqueta encuentra SU cuadro, no el del vecino");
+            } else {
+                // Si Windows no enseña las etiquetas de este programa, se dice y no se da por bueno a medias.
+                System.out.println("   (este programa no enseña sus etiquetas a Windows: en MN se usará el nombre o el #identificador)");
+            }
+            String boton = ctrl.pulsar(ficha, "boton:Guardar");
+            System.out.println("   pulsar «Guardar» por su nombre: " + boton);
+            ok(boton.startsWith("Pulsado"), "se pulsa un botón por su nombre, sin coordenadas");
+
+            // Y esperar a que DESAPAREZCA cuando se cierra.
+            v.cerrarVentana(ficha);
+            String fuera = ctrl.esperar(ficha, null, es.amagna.asistente.manos.Controles.Que.DESAPAREZCA, null, 15);
+            System.out.println("   esperar a que desaparezca: " + fuera);
+            ok(fuera.startsWith("Ya está"), "esperar_a: se entera de que la ventana ya no está");
+
+            // Y la prueba de que no se le escapa el tiempo: algo que no va a pasar.
+            long t3 = System.currentTimeMillis();
+            String nunca = ctrl.esperar(ficha, null, es.amagna.asistente.manos.Controles.Que.APAREZCA, null, 2);
+            long espero = System.currentTimeMillis() - t3;
+            ok(nunca.startsWith("Se han pasado") && espero >= 1800 && espero < 6000,
+                    "esperar_a: si no pasa, avisa al acabarse el tiempo (" + espero + " ms) y dice qué había");
+        } finally {
+            form.destroy();
+        }
+
+        System.out.println("10) El expediente: queda escrito qué hizo, con capturas");
+        es.amagna.asistente.cerebro.Expediente ex = es.amagna.asistente.cerebro.Expediente.abrir("Prueba de Windows del Asistente Altas");
+        ok(ex.sirve(), "se puede escribir el expediente en " + es.amagna.asistente.cerebro.Expediente.base());
+        ex.dice("Compruebo que todo queda registrado.");
+        ex.paso(1, "escribir_en", "campo junto a NIF", "IGUAL: el campo vale «00000000T».");
+        ex.captura(manos.captura());
+        ex.cerrar(true, "TERMINADO: prueba de Windows", 1, 0, 0, 0);
+        Path informe = ex.carpeta().resolve("informe.html");
+        ok(Files.isRegularFile(informe) && Files.size(informe) > 500, "se escribe el informe para mirar: " + informe);
+        ok(Files.isRegularFile(ex.carpeta().resolve("001-pantalla.png")) && Files.isRegularFile(ex.carpeta().resolve("pasos.jsonl")),
+                "y junto a él la captura y el detalle paso a paso");
+
         terminar(manos, v);
     }
 

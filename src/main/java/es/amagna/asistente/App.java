@@ -23,8 +23,10 @@ import java.util.List;
  *   asistente mirar                      captura de pantalla a captura.png y datos de escala (no toca nada)
  *   asistente probar-manos               prueba de precisión del ratón y de tecleo en el Bloc de notas (sin IA)
  *   asistente guardar-clave              guarda la clave de la API (no se ve al escribir)
- *   asistente agente "tarea" [--vista] [--pasos N] [--modelo M]
- *                                         el agente hace la tarea; --vista = mira pero no toca nada
+ *   asistente agente "tarea" [--vista] [--pasos N] [--modelo M] [--sin-expediente]
+ *                                         el agente hace la tarea; --vista = mira pero no toca nada.
+ *                                         Deja un expediente con todo lo que hizo (pasos, capturas e informe.html)
+ *                                         en %LOCALAPPDATA%\AsistenteAltas\expedientes
  * Freno de emergencia: lleva el ratón a la esquina superior izquierda.
  */
 public final class App {
@@ -51,7 +53,7 @@ public final class App {
                           asistente campo               (lee el campo donde hagas clic, sin IA)
                           asistente controles "<ventana>" [--hondo N]   (los controles por dentro, sin IA)
                           asistente probar-windows      (pruebas de manos y ventanas en el Bloc de notas, sin IA)
-                          asistente agente "tarea" [--vista] [--pasos 20] [--tope-tokens 200000] [--modelo claude-sonnet-5-5]
+                          asistente agente "tarea" [--vista] [--pasos 20] [--tope-tokens 200000] [--modelo claude-sonnet-5-5] [--sin-expediente]
                         Freno de emergencia: ratón a la esquina superior izquierda.""");
             }
         } catch (FrenoDeEmergencia e) {
@@ -159,13 +161,17 @@ public final class App {
         long t0 = System.currentTimeMillis();
         VentanasNativas ventanas = new VentanasNativas(vista);
         Agente ag = new Agente(new ClaudeApi(Clave.leer()), new ManosRobot(vista), ventanas, modelo, instrucciones("base"), pasos, tope, registro)
-                .conControles(new Controles(ventanas));
+                .conControles(new Controles(ventanas))
+                .conExpediente(!a.contains("--sin-expediente"));
         Agente.Resultado r = ag.ejecutar(tarea);
         registro.accept("");
         registro.accept(r.mensaje());
         registro.accept(String.format("Pasos: %d · %.0f s · tokens: %d de entrada (+%d leídos de caché), %d de salida", r.pasos(),
                 (System.currentTimeMillis() - t0) / 1000.0, r.tokensEntrada(), r.tokensCache(), r.tokensSalida()));
         registro.accept("Registro: " + log.toAbsolutePath());
+        if (ag.expediente() != null && ag.expediente().sirve()) {
+            registro.accept("Expediente (lo que hizo, con capturas): " + ag.expediente().carpeta().resolve("informe.html"));
+        }
         System.exit(r.terminado() ? 0 : 1);
     }
 

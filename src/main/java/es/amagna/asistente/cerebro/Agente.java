@@ -49,6 +49,7 @@ public final class Agente {
     private final String instrucciones;
     private final int pasosMax;
     private final Consumer<String> registro;
+    private Expediente expediente;
     private final Ventanas ventanas;
     private Controles controles;
     private final long topeTokens;
@@ -121,7 +122,11 @@ public final class Agente {
         if (controles != null) {
             Map<String, Object> ventana = Json.obj("type", "string", "description", "Parte del título de la ventana");
             Map<String, Object> control = Json.obj("type", "string",
-                    "description", "Parte del nombre del control; delante y con dos puntos, su tipo: «boton:Guardar», «campo:NIF», «opcion-de-menu:Nuevo»");
+                    "description", "Cómo se llama el control. Cuatro formas, de menos a más precisa: «Guardar» (por su nombre); "
+                    + "«boton:Guardar» (tipo + nombre: boton, campo, desplegable, casilla, opcion-de-menu, lista, fila…); «#txtNif» "
+                    + "(por su identificador interno, el que nunca cambia: el más seguro); «campo junto a NIF» (el cuadro que hay al "
+                    + "lado de la etiqueta «NIF», para formularios cuyos cuadros no tienen nombre). No hacen falta acentos ni mayúsculas. "
+                    + "Si dos controles encajan igual de bien no se toca ninguno y se te dicen cuáles son: afina entonces el nombre.");
             h.add(Json.obj("name", "ver_controles", "description",
                     "Lista los controles de una ventana POR DENTRO (nombre, tipo, valor exacto y si están activos), como los lee "
                     + "un lector de pantalla. Es mucho más fiable que mirar la captura: úsalo antes de rellenar nada.",
@@ -138,6 +143,18 @@ public final class Agente {
                     "input_schema", Json.obj("type", "object", "properties", Json.obj("ventana", ventana, "control", control,
                             "texto", Json.obj("type", "string", "description", "El valor exacto, tal cual")),
                             "required", List.of("ventana", "control", "texto"))));
+            h.add(Json.obj("name", "esperar_a", "description",
+                    "Espera MIRANDO a que ocurra algo de verdad, en vez de esperar un rato a ciegas: que aparezca una ventana o un "
+                    + "control, que desaparezca, que se active un botón, que un campo valga algo, o que la pantalla deje de cambiar "
+                    + "(el programa ha terminado de cargar). Úsalo SIEMPRE en vez de «wait»: así da igual que el ordenador vaya lento. "
+                    + "Si se acaba el tiempo te dice qué había en ese momento.",
+                    "input_schema", Json.obj("type", "object", "properties", Json.obj(
+                            "que", Json.obj("type", "string", "enum", List.of("aparezca", "desaparezca", "se active", "valga", "pantalla quieta"),
+                                    "description", "Qué tiene que pasar"),
+                            "ventana", ventana, "control", control,
+                            "valor", Json.obj("type", "string", "description", "Con «valga»: el valor exacto que tiene que tener"),
+                            "segundos", Json.obj("type", "number", "description", "Cuánto esperar como mucho (15 por defecto, 120 como máximo)")),
+                            "required", List.of("que"))));
             h.add(Json.obj("name", "pulsar_control", "description",
                     "Pulsa un botón, una opción de menú o una fila de una lista por su nombre, sin coordenadas: no hay "
                     + "forma de fallar el clic. Si el control no se deja, dice dónde está para pulsarlo con el ratón.",
@@ -150,7 +167,20 @@ public final class Agente {
     }
 
     @SuppressWarnings("unchecked")
+    /** Deja constancia de todo lo que haga en una carpeta propia (pasos, capturas e informe). */
+    public Agente conExpediente(boolean si) {
+        this.expediente = si ? Expediente.abrir("(pendiente)") : null;
+        return this;
+    }
+
+    public Expediente expediente() {
+        return expediente;
+    }
+
     public Resultado ejecutar(String tarea) {
+        if (expediente != null) {
+            expediente = Expediente.abrir(tarea);
+        }
         List<Object> mensajes = new ArrayList<>();
         mensajes.add(Json.obj("role", "user", "content", tarea));
         long ent = 0, sal = 0, cache = 0;
@@ -184,6 +214,7 @@ public final class Agente {
                 if ("text".equals(b.get("type"))) {
                     texto.append(b.get("text"));
                     registro.accept("  Claude: " + String.valueOf(b.get("text")).strip());
+                    anotar(e -> e.dice(String.valueOf(b.get("text")).strip()));
                 } else if ("tool_use".equals(b.get("type"))) {
                     String id = (String) b.get("id");
                     String accion = (String) b.get("name");
@@ -196,15 +227,24 @@ public final class Agente {
                     registro.accept("  paso " + paso + " · " + accion + (in.isEmpty() ? "" : " " + resumen(in)));
                     try {
                         List<Object> salida = ordenador ? ejecutarAccion(accion, in) : ejecutarPropia(accion, in);
+                        final int nPaso = paso;
+                        final List<Object> vista = salida;
+                        anotar(x -> {
+                            x.paso(nPaso, accion, in.isEmpty() ? "" : resumen(in), texto(vista));
+                            byte[] png = pngDe(vista);
+                            if (png != null) {
+                                x.captura(png);
+                            }
+                        });
                         if (ordenador && ("screenshot".equals(accion))) {
                             String huella = huella(salida);
                             iguales = huella.equals(huellaAnterior) ? iguales + 1 : 1;
                             huellaAnterior = huella;
                             if (iguales >= PARADA_SIN_CAMBIOS) {
                                 registro.accept("    sin avances: " + iguales + " capturas idénticas seguidas");
-                                return new Resultado(false, "PARADO: sin avances. La pantalla ha salido idéntica en " + iguales
+                                                return cerrar(new Resultado(false, "PARADO: sin avances. La pantalla ha salido idéntica en " + iguales
                                         + " capturas seguidas: lo que se intentaba no surtía efecto. Se ha parado para no gastar en balde.",
-                                        paso, ent, sal, cache);
+                                        paso, ent, sal, cache));
                             }
                             if (iguales >= AVISO_SIN_CAMBIOS) {
                                 salida = new ArrayList<>(salida);
@@ -220,17 +260,18 @@ public final class Agente {
                     } catch (RuntimeException e) {
                         fallo = true;
                         registro.accept("    error: " + e.getMessage());
+                        anotar(x -> x.error(accion + ": " + e.getMessage()));
                         resultados.add(resultado(id, List.of(textoBloque("Error: " + e.getMessage())), true, ordenador));
                     }
                 }
             }
             if (resultados.isEmpty()) { // sin acciones: ha terminado
                 String t = texto.toString().strip();
-                return new Resultado(t.startsWith("TERMINADO"), t.isEmpty() ? "(sin mensaje final)" : t, paso, ent, sal, cache);
+                return cerrar(new Resultado(t.startsWith("TERMINADO"), t.isEmpty() ? "(sin mensaje final)" : t, paso, ent, sal, cache));
             }
             if (gasto > topeTokens) {
-                return new Resultado(false, "PARADO: se ha llegado al tope de gasto de la tarea (" + gasto + " de " + topeTokens
-                        + " tokens) sin terminar.", paso, ent, sal, cache);
+                return cerrar(new Resultado(false, "PARADO: se ha llegado al tope de gasto de la tarea (" + gasto + " de " + topeTokens
+                        + " tokens) sin terminar.", paso, ent, sal, cache));
             }
             mensajes.add(Json.obj("role", "user", "content", resultados));
         }
@@ -321,6 +362,21 @@ public final class Agente {
                 return List.of(textoBloque(controles.escribir((String) in.get("ventana"), (String) in.get("control"), (String) in.get("texto"))));
             case "pulsar_control":
                 return List.of(textoBloque(controles.pulsar((String) in.get("ventana"), (String) in.get("control"))));
+            case "esperar_a": {
+                double segundos = Math.min(120, Math.max(0.5, dbl(in.getOrDefault("segundos", 15L))));
+                String que = String.valueOf(in.getOrDefault("que", "aparezca"));
+                if (que.startsWith("pantalla")) {
+                    return List.of(textoBloque(esperarPantallaQuieta(segundos)));
+                }
+                Controles.Que q = switch (que) {
+                    case "desaparezca" -> Controles.Que.DESAPAREZCA;
+                    case "se active" -> Controles.Que.SE_ACTIVE;
+                    case "valga" -> Controles.Que.VALGA;
+                    default -> Controles.Que.APAREZCA;
+                };
+                return List.of(textoBloque(controles.esperar((String) in.get("ventana"), (String) in.get("control"), q,
+                        (String) in.get("valor"), segundos)));
+            }
             case "cancelar_bloqueos": {
                 List<String> l = ventanas.cancelarBloqueos();
                 return List.of(textoBloque(l.isEmpty() ? "No había ninguna ventana bloqueada." : "Cancelado: " + String.join(", ", l)));
@@ -332,6 +388,75 @@ public final class Agente {
             default:
                 throw new IllegalArgumentException("Herramienta desconocida: " + accion);
         }
+    }
+
+    private void anotar(Consumer<Expediente> que) {
+        if (expediente != null) {
+            try {
+                que.accept(expediente);
+            } catch (RuntimeException ignorado) {
+                // El expediente nunca puede impedir trabajar.
+            }
+        }
+    }
+
+    private Resultado cerrar(Resultado r) {
+        anotar(e -> e.cerrar(r.terminado(), r.mensaje(), r.pasos(), r.tokensEntrada(), r.tokensSalida(), r.tokensCache()));
+        return r;
+    }
+
+    /** El texto que devolvió una herramienta (para el expediente). */
+    @SuppressWarnings("unchecked")
+    static String texto(List<Object> salida) {
+        StringBuilder b = new StringBuilder();
+        for (Object o : salida) {
+            if (o instanceof Map<?, ?> m && "text".equals(m.get("type"))) {
+                b.append(b.isEmpty() ? "" : "\n").append(m.get("text"));
+            }
+        }
+        return b.toString();
+    }
+
+    /** La captura que devolvió una herramienta, si la hay (para el expediente). */
+    @SuppressWarnings("unchecked")
+    static byte[] pngDe(List<Object> salida) {
+        for (Object o : salida) {
+            if (o instanceof Map<?, ?> m && "image".equals(m.get("type")) && m.get("source") instanceof Map<?, ?> f) {
+                try {
+                    return Base64.getDecoder().decode(String.valueOf(f.get("data")));
+                } catch (IllegalArgumentException e) {
+                    return null;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** Espera a que la pantalla deje de cambiar: la forma honrada de saber que un programa ha terminado de cargar. */
+    String esperarPantallaQuieta(double segundos) {
+        long fin = System.currentTimeMillis() + (long) (segundos * 1000);
+        byte[] antes = null;
+        int iguales = 0;
+        int vueltas = 0;
+        while (System.currentTimeMillis() < fin) {
+            try {
+                Thread.sleep(500);
+                byte[] ahora = manos.captura();
+                vueltas++;
+                iguales = antes != null && java.util.Arrays.equals(antes, ahora) ? iguales + 1 : 0;
+                antes = ahora;
+                if (iguales >= 2) {
+                    return "La pantalla lleva más de un segundo sin cambiar: el programa ha terminado de dibujar. Sigue.";
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return "Interrumpido.";
+            } catch (Exception e) {
+                return "No se ha podido mirar la pantalla: " + e.getMessage();
+            }
+        }
+        return "Se han pasado los " + (long) segundos + " s y la pantalla sigue cambiando (" + vueltas
+                + " miradas): el programa sigue trabajando o hay algo animado. Haz una captura para ver qué pasa.";
     }
 
     /** Comparación exacta, carácter a carácter (solo se igualan los saltos de línea de Windows y los demás). */

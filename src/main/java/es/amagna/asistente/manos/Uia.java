@@ -387,6 +387,17 @@ public final class Uia {
             }
         }
 
+        /** La etiqueta que Windows asocia a este control («NIF:» delante de su cuadro), si el programa la declara. */
+        public String etiqueta() {
+            PointerByReference r = new PointerByReference();
+            if (llamar(p, 44, r) != 0 || r.getValue() == null) { // get_CurrentLabeledBy
+                return "";
+            }
+            try (Elemento e = new Elemento(r.getValue())) {
+                return e.nombre();
+            }
+        }
+
         public boolean enfocar() {
             return llamar(p, 3) == 0; // SetFocus
         }

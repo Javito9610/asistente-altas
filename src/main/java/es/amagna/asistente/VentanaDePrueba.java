@@ -12,11 +12,19 @@ import java.awt.Label;
  * se queda colgado, que lo cancela bien y que el programa sigue sano después. Sin depender del diálogo de archivos de
  * Windows, que tarda lo que quiere (en un PC con OneDrive puede tardar medio minuto).
  *
- * Uso: java -cp … es.amagna.asistente.VentanaDePrueba <nombre>
+ * Con el argumento «formulario» abre otra cosa: una ficha con etiquetas y sus cuadros al lado («NIF:», «Importe:»),
+ * como las de MN. Sirve para probar que el asistente encuentra un cuadro POR LA ETIQUETA que tiene al lado, que es como
+ * hay que buscarlos en los programas de gestión, donde los cuadros no tienen nombre propio.
+ *
+ * Uso: java -cp … es.amagna.asistente.VentanaDePrueba <nombre> [formulario]
  */
 public final class VentanaDePrueba {
     public static void main(String[] args) throws Exception {
         String nombre = args.length > 0 ? args[0] : "ventana-de-prueba";
+        if (args.length > 1 && args[1].equals("formulario")) {
+            formulario(nombre);
+            return;
+        }
         Frame f = new Frame(nombre);
         f.add(new Label("Ventana de prueba del Asistente Altas"));
         f.setSize(420, 160);
@@ -37,6 +45,31 @@ public final class VentanaDePrueba {
             d.setVisible(true); // bloquea aquí hasta que se cierre
             Thread.sleep(1500);
         }
+        f.dispose();
+        System.exit(0);
+    }
+
+    /** Una ficha con etiquetas y cuadros al lado, como las de un programa de gestión. Se cierra sola a los 90 s. */
+    private static void formulario(String nombre) throws Exception {
+        Frame f = new Frame(nombre);
+        f.setLayout(null);
+        Label eNif = new Label("NIF:");
+        eNif.setBounds(20, 50, 70, 24);
+        java.awt.TextField cNif = new java.awt.TextField("");
+        cNif.setBounds(100, 50, 220, 24);
+        Label eImporte = new Label("Importe:");
+        eImporte.setBounds(20, 90, 70, 24);
+        java.awt.TextField cImporte = new java.awt.TextField("");
+        cImporte.setBounds(100, 90, 220, 24);
+        java.awt.Button guardar = new java.awt.Button("Guardar");
+        guardar.setBounds(100, 130, 100, 28);
+        for (java.awt.Component c : new java.awt.Component[] {eNif, cNif, eImporte, cImporte, guardar}) {
+            f.add(c);
+        }
+        f.setSize(380, 200);
+        f.setLocation(80, 80);
+        f.setVisible(true);
+        Thread.sleep(90_000);
         f.dispose();
         System.exit(0);
     }

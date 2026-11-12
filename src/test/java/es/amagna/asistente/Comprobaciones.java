@@ -204,6 +204,40 @@ public final class Comprobaciones {
         ok(d.startsWith("DISTINTO en el carácter 23") && d.contains("se esperaba «.» y hay (fin)"), "comparar: le falta el punto final → DISTINTO y dónde");
         ok(Agente.comparar("línea 1\nlínea 2", "línea 1\r\nlínea 2").startsWith("IGUAL") && Agente.comparar("a\nb", "a\rb").startsWith("IGUAL"), "comparar: saltos de línea de Windows cuentan igual");
         ok(Agente.comparar("PEREZ", "PÉREZ").startsWith("DISTINTO en el carácter 2"), "comparar: un acento de más → DISTINTO");
+
+        // --- Cómo se nombra un control: sin acentos, sin «&» y sin los dos puntos del final ---
+        ok(es.amagna.asistente.manos.Controles.llano("&Número de expediente:").equals("numero de expediente"),
+                "el nombre de un control se compara sin acentos, sin «&» y sin los dos puntos finales");
+        ok(es.amagna.asistente.manos.Controles.llano("  NIF  ").equals("nif") && es.amagna.asistente.manos.Controles.llano(null).isEmpty(),
+                "el nombre de un control se compara sin espacios de sobra y aguanta un nombre vacío");
+
+        // --- El expediente: la prueba de lo que hizo ---
+        try {
+            java.nio.file.Path base = java.nio.file.Files.createTempDirectory("expediente");
+            es.amagna.asistente.cerebro.Expediente ex = es.amagna.asistente.cerebro.Expediente.abrirEn(base, "Dar de alta a PÉREZ GARCÍA");
+            ok(ex.sirve(), "el expediente se abre");
+            ex.dice("Voy a abrir el programa");
+            ex.paso(1, "escribir_en", "campo:NIF", "IGUAL: campo «NIF» vale ahora exactamente «00000000T».");
+            ex.captura(new byte[] {(byte) 0x89, 'P', 'N', 'G'});
+            ex.error("algo salió regular");
+            ex.cerrar(true, "TERMINADO: alta creada", 7, 1000, 200, 500);
+            String html = java.nio.file.Files.readString(ex.carpeta().resolve("informe.html"));
+            String jsonl = java.nio.file.Files.readString(ex.carpeta().resolve("pasos.jsonl"));
+            ok(html.contains("PÉREZ GARCÍA") && html.contains("TERMINADO: alta creada") && html.contains("001-pantalla.png"),
+                    "el informe recoge la tarea, cómo acabó y las capturas");
+            ok(html.contains("<title>") && html.contains("prefers-color-scheme") && !html.contains("<script"),
+                    "el informe se abre solo, se ve bien de día y de noche y no lleva programación dentro");
+            ok(jsonl.lines().count() == 6 && jsonl.contains("\"que\":\"fin\"") && jsonl.contains("\"tokens_entrada\":1000"),
+                    "pasos.jsonl guarda una línea por cosa hecha, con el gasto al final");
+            ok(java.nio.file.Files.exists(ex.carpeta().resolve("001-pantalla.png")), "las capturas se guardan junto al informe");
+            java.nio.file.Path fichero = java.nio.file.Files.createTempFile("no-es-carpeta", ".txt");
+            es.amagna.asistente.cerebro.Expediente malo = es.amagna.asistente.cerebro.Expediente.abrirEn(fichero, "x");
+            malo.paso(1, "a", "b", "c");
+            malo.cerrar(false, "PARADO", 1, 0, 0, 0);
+            ok(!malo.sirve(), "si no se puede escribir el expediente, el asistente sigue trabajando igual");
+        } catch (java.io.IOException e) {
+            ok(false, "el expediente se puede escribir: " + e.getMessage());
+        }
     }
 
     static int ids = 0;
