@@ -5,7 +5,7 @@ import es.amagna.asistente.cerebro.ClaudeApi;
 import es.amagna.asistente.manos.Escala;
 import es.amagna.asistente.manos.FrenoDeEmergencia;
 import es.amagna.asistente.manos.ManosRobot;
-import es.amagna.asistente.manos.VentanasWindows;
+import es.amagna.asistente.manos.VentanasNativas;
 import java.io.Console;
 import java.io.IOException;
 import java.io.InputStream;
@@ -36,8 +36,9 @@ public final class App {
                 case "mirar" -> mirar();
                 case "probar-manos" -> probarManos();
                 case "guardar-clave" -> guardarClave();
-                case "ventanas" -> System.out.println(new VentanasWindows(false).abiertas());
+                case "ventanas" -> System.out.println(new VentanasNativas(false).abiertas());
                 case "campo" -> campo();
+                case "probar-windows" -> PruebasWindows.main(new String[0]);
                 case "agente" -> agente(Arrays.asList(args).subList(1, args.length));
                 default -> System.out.println("""
                         Asistente Altas (pruebas)
@@ -46,6 +47,7 @@ public final class App {
                           asistente guardar-clave
                           asistente ventanas            (lista las ventanas abiertas, sin IA)
                           asistente campo               (lee el campo donde hagas clic, sin IA)
+                          asistente probar-windows      (pruebas de manos y ventanas en el Bloc de notas, sin IA)
                           asistente agente "tarea" [--vista] [--pasos 20] [--tope-tokens 200000] [--modelo claude-sonnet-5-5]
                         Freno de emergencia: ratón a la esquina superior izquierda.""");
             }
@@ -101,7 +103,7 @@ public final class App {
     private static void campo() throws InterruptedException {
         System.out.println("Tienes 5 segundos: haz clic dentro de un campo de texto (por ejemplo, en el Bloc de notas).");
         Thread.sleep(5000);
-        var c = new VentanasWindows(false).campoConFoco();
+        var c = new VentanasNativas(false).campoConFoco();
         System.out.println("Control: «" + c.nombre() + "» · tipo " + c.tipo() + " · ventana «" + c.ventana() + "»");
         System.out.println(c.valor() == null ? "Este control no deja leer su texto." : "Texto exacto: «" + c.valor() + "» (" + c.valor().length() + " caracteres)");
     }
@@ -143,7 +145,7 @@ public final class App {
         };
         registro.accept("Tarea: " + tarea + (vista ? "   [MODO VISTA: no toca nada]" : "") + "   · modelo " + modelo + " · tope " + pasos + " pasos y " + tope + " tokens");
         long t0 = System.currentTimeMillis();
-        Agente ag = new Agente(new ClaudeApi(Clave.leer()), new ManosRobot(vista), new VentanasWindows(vista), modelo, instrucciones("base"), pasos, tope, registro);
+        Agente ag = new Agente(new ClaudeApi(Clave.leer()), new ManosRobot(vista), new VentanasNativas(vista), modelo, instrucciones("base"), pasos, tope, registro);
         Agente.Resultado r = ag.ejecutar(tarea);
         registro.accept("");
         registro.accept(r.mensaje());
