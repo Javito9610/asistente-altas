@@ -39,4 +39,12 @@ public interface Manos {
 
     /** Dónde está el ratón, en coordenadas de la captura. */
     int[] posicion();
+
+    /**
+     * Lee el texto EXACTO del campo que tiene el foco (Ctrl+A, Ctrl+C y el portapapeles, que luego se deja como estaba).
+     * Para comprobar letra a letra lo escrito, sin depender de lo que se ve en una captura.
+     */
+    default String leerCampo() {
+        throw new UnsupportedOperationException("Estas manos no saben leer campos");
+    }
 }

@@ -87,6 +87,12 @@ public final class Agente {
                     "Pone delante (con el foco del teclado) la ventana cuyo título contiene el texto dado. Devuelve si lo ha conseguido.",
                     "input_schema", Json.obj("type", "object", "properties", Json.obj(
                             "titulo", Json.obj("type", "string", "description", "Parte del título de la ventana")), "required", List.of("titulo"))));
+            h.add(Json.obj("name", "leer_campo", "description",
+                    "Lee el texto EXACTO del campo que tiene el foco (selecciona todo, copia y lo devuelve; no borra nada). "
+                    + "Si das «esperado», lo compara carácter a carácter y dice IGUAL o DISTINTO y dónde. Úsalo siempre para "
+                    + "comprobar lo que has escrito: es más fiable que mirar la captura.",
+                    "input_schema", Json.obj("type", "object", "properties", Json.obj(
+                            "esperado", Json.obj("type", "string", "description", "Texto que debería haber, exacto")))));
             h.add(Json.obj("name", "ventana_activa", "description",
                     "Dice el título de la ventana que tiene el foco del teclado (adonde irá lo que escribas o las teclas que pulses).",
                     "input_schema", Json.obj("type", "object", "properties", Json.obj())));
@@ -249,9 +255,31 @@ public final class Agente {
             }
             case "ventana_activa":
                 return List.of(textoBloque("Ventana activa: «" + ventanas.activa() + "»"));
+            case "leer_campo": {
+                String hay = manos.leerCampo();
+                Object esperado = in.get("esperado");
+                return List.of(textoBloque(esperado == null ? "Texto del campo: «" + hay + "»" : comparar(String.valueOf(esperado), hay)));
+            }
             default:
                 throw new IllegalArgumentException("Herramienta desconocida: " + accion);
         }
+    }
+
+    /** Comparación exacta, carácter a carácter (solo se igualan los saltos de línea de Windows y los demás). */
+    public static String comparar(String esperado, String hay) {
+        String e = esperado.replace("\r\n", "\n");
+        String h = hay.replace("\r\n", "\n");
+        if (e.equals(h)) {
+            return "IGUAL: el campo tiene exactamente «" + h + "» (" + h.length() + " caracteres).";
+        }
+        int i = 0;
+        while (i < e.length() && i < h.length() && e.charAt(i) == h.charAt(i)) {
+            i++;
+        }
+        String fe = i < e.length() ? "«" + e.charAt(i) + "»" : "(fin)";
+        String fh = i < h.length() ? "«" + h.charAt(i) + "»" : "(fin)";
+        return "DISTINTO en el carácter " + (i + 1) + ": se esperaba " + fe + " y hay " + fh + ". Esperado: «" + e + "» ("
+                + e.length() + "). Hay: «" + h + "» (" + h.length() + "). Corrígelo y vuelve a comprobar.";
     }
 
     @SuppressWarnings("unchecked")

@@ -262,6 +262,55 @@ public final class ManosRobot implements Manos {
         pausa();
     }
 
+    @Override
+    public String leerCampo() {
+        freno();
+        if (modoVista) {
+            System.out.println("    [modo vista, no se hace] leer el campo activo");
+            return "";
+        }
+        Clipboard cb = Toolkit.getDefaultToolkit().getSystemClipboard();
+        Transferable antes = null;
+        try {
+            antes = cb.isDataFlavorAvailable(DataFlavor.stringFlavor) ? cb.getContents(null) : null;
+        } catch (IllegalStateException ignorada) {
+            // ocupado
+        }
+        String marca = "\u0000asistente-altas-" + System.nanoTime();
+        cb.setContents(new StringSelection(marca), null); // si después sigue la marca, es que no se ha copiado nada
+        for (int[] combo : new int[][] {{KeyEvent.VK_CONTROL, KeyEvent.VK_A}, {KeyEvent.VK_CONTROL, KeyEvent.VK_C}}) {
+            robot.keyPress(combo[0]);
+            robot.keyPress(combo[1]);
+            robot.keyRelease(combo[1]);
+            robot.keyRelease(combo[0]);
+            robot.delay(120);
+        }
+        String texto = null;
+        for (int intento = 0; intento < 10 && texto == null; intento++) {
+            robot.delay(80);
+            try {
+                String t = (String) cb.getData(DataFlavor.stringFlavor);
+                texto = marca.equals(t) ? null : t;
+            } catch (Exception ignorada) {
+                // el portapapeles aún está ocupado: se reintenta
+            }
+        }
+        robot.keyPress(KeyEvent.VK_END); // quitar la selección sin borrar nada
+        robot.keyRelease(KeyEvent.VK_END);
+        if (antes != null) {
+            try {
+                cb.setContents(antes, null);
+            } catch (IllegalStateException ignorada) {
+                // no pasa nada
+            }
+        }
+        pausa();
+        if (texto == null) {
+            throw new IllegalStateException("No se ha podido copiar el texto del campo activo (¿tiene el foco un campo de texto?)");
+        }
+        return texto;
+    }
+
     /** Pega el texto con Ctrl+V y deja el portapapeles como estaba. */
     private void pegar(String texto) {
         Clipboard cb = Toolkit.getDefaultToolkit().getSystemClipboard();

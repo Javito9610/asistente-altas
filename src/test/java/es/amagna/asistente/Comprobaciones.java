@@ -190,7 +190,12 @@ public final class Comprobaciones {
         ok(pet.contains("Ventana activa: «Sin título: Bloc de notas»") && !Json.escribir(conV.get(1)).contains("\"toolset_name\":\"computer\",\"content\":[{\"type\":\"text\",\"text\":\"Abierto"),
                 "ventana_activa responde; las herramientas propias no llevan toolset_name");
         List<Object> tools = (List<Object>) conV.get(0).get("tools");
-        ok(tools.size() == 4 && Agente.HERRAMIENTA.equals(((Map<String, Object>) tools.get(3)).get("type")), "con ventanas: 3 herramientas propias + la de ordenador");
+        ok(tools.size() == 5 && Agente.HERRAMIENTA.equals(((Map<String, Object>) tools.get(4)).get("type")), "con ventanas: 4 herramientas propias + la de ordenador");
+        ok(Agente.comparar("Hola, soy el Asistente.", "Hola, soy el Asistente.").startsWith("IGUAL"), "comparar: igual");
+        String d = Agente.comparar("Hola, soy el Asistente.", "Hola, soy el Asistente");
+        ok(d.startsWith("DISTINTO en el carácter 23") && d.contains("se esperaba «.» y hay (fin)"), "comparar: le falta el punto final → DISTINTO y dónde");
+        ok(Agente.comparar("línea 1\nlínea 2", "línea 1\r\nlínea 2").startsWith("IGUAL"), "comparar: saltos de línea de Windows cuentan igual");
+        ok(Agente.comparar("PEREZ", "PÉREZ").startsWith("DISTINTO en el carácter 2"), "comparar: un acento de más → DISTINTO");
     }
 
     static int ids = 0;
