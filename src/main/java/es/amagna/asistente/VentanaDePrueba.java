@@ -66,6 +66,14 @@ public final class VentanaDePrueba {
         for (java.awt.Component c : new java.awt.Component[] {eNif, cNif, eImporte, cImporte, guardar}) {
             f.add(c);
         }
+        // Un menú de los de toda la vida (los que usa MN, que es WinForms): al desplegarse crea una ventana
+        // «#32768» de Windows. El Bloc de notas moderno no lo hace, así que para probar eso hace falta este.
+        java.awt.MenuBar barra = new java.awt.MenuBar();
+        java.awt.Menu datos = new java.awt.Menu("Datos");
+        datos.add(new java.awt.MenuItem("Clientes"));
+        datos.add(new java.awt.MenuItem("Expedientes"));
+        barra.add(datos);
+        f.setMenuBar(barra);
         f.addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosing(java.awt.event.WindowEvent e) {

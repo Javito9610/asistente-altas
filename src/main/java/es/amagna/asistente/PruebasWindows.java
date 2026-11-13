@@ -487,10 +487,11 @@ public final class PruebasWindows {
                 es.amagna.asistente.guion.Mapa.leer(mIr), "", l -> System.out.println("   " + l));
         ok(!sesionIr.mirar().lista(), "de partida el programa no está abierto");
         ok(sesionIr.asegurar().lista(), "lo abre él solo, sin que nadie lo abra a mano");
-        // Y una vez dentro, distingue la pantalla del menú desplegado.
-        v.activar(clave);
+        // Y una vez dentro, distingue la pantalla del menú desplegado. Se prueba contra un menú de los clásicos de
+        // Windows, que son los que usa MN; el del Bloc de notas moderno ni siquiera crea una ventana.
+        v.activar(vIr);
         var antesMenu = es.amagna.asistente.guion.Explorador.ventanasAhora();
-        ctrl.pulsarRuta(clave, List.of(menuArchivo));
+        System.out.println("   " + ctrl.pulsarRuta(vIr, List.of("Datos")));
         var queSalio = es.amagna.asistente.guion.Explorador.esperarPantalla(antesMenu, 4);
         System.out.println("   al pulsar un menú: ventana=" + queSalio.ventana() + " menu=" + queSalio.menu());
         if (!queSalio.menu()) {
@@ -505,7 +506,7 @@ public final class PruebasWindows {
         }
         ok(queSalio.ventana() == null && queSalio.menu(),
                 "sabe que lo que se ha abierto es un menú desplegado, no una pantalla");
-        manos.tecla("Escape", 1);
+        manos.tecla("Escape", 2);
         ((VentanasNativas) v).cerrarSiEsNuestra(vIr);
 
         System.out.println("15) No se lía con su propia consola, y despierta la ventana si está minimizada");
