@@ -1,21 +1,22 @@
 {
-  "nombre": "MN: pantalla de entrada",
-  "ventana": "Control de Acceso",
-  "_nota": "Los dos cuadros de MN no tienen nombre ni etiqueta, y el número que da Windows cambia cada vez que se abre el diálogo. Lo único estable es el sitio: el usuario arriba, la contraseña debajo. Si algún día MN les pone nombre, se ponen delante y se usarán esos.",
+  "nombre": "MN: arranque (entrar, empresa y ejercicio)",
+  "ventana": "Control de acceso",
+  "_nota": "Entrar en MN son CUATRO pantallas seguidas: el acceso, la elección de empresa, la del ejercicio contable y un anuncio que hay que cerrar. Cada paso del guion dice en qué ventana actúa.",
   "controles": {
     "usuario": [
-      "campo[1]",
-      "#txtUsuario",
-      "campo junto a Nombre Usuario"
+      "#txtEmail",
+      "campo junto a Correo electrónico",
+      "campo[1]"
     ],
     "clave": [
-      "campo[2]",
       "#txtPassword",
-      "campo junto a Contraseña"
+      "campo junto a Contraseña",
+      "campo[2]"
     ],
     "entrar": [
-      "boton:Aceptar",
-      "#btnAceptar"
+      "boton:Iniciar Sesión",
+      "boton:Iniciar sesión",
+      "#btnLogin"
     ]
   }
 }

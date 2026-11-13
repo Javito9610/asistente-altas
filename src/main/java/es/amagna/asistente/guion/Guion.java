@@ -152,13 +152,17 @@ public final class Guion {
             Map<String, Object> m = mapaDe(crudo);
             String hacer = String.valueOf(m.getOrDefault("hacer", "")).trim();
             String control = String.valueOf(m.getOrDefault("control", "")).trim();
+            // Un trabajo puede pasar por varias ventanas (entrar, elegir empresa, elegir ejercicio…). Cada paso puede
+            // decir en qué ventana actúa, y nombrar el control directamente sin tener que estar en el mapa.
+            String ventanaPaso = m.get("ventana") == null ? mapa.ventana() : String.valueOf(m.get("ventana"));
+            String apodoSuelto = m.get("apodo") == null ? null : String.valueOf(m.get("apodo"));
             String valor = m.get("valor") == null ? null : String.valueOf(m.get("valor"));
             boolean toca = Boolean.TRUE.equals(m.get("toca"));
             double segundos = m.get("segundos") instanceof Number n ? n.doubleValue() : 20;
 
             // Hay pasos que no van contra ningún control (pulsar una tecla, esperar un rato): no hay nada que buscar.
-            if (control.isBlank()) {
-                String soloTecla = hacerPaso(hacer, control, "", valor, segundos, m, ensayo, lineas, escrito);
+            if (control.isBlank() && apodoSuelto == null) {
+                String soloTecla = hacerPaso(hacer, control, "", valor, segundos, m, ensayo, lineas, escrito, ventanaPaso);
                 if (soloTecla != null && soloTecla != SALTADO) {
                     lineas.add("FALLA  " + hacer + ": " + soloTecla);
                     return parte(false, "PARADO en «" + hacer + "»: " + soloTecla, lineas, hechos, avisos, rescates, clave, ensayo);
@@ -171,12 +175,13 @@ public final class Guion {
             }
             String apodo;
             try {
-                apodo = resolver(control, hacer.equals("esperar") ? segundos : 0);
+                apodo = apodoSuelto != null ? esperarA(ventanaPaso, apodoSuelto, hacer.equals("esperar") ? segundos : 0)
+                        : resolver(control, hacer.equals("esperar") ? segundos : 0, ventanaPaso);
             } catch (Fallo f) {
                 lineas.add("FALLA  " + hacer + " " + control + ": " + f.getMessage());
                 return parte(false, "PARADO en «" + hacer + " " + control + "»: " + f.getMessage(), lineas, hechos, avisos, rescates, clave, ensayo);
             }
-            List<String> todos = mapa.apodos(control);
+            List<String> todos = apodoSuelto != null ? List.of(apodoSuelto) : mapa.apodos(control);
             if (!apodo.equals(todos.get(0)) && yaAvisado.add(control)) {
                 avisos++;
                 lineas.add("AVISO  «" + control + "»: «" + todos.get(0) + "» ya no vale; ha funcionado «" + apodo
@@ -191,7 +196,8 @@ public final class Guion {
 
             // Se hace el paso. Si se atasca y hay IA de guardia, se le pasa el problema con todo el contexto,
             // y después se vuelve a intentar: la rutina la lleva el guion, lo raro lo resuelve la cabeza.
-            String error = hacerPaso(hacer, control, apodo, valor, segundos, m, ensayo, lineas, escrito);
+            String error = hacerPaso(hacer, control.isBlank() ? apodoSuelto : control, apodo, valor, segundos, m, ensayo,
+                    lineas, escrito, ventanaPaso);
             if (error == SALTADO) {
                 hechos++;
                 continue;
@@ -209,8 +215,8 @@ public final class Guion {
                 }
                 lineas.add("IA     " + hizo);
                 try {
-                    apodo = resolver(control, 5); // la pantalla puede haber cambiado
-                    error = hacerPaso(hacer, control, apodo, valor, segundos, m, ensayo, lineas, escrito);
+                    apodo = resolver(control, 5, ventanaPaso); // la pantalla puede haber cambiado
+                    error = hacerPaso(hacer, control, apodo, valor, segundos, m, ensayo, lineas, escrito, ventanaPaso);
                     if (error == SALTADO) {
                         error = null;
                     }
@@ -239,7 +245,7 @@ public final class Guion {
                 String v2 = l2.get("valor") == null ? null : String.valueOf(l2.get("valor"));
                 String apodo2;
                 try {
-                    apodo2 = resolver(ctrl2, s2);
+                    apodo2 = resolver(ctrl2, s2, ventanaPaso);
                 } catch (Fallo f) {
                     if (ensayo) {
                         lineas.add("ENSAYO después de " + hacer + " " + control + ": no se comprueba (no se ha tocado nada)");
@@ -249,7 +255,7 @@ public final class Guion {
                     return parte(false, "PARADO: después de «" + hacer + " " + control + "» no ha pasado lo que tenía que pasar: "
                             + f.getMessage(), lineas, hechos, avisos, rescates, clave, ensayo);
                 }
-                String r2 = controles.esperar(mapa.ventana(), apodo2, que2, v2, s2);
+                String r2 = controles.esperar(ventanaPaso, apodo2, que2, v2, s2);
                 if (!r2.startsWith("Ya está")) {
                     lineas.add("FALLA  después de " + hacer + " " + control + ": " + r2);
                     return parte(false, "PARADO: después de «" + hacer + " " + control + "»: " + r2, lineas, hechos, avisos, rescates, clave, ensayo);
@@ -307,7 +313,7 @@ public final class Guion {
 
     /** Hace un paso. Devuelve null si ha ido bien, SALTADO si no tocaba hacerlo, o por qué ha fallado. */
     private String hacerPaso(String hacer, String control, String apodo, String valor, double segundos,
-            Map<String, Object> m, boolean ensayo, List<String> lineas, Map<String, String[]> escrito) {
+            Map<String, Object> m, boolean ensayo, List<String> lineas, Map<String, String[]> escrito, String ventana) {
         switch (hacer) {
             case "escribir":
                 if (valor == null) {
@@ -335,17 +341,17 @@ public final class Guion {
                     lineas.add("ENSAYO escribir " + control + " (" + apodo + "): encontrado, NO se escribe");
                     return SALTADO;
                 }
-                String e = controles.escribir(mapa.ventana(), apodo, valor);
+                String e = controles.escribir(ventana, apodo, valor);
                 if (!e.startsWith("IGUAL")) {
                     return e;
                 }
                 escrito.put(control, new String[] {apodo, valor});
                 return null;
             case "pulsar":
-                String p = controles.pulsar(mapa.ventana(), apodo);
+                String p = controles.pulsar(ventana, apodo);
                 return p.startsWith("Pulsado") || p.startsWith("Desplegado") ? null : p;
             case "esperar":
-                String s = controles.esperar(mapa.ventana(), apodo, que(m.get("que")), valor, segundos);
+                String s = controles.esperar(ventana, apodo, que(m.get("que")), valor, segundos);
                 return s.startsWith("Ya está") ? null : s;
             case "comprobar":
                 if (ensayo) {
@@ -353,7 +359,7 @@ public final class Guion {
                             + "porque en ensayo no se ha escrito nada");
                     return SALTADO;
                 }
-                String hay = controles.valorDe(mapa.ventana(), apodo);
+                String hay = controles.valorDe(ventana, apodo);
                 return valor == null || valor.equals(hay) ? null
                         : "se esperaba «" + valor + "» y hay «" + hay + "»";
             case "apartar":
@@ -470,12 +476,12 @@ public final class Guion {
     }
 
     /** Prueba los apodos del mapa por orden y devuelve el que funciona. */
-    private String resolver(String control, double esperarSegundos) {
+    private String resolver(String control, double esperarSegundos, String ventana) {
         List<String> apodos = mapa.apodos(control);
         long fin = System.currentTimeMillis() + (long) (Math.max(0, esperarSegundos) * 1000);
         do {
             for (String a : apodos) {
-                if (controles.existe(mapa.ventana(), a)) {
+                if (controles.existe(ventana, a)) {
                     return a;
                 }
             }
@@ -489,8 +495,28 @@ public final class Guion {
                 break;
             }
         } while (true);
-        throw new Fallo("no se encuentra «" + control + "» en la ventana «" + mapa.ventana() + "» de ninguna de sus formas ("
+        throw new Fallo("no se encuentra «" + control + "» en la ventana «" + ventana + "» de ninguna de sus formas ("
                 + String.join(" / ", apodos) + "). O no estamos en esa pantalla, o el programa ha cambiado y hay que repasar el mapa.");
+    }
+
+    /** Igual que resolver, pero con un nombre de control escrito a pelo en el paso. */
+    private String esperarA(String ventana, String apodo, double segundos) {
+        long fin = System.currentTimeMillis() + (long) (Math.max(0, segundos) * 1000);
+        do {
+            if (controles.existe(ventana, apodo)) {
+                return apodo;
+            }
+            if (System.currentTimeMillis() >= fin) {
+                break;
+            }
+            try {
+                Thread.sleep(300);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        } while (true);
+        throw new Fallo("no se encuentra «" + apodo + "» en la ventana «" + ventana + "»");
     }
 
     private Parte parte(boolean bien, String resumen, List<String> lineas, int hechos, int avisos, int rescates, String clave, boolean ensayo) {

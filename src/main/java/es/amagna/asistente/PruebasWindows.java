@@ -559,6 +559,40 @@ public final class PruebasWindows {
             pCierra.destroy();
         }
 
+        System.out.println("14j) Un trabajo que pasa por VARIAS ventanas, y «el último de la lista»");
+        // Entrar en MN son cuatro pantallas seguidas: acceso, empresa, ejercicio y un anuncio. Cada paso tiene que
+        // poder decir en qué ventana trabaja.
+        String vA = "prueba-varias-a";
+        String vB = "prueba-varias-b";
+        Process pA = new ProcessBuilder(exeJava, "-cp", cp, "es.amagna.asistente.VentanaDePrueba", vA, "formulario").inheritIO().start();
+        Process pB = new ProcessBuilder(exeJava, "-cp", cp, "es.amagna.asistente.VentanaDePrueba", vB, "formulario").inheritIO().start();
+        try {
+            ok(ctrl.esperar(vA, null, es.amagna.asistente.manos.Controles.Que.APAREZCA, null, 25).startsWith("Ya está")
+                    && ctrl.esperar(vB, null, es.amagna.asistente.manos.Controles.Que.APAREZCA, null, 25).startsWith("Ya está"),
+                    "se abren dos ventanas distintas");
+            Path mV = dirG.resolve("varias.json");
+            Path gV = dirG.resolve("guion-varias.json");
+            Files.writeString(mV, """
+                    {"nombre": "Varias", "ventana": "%s", "controles": {"nif": ["campo[1]"]}}""".formatted(vA),
+                    java.nio.charset.StandardCharsets.UTF_8);
+            Files.writeString(gV, """
+                    {"pasos": [
+                      {"hacer": "escribir", "control": "nif", "valor": "EN LA PRIMERA"},
+                      {"hacer": "escribir", "ventana": "%s", "apodo": "campo[1]", "valor": "EN LA SEGUNDA"},
+                      {"hacer": "escribir", "ventana": "%s", "apodo": "campo[-1]", "valor": "LA ÚLTIMA DE LA SEGUNDA"}
+                    ]}""".formatted(vB, vB), java.nio.charset.StandardCharsets.UTF_8);
+            var parteV = new es.amagna.asistente.guion.Guion(ctrl, (VentanasNativas) v,
+                    es.amagna.asistente.guion.Mapa.leer(mV), l -> System.out.println("   " + l)).ejecutar(gV, false);
+            ok(parteV.bien(), "un mismo guion trabaja en varias ventanas: " + parteV.resumen());
+            ok("EN LA PRIMERA".equals(ctrl.valorDe(vA, "campo[1]")), "lo de la primera ventana, en la primera");
+            ok("EN LA SEGUNDA".equals(ctrl.valorDe(vB, "campo[1]")), "lo de la segunda, en la segunda");
+            ok("LA ÚLTIMA DE LA SEGUNDA".equals(ctrl.valorDe(vB, "campo[2]")),
+                    "y «campo[-1]» es el último de la lista, que es lo estable cuando la lista crece");
+        } finally {
+            pA.destroy();
+            pB.destroy();
+        }
+
         System.out.println("15) No se lía con su propia consola, y despierta la ventana si está minimizada");
         // El título de una consola lleva dentro el comando que se escribió, así que buscar «MNprogram» encontraba
         // la consola donde se había escrito «MNprogram»: el asistente se leía a sí mismo.

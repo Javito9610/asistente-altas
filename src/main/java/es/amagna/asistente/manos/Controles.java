@@ -273,7 +273,7 @@ public final class Controles {
         // «campo[2]» = el segundo cuadro de arriba abajo. Para los diálogos cuyos cuadros no tienen NI nombre NI
         // etiqueta: lo único estable de verdad es dónde están. Los números que da Windows en esos casos son el
         // identificador de la ventana y cambian cada vez que se abre, así que no sirven.
-        java.util.regex.Matcher porSitio = java.util.regex.Pattern.compile("^([a-zA-Zñáéíóú-]+)\\s*\\[(\\d+)\\]$").matcher(resto);
+        java.util.regex.Matcher porSitio = java.util.regex.Pattern.compile("^([a-zA-Zñáéíóú-]+)\\s*\\[(-?\\d+)\\]$").matcher(resto);
         if (porSitio.matches()) {
             return porOrden(todos(raiz), llano(porSitio.group(1)), Integer.parseInt(porSitio.group(2)), apodo);
         }
@@ -326,6 +326,11 @@ public final class Controles {
             }
         }
         deEseTipo.sort(Comparator.<Candidato>comparingInt(c -> c.recuadro()[1]).thenComparingInt(c -> c.recuadro()[0]));
+        // Los negativos cuentan desde el final: «fila[-1]» es la última. Para listas que crecen (los ejercicios
+        // contables, por ejemplo), «el último» es estable y «el número 8» no lo es.
+        if (cual < 0) {
+            cual = deEseTipo.size() + cual + 1;
+        }
         if (cual < 1 || cual > deEseTipo.size()) {
             return new Encontrado(null, "se pide el «" + tipo + "» número " + cual + " de la pantalla, y solo se ven "
                     + deEseTipo.size() + ". ¿Seguro que estamos en esa pantalla?");
