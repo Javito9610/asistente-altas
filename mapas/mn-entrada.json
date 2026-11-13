@@ -2,8 +2,26 @@
   "nombre": "MN: pantalla de entrada",
   "ventana": "Control de Acceso",
   "controles": {
-    "usuario": ["#txtUsuario", "campo junto a Nombre Usuario", "campo junto a Usuario"],
-    "clave":   ["#txtPassword", "#txtClave", "campo junto a Contraseña"],
-    "entrar":  ["#btnAceptar", "boton:Aceptar"]
+    "usuario": [
+      "#txtUsuario",
+      "#txtUser",
+      "#txtLogin",
+      "campo junto a Nombre Usuario",
+      "campo junto a Usuario",
+      "campo:Nombre Usuario"
+    ],
+    "clave": [
+      "#txtPassword",
+      "#txtClave",
+      "#txtPass",
+      "campo junto a Contraseña",
+      "campo:Contraseña"
+    ],
+    "entrar": [
+      "#btnAceptar",
+      "#cmdAceptar",
+      "boton:Aceptar",
+      "boton:&Aceptar"
+    ]
   }
 }

@@ -3,6 +3,7 @@ package es.amagna.asistente.guion;
 import es.amagna.asistente.manos.Controles;
 import es.amagna.asistente.manos.VentanasNativas;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
@@ -80,6 +81,19 @@ public final class Sesion {
         return this;
     }
 
+    /** Deja escrito todo lo que hay en la pantalla de entrada, para poder corregir el mapa sin adivinar. */
+    private String diagnostico() {
+        try {
+            Path f = Path.of("diagnostico-entrada.txt");
+            Files.writeString(f, "Pantalla de entrada: " + mapaEntrada.ventana() + "\n\n"
+                    + controles.arbol(mapaEntrada.ventana(), 12, 2000), java.nio.charset.StandardCharsets.UTF_8);
+            return "\n   He dejado lo que hay en esa pantalla en " + f.toAbsolutePath()
+                    + " · pásamelo y corrijo el mapa.";
+        } catch (IOException | RuntimeException e) {
+            return "";
+        }
+    }
+
     /** ¿Está el programa pidiendo usuario y contraseña ahora mismo? */
     public boolean pideEntrar() {
         return mapaEntrada != null && ventanas.handleDe(mapaEntrada.ventana()) != null;
@@ -94,7 +108,9 @@ public final class Sesion {
             var parte = new Guion(controles, ventanas, mapaEntrada, l -> registro.accept("     " + l))
                     .ejecutar(guionEntrada, false);
             if (!parte.bien()) {
-                return "no se ha podido entrar: " + parte.resumen();
+                // Si no ha encontrado un campo, lo útil no es rendirse: es dejar escrito QUÉ hay en esa pantalla,
+                // para poder corregir el mapa en un minuto en vez de ir adivinando.
+                return "no se ha podido entrar: " + parte.resumen() + diagnostico();
             }
         } catch (IOException e) {
             return "no se ha podido leer el guion de entrada: " + e.getMessage();

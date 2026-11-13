@@ -93,7 +93,17 @@ public final class Guion {
     public Parte ejecutar(Path fichero, boolean ensayo) throws IOException {
         Map<String, Object> g = Json.objeto(Files.readString(fichero, StandardCharsets.UTF_8));
         String clave = String.valueOf(g.getOrDefault("clave", "")).trim();
-        List<String> lineas = new ArrayList<>();
+        // Cada paso se cuenta EN EL MOMENTO. Antes se guardaban todos y se soltaban al final, y mientras tanto
+        // parecía que el programa se había colgado. Quedarse mudo es la peor forma de trabajar.
+        List<String> lineas = new ArrayList<>() {
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public boolean add(String linea) {
+                registro.accept(linea);
+                return super.add(linea);
+            }
+        };
         int avisos = 0;
 
         if (!ensayo && !clave.isEmpty()) {
@@ -310,8 +320,22 @@ public final class Guion {
                 String hay = controles.valorDe(mapa.ventana(), apodo);
                 return valor == null || valor.equals(hay) ? null
                         : "se esperaba «" + valor + "» y hay «" + hay + "»";
+            case "tecla":
+                if (valor == null || valor.isBlank()) {
+                    return "el guion no dice qué tecla pulsar";
+                }
+                if (ensayo) {
+                    lineas.add("ENSAYO tecla " + valor + ": NO se pulsa");
+                    return SALTADO;
+                }
+                try {
+                    new es.amagna.asistente.manos.ManosRobot(false).tecla(valor, 1);
+                    return null;
+                } catch (RuntimeException ex) {
+                    return "no se ha podido pulsar «" + valor + "»: " + ex.getMessage();
+                }
             default:
-                return "«" + hacer + "» no se sabe hacer (escribir, pulsar, esperar, comprobar)";
+                return "«" + hacer + "» no se sabe hacer (escribir, pulsar, esperar, comprobar, tecla)";
         }
     }
 
@@ -401,7 +425,6 @@ public final class Guion {
     }
 
     private Parte parte(boolean bien, String resumen, List<String> lineas, int hechos, int avisos, int rescates, String clave, boolean ensayo) {
-        lineas.forEach(registro);
         registro.accept(resumen);
         if (bien && !ensayo && !clave.isEmpty()) {
             try {
