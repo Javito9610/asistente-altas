@@ -531,6 +531,34 @@ public final class PruebasWindows {
             pSitio.destroy();
         }
 
+        System.out.println("14i) Una pantalla que se cierra al terminar (como la de entrar) no se le pide cuentas después");
+        String vCierra = "prueba-se-cierra";
+        Path mCierra = dirG.resolve("se-cierra.json");
+        Path gCierra = dirG.resolve("guion-se-cierra.json");
+        Files.writeString(mCierra, """
+                {"nombre": "Se cierra", "ventana": "%s", "controles": {"nif": ["campo[1]"]}}""".formatted(vCierra),
+                java.nio.charset.StandardCharsets.UTF_8);
+        Files.writeString(gCierra, """
+                {"pasos": [
+                  {"hacer": "esperar",  "control": "nif", "que": "aparezca", "segundos": 30},
+                  {"hacer": "escribir", "control": "nif", "valor": "00000000T"},
+                  {"hacer": "tecla",    "valor": "alt+F4", "toca": true}
+                ]}""", java.nio.charset.StandardCharsets.UTF_8);
+        Process pCierra = new ProcessBuilder(exeJava, "-cp", cp, "es.amagna.asistente.VentanaDePrueba", vCierra, "formulario")
+                .inheritIO().start();
+        try {
+            ok(ctrl.esperar(vCierra, null, es.amagna.asistente.manos.Controles.Que.APAREZCA, null, 25).startsWith("Ya está"),
+                    "se abre la pantalla que va a cerrarse sola");
+            v.activar(vCierra);
+            var parteCierra = new es.amagna.asistente.guion.Guion(ctrl, (VentanasNativas) v,
+                    es.amagna.asistente.guion.Mapa.leer(mCierra), l -> System.out.println("   " + l)).ejecutar(gCierra, false);
+            ok(parteCierra.bien(), "se escribe, la pantalla se cierra, y NO se da por fallido: " + parteCierra.resumen());
+            ok(parteCierra.lineas().stream().anyMatch(l -> l.contains("ya se ha cerrado")),
+                    "y queda dicho que la pantalla hizo su trabajo y se fue");
+        } finally {
+            pCierra.destroy();
+        }
+
         System.out.println("15) No se lía con su propia consola, y despierta la ventana si está minimizada");
         // El título de una consola lleva dentro el comando que se escribió, así que buscar «MNprogram» encontraba
         // la consola donde se había escrito «MNprogram»: el asistente se leía a sí mismo.

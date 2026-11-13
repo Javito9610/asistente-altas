@@ -5,6 +5,7 @@ import es.amagna.asistente.manos.VentanasNativas;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
@@ -115,8 +116,27 @@ public final class Sesion {
         } catch (IOException e) {
             return "no se ha podido leer el guion de entrada: " + e.getMessage();
         }
-        String r = controles.esperar(mapa.ventana(), null, Controles.Que.APAREZCA, null, 120);
-        return r.startsWith("Ya está") ? null : "se ha entrado pero la ventana principal no ha llegado a aparecer: " + r;
+        // Al entrar, los programas de gestión sueltan lo que tengan pendiente: avisos, configuraciones, novedades.
+        // Nada de eso lo hemos pedido nosotros, así que se cancela y se sigue; queda apuntado por si interesa.
+        long fin = System.currentTimeMillis() + 120_000;
+        List<String> apartados = new ArrayList<>();
+        while (System.currentTimeMillis() < fin) {
+            if (ventanas.handleDe(mapa.ventana()) != null && !ventanas.abiertas().contains("BLOQUEADA")) {
+                if (!apartados.isEmpty()) {
+                    registro.accept("     (se han apartado " + apartados.size() + " ventanas que salieron al entrar: "
+                            + String.join(", ", apartados) + ")");
+                }
+                return null;
+            }
+            List<String> cerrados = ventanas.cancelarBloqueos();
+            if (!cerrados.isEmpty()) {
+                apartados.addAll(cerrados);
+                registro.accept("     apartando lo que ha salido al entrar: " + String.join(", ", cerrados));
+            }
+            esperar(1);
+        }
+        return "se ha entrado pero la ventana principal no ha llegado a estar libre en 2 minutos"
+                + (apartados.isEmpty() ? "" : " (se apartaron: " + String.join(", ", apartados) + ")");
     }
 
     /** Lo que se encontró y lo que hubo que hacer. */

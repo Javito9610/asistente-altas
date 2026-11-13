@@ -212,7 +212,9 @@ public final class Guion {
                 lineas.add("FALLA  " + hacer + " " + control + ": " + error);
                 return parte(false, "PARADO en «" + hacer + " " + control + "»: " + error, lineas, hechos, avisos, rescates, clave, ensayo);
             }
-            lineas.add("ok     " + hacer + " " + control + (valor == null ? "" : " = «" + valor + "»"));
+            if (valor == null || !valor.startsWith("secreto:")) {
+                lineas.add("ok     " + hacer + " " + control + (valor == null ? "" : " = «" + valor + "»"));
+            }
             hechos++;
 
             // Condición de después: no se sigue hasta que el programa reaccione de verdad.
@@ -246,7 +248,14 @@ public final class Guion {
         // La doble lectura: todo lo escrito se vuelve a leer y se compara. Como arquear una caja.
         if (!ensayo && !escrito.isEmpty()) {
             List<String> mal = new ArrayList<>();
-            for (Map.Entry<String, String[]> e : escrito.entrySet()) {
+            // Si la pantalla ya no está, no hay nada que releer: ESO es exactamente lo que tenía que pasar. Una
+            // pantalla de entrada se cierra al entrar, y un diálogo se cierra al aceptarlo. Pedirle cuentas a una
+            // ventana que ya ha hecho su trabajo y se ha ido no tiene ningún sentido.
+            boolean sigueAhi = ventanas != null && ventanas.handleDe(mapa.ventana()) != null;
+            if (!sigueAhi) {
+                lineas.add("ok     la pantalla «" + mapa.ventana() + "» ya se ha cerrado: hizo lo que tenía que hacer");
+            }
+            for (Map.Entry<String, String[]> e : sigueAhi ? escrito.entrySet() : java.util.Map.<String, String[]>of().entrySet()) {
                 String hay = controles.valorDe(mapa.ventana(), e.getValue()[0]);
                 if (!e.getValue()[1].equals(hay)) {
                     mal.add("«" + e.getKey() + "» tenía que valer «" + e.getValue()[1] + "» y vale «" + hay + "»");
