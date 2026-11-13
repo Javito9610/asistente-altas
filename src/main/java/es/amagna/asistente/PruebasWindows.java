@@ -392,14 +392,17 @@ public final class PruebasWindows {
         System.out.println("   menús que se ven sin tocar nada: " + rutas.size());
         rutas.stream().limit(6).forEach(r -> System.out.println("     · " + String.join(" > ", r)));
         ok(rutas.size() >= 3, "se leen las opciones de menú de un programa sin abrir ninguna");
-        ok(rutas.stream().anyMatch(r -> r.get(r.size() - 1).equalsIgnoreCase("Archivo")),
-                "entre ellas está «Archivo»");
+        // Sin dar por hecho el idioma de Windows: aquí sale «Archivo» y en el Windows de las pruebas «File».
+        String menuArchivo = rutas.stream().map(r -> r.get(r.size() - 1))
+                .filter(n -> n.equalsIgnoreCase("Archivo") || n.equalsIgnoreCase("File")).findFirst().orElse("");
+        ok(!menuArchivo.isBlank(), "entre ellas está la de Archivo, se llame como se llame en este Windows ("
+                + (menuArchivo.isBlank() ? "no está" : menuArchivo) + ")");
         // Y pulsar por RUTA, no por nombre suelto (en MN hay nombres repetidos en sitios distintos).
-        String porRuta = ctrl.pulsarRuta(clave, List.of("Archivo"));
+        String porRuta = ctrl.pulsarRuta(clave, List.of(menuArchivo));
         System.out.println("   pulsar por ruta: " + porRuta);
         ok(porRuta.startsWith("Pulsado") || porRuta.startsWith("Desplegado"), "se pulsa una opción siguiendo su ruta");
         manos.tecla("Escape", 1);
-        String noExiste = ctrl.pulsarRuta(clave, List.of("Archivo", "Esto No Existe"));
+        String noExiste = ctrl.pulsarRuta(clave, List.of(menuArchivo, "Esto No Existe"));
         ok(noExiste.startsWith("No se encuentra"), "y si la ruta no existe lo dice, sin pulsar nada al azar");
 
         System.out.println("15) No se lía con su propia consola, y despierta la ventana si está minimizada");
