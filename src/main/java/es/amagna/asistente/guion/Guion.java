@@ -156,6 +156,19 @@ public final class Guion {
             boolean toca = Boolean.TRUE.equals(m.get("toca"));
             double segundos = m.get("segundos") instanceof Number n ? n.doubleValue() : 20;
 
+            // Hay pasos que no van contra ningún control (pulsar una tecla, esperar un rato): no hay nada que buscar.
+            if (control.isBlank()) {
+                String soloTecla = hacerPaso(hacer, control, "", valor, segundos, m, ensayo, lineas, escrito);
+                if (soloTecla != null && soloTecla != SALTADO) {
+                    lineas.add("FALLA  " + hacer + ": " + soloTecla);
+                    return parte(false, "PARADO en «" + hacer + "»: " + soloTecla, lineas, hechos, avisos, rescates, clave, ensayo);
+                }
+                if (soloTecla == null) {
+                    lineas.add("ok     " + hacer + (valor == null ? "" : " " + valor));
+                }
+                hechos++;
+                continue;
+            }
             String apodo;
             try {
                 apodo = resolver(control, hacer.equals("esperar") ? segundos : 0);
