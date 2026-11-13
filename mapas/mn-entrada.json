@@ -1,27 +1,22 @@
 {
   "nombre": "MN: pantalla de entrada",
   "ventana": "Control de Acceso",
+  "_nota": "Los dos cuadros de MN no tienen nombre ni etiqueta, y el número que da Windows cambia cada vez que se abre el diálogo. Lo único estable es el sitio: el usuario arriba, la contraseña debajo.",
   "controles": {
     "usuario": [
       "#txtUsuario",
-      "#txtUser",
-      "#txtLogin",
       "campo junto a Nombre Usuario",
-      "campo junto a Usuario",
-      "campo:Nombre Usuario"
+      "campo[1]"
     ],
     "clave": [
       "#txtPassword",
       "#txtClave",
-      "#txtPass",
       "campo junto a Contraseña",
-      "campo:Contraseña"
+      "campo[2]"
     ],
     "entrar": [
       "#btnAceptar",
-      "#cmdAceptar",
-      "boton:Aceptar",
-      "boton:&Aceptar"
+      "boton:Aceptar"
     ]
   }
 }

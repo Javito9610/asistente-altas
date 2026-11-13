@@ -270,6 +270,13 @@ public final class Controles {
             anclaje = resto.substring(junto + " junto a ".length()).trim();
             resto = resto.substring(0, junto).trim();
         }
+        // «campo[2]» = el segundo cuadro de arriba abajo. Para los diálogos cuyos cuadros no tienen NI nombre NI
+        // etiqueta: lo único estable de verdad es dónde están. Los números que da Windows en esos casos son el
+        // identificador de la ventana y cambian cada vez que se abre, así que no sirven.
+        java.util.regex.Matcher porSitio = java.util.regex.Pattern.compile("^([a-zA-Zñáéíóú-]+)\\s*\\[(\\d+)\\]$").matcher(resto);
+        if (porSitio.matches()) {
+            return porOrden(todos(raiz), llano(porSitio.group(1)), Integer.parseInt(porSitio.group(2)), apodo);
+        }
         String tipo = null;
         String nombre = resto;
         if (resto.startsWith("#")) {
@@ -284,8 +291,7 @@ public final class Controles {
         }
         boolean porId = resto.startsWith("#");
 
-        List<Candidato> todos = new ArrayList<>();
-        recoger(raiz, HONDO, todos);
+        List<Candidato> todos = todos(raiz);
         try {
             if (anclaje != null) {
                 return porAnclaje(todos, tipo, anclaje, apodo);
@@ -299,6 +305,34 @@ public final class Controles {
             });
             guardado = null;
         }
+    }
+
+    private List<Candidato> todos(Uia.Elemento raiz) {
+        List<Candidato> r = new ArrayList<>();
+        recoger(raiz, HONDO, r);
+        return r;
+    }
+
+    /**
+     * El n-ésimo control de un tipo, contando como se lee: de arriba abajo y, a igual altura, de izquierda a derecha.
+     * Es el último recurso, pero para un diálogo de los de siempre es perfectamente estable: el cuadro de la
+     * contraseña siempre está debajo del del usuario.
+     */
+    private Encontrado porOrden(List<Candidato> todos, String tipo, int cual, String apodo) {
+        List<Candidato> deEseTipo = new ArrayList<>();
+        for (Candidato c : todos) {
+            if (c.tipo().equals(tipo) && c.recuadro() != null && c.recuadro()[2] > 0 && c.recuadro()[3] > 0) {
+                deEseTipo.add(c);
+            }
+        }
+        deEseTipo.sort(Comparator.<Candidato>comparingInt(c -> c.recuadro()[1]).thenComparingInt(c -> c.recuadro()[0]));
+        if (cual < 1 || cual > deEseTipo.size()) {
+            return new Encontrado(null, "se pide el «" + tipo + "» número " + cual + " de la pantalla, y solo se ven "
+                    + deEseTipo.size() + ". ¿Seguro que estamos en esa pantalla?");
+        }
+        Candidato elegido = deEseTipo.get(cual - 1);
+        guardado = elegido.e();
+        return new Encontrado(guardado, elegido.comoSeLlama() + " (el " + cual + ".º de arriba abajo)");
     }
 
     /** El que se devuelve no se cierra aquí: lo cierra quien lo use. */

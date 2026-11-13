@@ -507,6 +507,30 @@ public final class PruebasWindows {
         manos.tecla("Escape", 2);
         ((VentanasNativas) v).cerrarSiEsNuestra(vIr);
 
+        System.out.println("14h) Encontrar un cuadro por su SITIO, cuando no tiene ni nombre ni etiqueta");
+        // Es el caso de la pantalla de entrada de MN: dos cuadros sin nombre, sin etiqueta asociada, y con unos
+        // números que Windows cambia cada vez que se abre el diálogo. Lo único estable es que uno está encima del otro.
+        String vSitio = "prueba-sitio";
+        Process pSitio = new ProcessBuilder(exeJava, "-cp", cp, "es.amagna.asistente.VentanaDePrueba", vSitio, "formulario")
+                .inheritIO().start();
+        try {
+            ok(ctrl.esperar(vSitio, null, es.amagna.asistente.manos.Controles.Que.APAREZCA, null, 25).startsWith("Ya está"),
+                    "se abre la ventana con dos cuadros");
+            String arriba = ctrl.escribir(vSitio, "campo[1]", "EL DE ARRIBA");
+            String abajo = ctrl.escribir(vSitio, "campo[2]", "EL DE ABAJO");
+            System.out.println("   campo[1]: " + arriba);
+            System.out.println("   campo[2]: " + abajo);
+            ok(arriba.startsWith("IGUAL") && abajo.startsWith("IGUAL"), "se escribe en los dos por su sitio");
+            // Y lo que de verdad importa: que no los confunda. El de arriba es el de la etiqueta NIF.
+            ok("EL DE ARRIBA".equals(ctrl.valorDe(vSitio, "campo junto a NIF"))
+                    && "EL DE ABAJO".equals(ctrl.valorDe(vSitio, "campo junto a Importe")),
+                    "y el 1.º es el de arriba y el 2.º el de abajo, no al revés");
+            String noHay = ctrl.leer(vSitio, "campo[9]");
+            ok(noHay.contains("solo se ven"), "si se pide uno que no existe, lo dice en vez de tocar otro");
+        } finally {
+            pSitio.destroy();
+        }
+
         System.out.println("15) No se lía con su propia consola, y despierta la ventana si está minimizada");
         // El título de una consola lleva dentro el comando que se escribió, así que buscar «MNprogram» encontraba
         // la consola donde se había escrito «MNprogram»: el asistente se leía a sí mismo.
