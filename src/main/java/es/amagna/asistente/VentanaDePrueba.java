@@ -57,6 +57,11 @@ public final class VentanaDePrueba {
         eNif.setBounds(20, 50, 70, 24);
         java.awt.TextField cNif = new java.awt.TextField("");
         cNif.setBounds(100, 50, 220, 24);
+        // Un panel que se llama igual que la etiqueta y envuelve al cuadro: es lo que hace MN en su pantalla de
+        // entrada, y lo que hizo que el asistente escribiera el correo en la casilla de la contraseña.
+        java.awt.Panel envoltorio = new java.awt.Panel();
+        envoltorio.setName("NIF");
+        envoltorio.setBounds(100, 50, 220, 24);
         Label eImporte = new Label("Importe:");
         eImporte.setBounds(20, 90, 70, 24);
         java.awt.TextField cImporte = new java.awt.TextField("");

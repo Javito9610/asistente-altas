@@ -593,6 +593,24 @@ public final class PruebasWindows {
             pB.destroy();
         }
 
+        System.out.println("14k) La etiqueta no puede ser el propio cuadro (lo que mandó el correo a la contraseña)");
+        String vEti = "prueba-etiquetas";
+        Process pEti = new ProcessBuilder(exeJava, "-cp", cp, "es.amagna.asistente.VentanaDePrueba", vEti, "formulario").inheritIO().start();
+        try {
+            ok(ctrl.esperar(vEti, null, es.amagna.asistente.manos.Controles.Que.APAREZCA, null, 25).startsWith("Ya está"),
+                    "se abre la ventana de prueba");
+            // «junto a NIF» tiene que dar el cuadro de al lado de NIF, NUNCA el de Importe que hay debajo.
+            String puesto = ctrl.escribir(vEti, "campo junto a NIF", "00000000T");
+            System.out.println("   " + puesto);
+            ok(puesto.startsWith("IGUAL"), "se escribe en el cuadro de la etiqueta NIF");
+            ok("".equals(ctrl.valorDe(vEti, "campo junto a Importe")),
+                    "y el cuadro de DEBAJO (Importe) se queda vacío: no se ha confundido de casilla");
+            ok("00000000T".equals(ctrl.valorDe(vEti, "campo[1]")) && "".equals(ctrl.valorDe(vEti, "campo[2]")),
+                    "lo escrito está en el primer cuadro, no en el segundo");
+        } finally {
+            pEti.destroy();
+        }
+
         System.out.println("15) No se lía con su propia consola, y despierta la ventana si está minimizada");
         // El título de una consola lleva dentro el comando que se escribió, así que buscar «MNprogram» encontraba
         // la consola donde se había escrito «MNprogram»: el asistente se leía a sí mismo.

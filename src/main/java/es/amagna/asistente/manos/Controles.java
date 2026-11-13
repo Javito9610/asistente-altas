@@ -398,9 +398,27 @@ public final class Controles {
     /** El control que está pegado a una etiqueta: a su derecha en la misma línea, o justo debajo. Como en los formularios. */
     private Encontrado porAnclaje(List<Candidato> todos, String tipo, String anclaje, String apodo) {
         String buscado = llano(anclaje);
+        List<String> tiposBuenos = tipo != null ? List.of(tipo) : List.of("campo", "desplegable", "casilla", "lista");
+
+        // Antes de buscar la etiqueta: si hay un control DEL TIPO QUE SE PIDE que ya se llama así, ese es. Los
+        // programas modernos le ponen el nombre al propio cuadro, no solo a la etiqueta de al lado.
+        for (Candidato c : todos) {
+            if (tiposBuenos.contains(c.tipo()) && llano(c.nombre()).equals(buscado)
+                    && c.recuadro() != null && c.recuadro()[2] > 0) {
+                guardado = c.e();
+                return new Encontrado(guardado, c.comoSeLlama() + " (se llama así él mismo)");
+            }
+        }
+
+        // Y la etiqueta NUNCA puede ser un cuadro ni el panel que lo envuelve: si no, se toma por etiqueta el propio
+        // recuadro del campo y se acaba escribiendo en el de debajo. Que es exactamente lo que pasó con MN: el panel
+        // que envuelve el cuadro del correo se llama «Correo electrónico», igual que su etiqueta.
         Candidato etiqueta = null;
         int mejor = 0;
         for (Candidato c : todos) {
+            if (tiposBuenos.contains(c.tipo()) || c.tipo().equals("panel")) {
+                continue;
+            }
             String n = llano(c.nombre());
             int p = n.equals(buscado) ? 100 : n.startsWith(buscado) ? 70 : n.contains(buscado) ? 50 : 0;
             if (p > mejor && c.recuadro() != null && c.recuadro()[2] > 0) {
@@ -418,7 +436,7 @@ public final class Controles {
             if (c.e().equals(etiqueta.e()) || c.recuadro() == null || c.recuadro()[2] <= 0) {
                 continue;
             }
-            if (tipo != null ? !c.tipo().equals(tipo) : !List.of("campo", "desplegable", "casilla", "lista").contains(c.tipo())) {
+            if (!tiposBuenos.contains(c.tipo())) {
                 continue;
             }
             int[] q = c.recuadro();
