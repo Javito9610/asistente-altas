@@ -364,6 +364,24 @@ public final class Comprobaciones {
             ok(false, "se puede probar un guion con secreto: " + e.getMessage());
         }
 
+        // El mapa sabe dónde está su pantalla de entrada: así una sola orden puede también volver a entrar sola.
+        try {
+            java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("mapas");
+            java.nio.file.Files.writeString(dir.resolve("prog.json"),
+                    "{\"ventana\": \"Programa\", \"entrada\": {\"mapa\": \"prog-entrada.json\", \"guion\": \"entrar.json\"},"
+                    + " \"controles\": {\"a\": [\"b\"]}}");
+            var conEntrada = es.amagna.asistente.guion.Mapa.leer(dir.resolve("prog.json"));
+            ok(conEntrada.entradaMapa() != null && conEntrada.entradaMapa().endsWith("prog-entrada.json")
+                    && conEntrada.entradaGuion() != null && conEntrada.entradaGuion().endsWith("entrar.json"),
+                    "el mapa apunta a su pantalla de entrada, y las rutas se cuentan desde el propio mapa");
+            java.nio.file.Files.writeString(dir.resolve("solo.json"), "{\"ventana\": \"X\", \"controles\": {\"a\": [\"b\"]}}");
+            var sinEntrada = es.amagna.asistente.guion.Mapa.leer(dir.resolve("solo.json"));
+            ok(sinEntrada.entradaMapa() == null && sinEntrada.entradaGuion() == null,
+                    "y un programa que no pide entrar no necesita ese bloque");
+        } catch (java.io.IOException e) {
+            ok(false, "se puede leer un mapa con entrada: " + e.getMessage());
+        }
+
         // Nunca quedarse mudo para siempre: si el programa no contesta, se deja por imposible y se avisa.
         long t0espera = System.currentTimeMillis();
         String tarde = es.amagna.asistente.guion.Explorador.conTiempo(1, () -> {

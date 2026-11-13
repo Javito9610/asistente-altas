@@ -1,0 +1,8 @@
+{
+  "pasos": [
+    {"hacer": "esperar",  "control": "usuario", "que": "aparezca", "segundos": 60},
+    {"hacer": "escribir", "control": "usuario", "valor": "usuario:mn"},
+    {"hacer": "escribir", "control": "clave",   "valor": "secreto:mn"},
+    {"hacer": "pulsar",   "control": "entrar",  "toca": true}
+  ]
+}

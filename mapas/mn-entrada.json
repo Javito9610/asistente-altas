@@ -1,0 +1,9 @@
+{
+  "nombre": "MN: pantalla de entrada",
+  "ventana": "Control de Acceso",
+  "controles": {
+    "usuario": ["#txtUsuario", "campo junto a Nombre Usuario", "campo junto a Usuario"],
+    "clave":   ["#txtPassword", "#txtClave", "campo junto a Contraseña"],
+    "entrar":  ["#btnAceptar", "boton:Aceptar"]
+  }
+}

@@ -46,6 +46,7 @@ public final class Sesion {
     private final Consumer<String> registro;
     private final String debeDecir;
     private Path guionEntrada;
+    private Mapa mapaEntrada;
 
     /**
      * @param debeDecir texto que tiene que aparecer en el título para dar la sesión por buena (por ejemplo
@@ -64,12 +65,55 @@ public final class Sesion {
         return this;
     }
 
+    /** La pantalla de entrada (usuario y contraseña) con su propio mapa y el guion que la rellena. */
+    public Sesion conEntrada(Mapa mapaEntrada, Path guion) {
+        this.mapaEntrada = mapaEntrada;
+        this.guionEntrada = guion;
+        return this;
+    }
+
+    /** Toma la pantalla de entrada del propio mapa, si la trae apuntada. */
+    public Sesion conEntradaDelMapa() throws IOException {
+        if (mapa.entradaMapa() != null && mapa.entradaGuion() != null) {
+            return conEntrada(Mapa.leer(mapa.entradaMapa()), mapa.entradaGuion());
+        }
+        return this;
+    }
+
+    /** ¿Está el programa pidiendo usuario y contraseña ahora mismo? */
+    public boolean pideEntrar() {
+        return mapaEntrada != null && ventanas.handleDe(mapaEntrada.ventana()) != null;
+    }
+
+    /** Rellena la pantalla de entrada y espera a que aparezca la principal. */
+    private String entrar() {
+        if (mapaEntrada == null || guionEntrada == null) {
+            return "está pidiendo usuario y contraseña y no hay nada configurado para entrar solo";
+        }
+        try {
+            var parte = new Guion(controles, ventanas, mapaEntrada, l -> registro.accept("     " + l))
+                    .ejecutar(guionEntrada, false);
+            if (!parte.bien()) {
+                return "no se ha podido entrar: " + parte.resumen();
+            }
+        } catch (IOException e) {
+            return "no se ha podido leer el guion de entrada: " + e.getMessage();
+        }
+        String r = controles.esperar(mapa.ventana(), null, Controles.Que.APAREZCA, null, 120);
+        return r.startsWith("Ya está") ? null : "se ha entrado pero la ventana principal no ha llegado a aparecer: " + r;
+    }
+
     /** Lo que se encontró y lo que hubo que hacer. */
     public record Estado(boolean lista, String comoEsta, int escalon) {
     }
 
     /** ¿Está el programa vivo, respondiendo y donde tiene que estar? */
     public Estado mirar() {
+        // Lo primero: ¿está pidiendo usuario y contraseña? Es lo que pasa cuando caduca la sesión, y no hay que
+        // reiniciar nada: hay que entrar.
+        if (pideEntrar()) {
+            return new Estado(false, "está pidiendo usuario y contraseña", 0);
+        }
         String titulo = ventanas.tituloDe(mapa.ventana());
         if (titulo == null) {
             return new Estado(false, "el programa no está abierto", 0);
@@ -94,6 +138,19 @@ public final class Sesion {
             return e;
         }
         registro.accept("La sesión no está lista: " + e.comoEsta() + ". Arreglándolo…");
+
+        // 0) Si solo está pidiendo entrar, se entra. No hay que reiniciar nada.
+        if (pideEntrar()) {
+            registro.accept("  0. está en la pantalla de entrada: escribiendo usuario y contraseña");
+            String fallo = entrar();
+            if (fallo != null) {
+                return new Estado(false, fallo, 0);
+            }
+            e = mirar();
+            if (e.lista()) {
+                return new Estado(true, "listo (ha vuelto a entrar)", 0);
+            }
+        }
 
         // 1) Avisos y diálogos encima.
         List<String> cerrados = ventanas.cancelarBloqueos();
@@ -131,29 +188,32 @@ public final class Sesion {
         matar(mapa.ejecutable());
         esperar(3);
         ventanas.abrir(mapa.ejecutable(), mapa.argumentos());
-        String apareció = controles.esperar(mapa.ventana(), null, Controles.Que.APAREZCA, null, 120);
-        if (!apareció.startsWith("Ya está")) {
-            return new Estado(false, "se ha reiniciado el programa pero no ha llegado a abrirse: " + apareció, 4);
-        }
 
-        // 5) Volver a entrar.
-        if (guionEntrada == null) {
-            e = mirar();
-            return e.lista() ? new Estado(true, "listo (reiniciado)", 4)
-                    : new Estado(false, "reiniciado, pero hay que entrar y no hay guion de entrada: " + e.comoEsta(), 5);
-        }
-        registro.accept("  5. entrando con el usuario y la contraseña guardada");
-        try {
-            var parte = new Guion(controles, ventanas, mapa, l -> registro.accept("     " + l)).ejecutar(guionEntrada, false);
-            if (!parte.bien()) {
-                return new Estado(false, "no se ha podido entrar: " + parte.resumen(), 5);
+        // Al arrancar puede salir la principal o la pantalla de entrada: se espera a cualquiera de las dos.
+        registro.accept("     esperando a que arranque…");
+        long fin = System.currentTimeMillis() + 180_000;
+        while (System.currentTimeMillis() < fin) {
+            if (pideEntrar()) {
+                registro.accept("  5. pide usuario y contraseña: entrando");
+                String fallo = entrar();
+                if (fallo != null) {
+                    return new Estado(false, fallo, 5);
+                }
+                break;
             }
-        } catch (IOException ex) {
-            return new Estado(false, "no se ha podido leer el guion de entrada: " + ex.getMessage(), 5);
+            if (ventanas.tituloDe(mapa.ventana()) != null) {
+                break;
+            }
+            esperar(1);
         }
         e = mirar();
-        return e.lista() ? new Estado(true, "listo (reiniciado y vuelto a entrar)", 5)
-                : new Estado(false, "se ha entrado pero sigue sin estar listo: " + e.comoEsta(), 5);
+        if (e.lista()) {
+            return new Estado(true, "listo (reiniciado" + (guionEntrada == null ? "" : " y vuelto a entrar") + ")", 5);
+        }
+        return new Estado(false, pideEntrar()
+                ? "el programa pide usuario y contraseña y no hay nada configurado para entrar solo: "
+                  + "pon el bloque «entrada» en el mapa y guarda la contraseña con «asistente secreto»"
+                : "se ha reiniciado pero sigue sin estar listo: " + e.comoEsta(), 5);
     }
 
     private int cerrarPantallasSueltas() {

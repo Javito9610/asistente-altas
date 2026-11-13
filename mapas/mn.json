@@ -5,7 +5,11 @@
     "ejecutable": "C:\\MnProgram\\MNprogramCloud\\PlaJuSQL.exe",
     "argumentos": []
   },
+  "entrada": {
+    "mapa": "mn-entrada.json",
+    "guion": "../guiones/entrar-mn.json"
+  },
   "controles": {
-    "_pendiente": ["esto se rellena con «asistente aprender» cuando veamos la pantalla de entrada de MN"]
+    "menu_clientes": ["Bases de Datos > Clientes"]
   }
 }

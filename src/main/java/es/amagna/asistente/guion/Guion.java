@@ -334,13 +334,23 @@ public final class Guion {
         }
         try {
             String r = controles.escribir(mapa.ventana(), apodo, new String(clave));
-            if (!r.startsWith("IGUAL")) {
-                // El mensaje de error del control podría llevar dentro lo escrito: se corta y no se repite.
-                return r.startsWith("DISTINTO") ? "lo escrito no ha quedado igual (no se enseña por ser un secreto)"
-                        : sinSecretos(r, new String(clave));
+            // Un campo de contraseña NO devuelve lo que se escribió: devuelve puntitos, o nada. Así que aquí la
+            // comprobación no puede ser «es igual», tiene que ser «hay algo escrito, y del largo que toca».
+            if (r.startsWith("IGUAL")) {
+                lineas.add("ok     escribir " + control + " = «(secreto " + nombre + ", " + clave.length + " caracteres)»");
+                return null;
             }
-            lineas.add("ok     escribir " + control + " = «(secreto " + nombre + ")»");
-            return null;
+            String hay = controles.valorDe(mapa.ventana(), apodo);
+            if (hay != null && !hay.isEmpty()) {
+                lineas.add("ok     escribir " + control + " = «(secreto " + nombre + ")» · el campo lo tapa, pero hay "
+                        + hay.length() + " caracteres dentro");
+                return hay.length() == clave.length ? null
+                        : "en «" + control + "» tenía que haber " + clave.length + " caracteres y hay " + hay.length()
+                          + ": algo se ha perdido por el camino";
+            }
+            // El mensaje del control podría llevar dentro lo escrito: se limpia antes de devolverlo.
+            return r.startsWith("DISTINTO") ? "lo escrito en «" + control + "» no ha quedado bien (no se enseña por ser un secreto)"
+                    : sinSecretos(r, new String(clave));
         } finally {
             java.util.Arrays.fill(clave, '\0');
         }

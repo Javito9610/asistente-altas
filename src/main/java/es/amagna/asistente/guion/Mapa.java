@@ -35,7 +35,8 @@ import java.util.Map;
  *
  * @package Amagna\Altas
  */
-public record Mapa(String nombre, String ventana, String ejecutable, List<String> argumentos, Map<String, List<String>> controles) {
+public record Mapa(String nombre, String ventana, String ejecutable, List<String> argumentos, Map<String, List<String>> controles,
+        Path entradaMapa, Path entradaGuion) {
 
     @SuppressWarnings("unchecked")
     public static Mapa leer(Path fichero) throws IOException {
@@ -70,7 +71,17 @@ public record Mapa(String nombre, String ventana, String ejecutable, List<String
         if (controles.isEmpty()) {
             throw new IllegalArgumentException("El mapa " + fichero.getFileName() + " no tiene ningún control.");
         }
-        return new Mapa(texto(m.getOrDefault("nombre", fichero.getFileName().toString())), ventana, exe, List.copyOf(args), Map.copyOf(controles));
+        // La pantalla de entrada: su propio mapa y el guion que la rellena. Se apuntan aquí para que una sola orden
+        // («ábrelo y déjalo listo») sepa también volver a entrar si el programa pide usuario y contraseña.
+        Path base = fichero.toAbsolutePath().getParent();
+        Path eMapa = null;
+        Path eGuion = null;
+        if (m.get("entrada") instanceof Map<?, ?> e) {
+            eMapa = e.get("mapa") == null ? null : base.resolve(String.valueOf(e.get("mapa"))).normalize();
+            eGuion = e.get("guion") == null ? null : base.resolve(String.valueOf(e.get("guion"))).normalize();
+        }
+        return new Mapa(texto(m.getOrDefault("nombre", fichero.getFileName().toString())), ventana, exe, List.copyOf(args),
+                Map.copyOf(controles), eMapa, eGuion);
     }
 
     /** Las formas de encontrar un control, de la mejor a la peor. */

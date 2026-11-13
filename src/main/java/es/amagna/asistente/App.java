@@ -319,7 +319,7 @@ public final class App {
         Controles ctrl = new Controles(ventanas);
 
         // 1. Que el programa esté vivo y responda. Si está cerrado, lo abre.
-        var sesion = new es.amagna.asistente.guion.Sesion(ctrl, ventanas, mapa, "", System.out::println);
+        var sesion = new es.amagna.asistente.guion.Sesion(ctrl, ventanas, mapa, "", System.out::println).conEntradaDelMapa();
         var estado = sesion.asegurar();
         if (!estado.lista()) {
             throw new IllegalStateException("No se ha podido dejar el programa listo: " + estado.comoEsta());
@@ -423,7 +423,8 @@ public final class App {
         es.amagna.asistente.guion.Mapa mapa = es.amagna.asistente.guion.Mapa.leer(Path.of(a.get(0)));
         VentanasNativas ventanas = new VentanasNativas(false);
         String debeDecir = a.contains("--debe-decir") ? a.get(a.indexOf("--debe-decir") + 1) : "";
-        var sesion = new es.amagna.asistente.guion.Sesion(new Controles(ventanas), ventanas, mapa, debeDecir, System.out::println);
+        var sesion = new es.amagna.asistente.guion.Sesion(new Controles(ventanas), ventanas, mapa, debeDecir, System.out::println)
+                .conEntradaDelMapa();
         if (a.contains("--entrar")) {
             sesion.conGuionDeEntrada(Path.of(a.get(a.indexOf("--entrar") + 1)));
         }
