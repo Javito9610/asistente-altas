@@ -181,7 +181,7 @@ public final class Explorador {
      * ¿Esta opción solo despliega otras? «Bases de Datos» no es una pantalla; «Bases de Datos > Clientes» sí.
      * Pulsar un submenú no abre nada: deja el menú desplegado y deja al programa esperando a que alguien elija.
      */
-    static boolean esSubmenu(List<String> ruta, List<List<String>> todas) {
+    public static boolean esSubmenu(List<String> ruta, List<List<String>> todas) {
         for (List<String> otra : todas) {
             if (otra.size() == ruta.size() + 1 && otra.subList(0, ruta.size()).equals(ruta)) {
                 return true;
