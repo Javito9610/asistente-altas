@@ -376,6 +376,16 @@ public final class Comprobaciones {
         ok("ya".equals(es.amagna.asistente.guion.Explorador.conTiempo(5, () -> "ya", "no contesta")),
                 "y si contesta a tiempo, se devuelve lo suyo");
 
+        // Qué es un menú desplegado y qué es una pantalla. MN es WinForms y usa «#32768»; otros programas abren el
+        // menú como una ventana flotante con otro nombre: hay que conocer las dos formas.
+        ok(es.amagna.asistente.guion.Explorador.esDesplegable("#32768", ""), "«#32768» es un menú desplegado (los de MN)");
+        ok(es.amagna.asistente.guion.Explorador.esDesplegable("DropDownSomething", "")
+                && es.amagna.asistente.guion.Explorador.esDesplegable("Xaml_WindowedPopupClass", "")
+                && es.amagna.asistente.guion.Explorador.esDesplegable("algo", "PopupHost"),
+                "y los menús de los programas modernos, también");
+        ok(!es.amagna.asistente.guion.Explorador.esDesplegable("WindowsForms10.Window.8.app.0.141b42a_r6_ad1", "Clientes"),
+                "pero una ventana normal de MN NO se confunde con un menú");
+
         ok(es.amagna.asistente.guion.Explorador.esCargandoPrueba("Cargando...")
                 && es.amagna.asistente.guion.Explorador.esCargandoPrueba("Espere por favor")
                 && !es.amagna.asistente.guion.Explorador.esCargandoPrueba("Clientes"),
