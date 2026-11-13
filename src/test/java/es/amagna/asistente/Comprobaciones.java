@@ -347,6 +347,17 @@ public final class Comprobaciones {
         ok(es.amagna.asistente.guion.Explorador.porQueNoSeToca(List.of("Lexnet")) != null
                 && es.amagna.asistente.guion.Explorador.porQueNoSeToca(List.of("Correo")) != null,
                 "los módulos que hablan con fuera (Lexnet, Correo) no se abren: al entrar pueden bajar o mandar cosas");
+        // Un submenú no es una pantalla: pulsarlo deja el menú desplegado y al programa esperando.
+        var menus = List.of(List.of("Bases de Datos"), List.of("Bases de Datos", "Clientes"),
+                List.of("Bases de Datos", "Ficheros"), List.of("Bases de Datos", "Ficheros", "Contrarios"),
+                List.of("Agenda"));
+        ok(es.amagna.asistente.guion.Explorador.esSubmenu(List.of("Bases de Datos"), menus),
+                "«Bases de Datos» es un submenú: no se entra, se entra en las de dentro");
+        ok(es.amagna.asistente.guion.Explorador.esSubmenu(List.of("Bases de Datos", "Ficheros"), menus),
+                "y un submenú dentro de otro, igual");
+        ok(!es.amagna.asistente.guion.Explorador.esSubmenu(List.of("Bases de Datos", "Clientes"), menus)
+                && !es.amagna.asistente.guion.Explorador.esSubmenu(List.of("Agenda"), menus),
+                "las que no tienen nada debajo sí son pantallas, estén al final o arriba del todo");
         var recortado = es.amagna.asistente.guion.Explorador.soloEstas(
                 es.amagna.asistente.guion.Explorador.juntar(plano, juicios), List.of("Clientes"));
         ok(recortado.get(0).seguro() && recortado.stream().filter(es.amagna.asistente.guion.Explorador.Pantalla::seguro).count() == 1,

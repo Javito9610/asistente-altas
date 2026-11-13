@@ -167,12 +167,27 @@ public final class Explorador {
 
     /** Paso 1: el plano. Solo mira. */
     public static List<Pantalla> plano(Controles ctrl, String ventana, int hondo) {
+        List<List<String>> todas = ctrl.rutasDeMenu(ventana, hondo);
         List<Pantalla> r = new ArrayList<>();
-        for (List<String> ruta : ctrl.rutasDeMenu(ventana, hondo)) {
-            String motivo = porQueNoSeToca(ruta);
+        for (List<String> ruta : todas) {
+            String motivo = esSubmenu(ruta, todas) ? "es un submenú, no una pantalla: lo que hay son las de dentro"
+                    : porQueNoSeToca(ruta);
             r.add(new Pantalla(ruta, motivo == null, motivo));
         }
         return r;
+    }
+
+    /**
+     * ¿Esta opción solo despliega otras? «Bases de Datos» no es una pantalla; «Bases de Datos > Clientes» sí.
+     * Pulsar un submenú no abre nada: deja el menú desplegado y deja al programa esperando a que alguien elija.
+     */
+    static boolean esSubmenu(List<String> ruta, List<List<String>> todas) {
+        for (List<String> otra : todas) {
+            if (otra.size() == ruta.size() + 1 && otra.subList(0, ruta.size()).equals(ruta)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static String porQueNoSeToca(List<String> ruta) {
@@ -247,8 +262,12 @@ public final class Explorador {
             }
             registro.accept("→ " + p.comoTexto());
             java.util.Set<Long> antes = new java.util.HashSet<>(VentanasNativas.instantanea().keySet());
-            String r = ctrl.pulsarRuta(ventana, p.ruta());
+            // Con tiempo máximo: una llamada a un programa ajeno puede quedarse colgada para siempre (un menú que se
+            // despliega y espera, un cuadro que no termina de pintarse). Un recorrido de 40 pantallas no se puede
+            // perder porque una se atasque.
+            String r = conTiempo(30, () -> ctrl.pulsarRuta(ventana, p.ruta()), "se ha quedado colgado al pulsar");
             if (!r.startsWith("Pulsado")) {
+                escapar();
                 incidencias.add(p.comoTexto() + ": no se pudo entrar (" + r + ")");
                 resumen.add("- " + p.comoTexto() + " · NO SE PUDO ENTRAR");
                 if (++seguidosMal >= 3) {
@@ -286,7 +305,14 @@ public final class Explorador {
             }
             seguidosMal = 0;
 
-            String arbol = ctrl.arbol(nueva, 14, 3000);
+            String arbol = conTiempo(45, () -> ctrl.arbol(nueva, 14, 3000), "se ha quedado colgado al leer la pantalla");
+            if (arbol.startsWith("se ha quedado colgado")) {
+                incidencias.add(p.comoTexto() + ": " + arbol);
+                resumen.add("- " + p.comoTexto() + " · SE QUEDÓ COLGADA AL LEERLA");
+                escapar();
+                cerrarDeVerdad(ventanas, nuevaH, nueva);
+                continue;
+            }
             Path f = carpeta.resolve(limpio(p.comoTexto()) + ".txt");
             Files.writeString(f, "Pantalla: " + p.comoTexto() + "\nVentana: " + nueva + "\n\n" + arbol, StandardCharsets.UTF_8);
             long lineas = arbol.lines().count();
@@ -317,6 +343,37 @@ public final class Explorador {
                 + "Recorridas " + hechas + " pantallas, saltadas " + saltadas + " (no aprobadas o peligrosas)"
                 + (incidencias.isEmpty() ? "" : ", " + incidencias.size() + " piden algo al entrar y quedan para mirar a mano")
                 + ". Todo en " + carpeta.toAbsolutePath() + " (empieza por resumen.md).";
+    }
+
+    /** Hace algo dándole un tiempo máximo; si se pasa, lo deja por imposible en vez de colgar el recorrido entero. */
+    private static String conTiempo(int segundos, java.util.concurrent.Callable<String> tarea, String siTarda) {
+        java.util.concurrent.ExecutorService hilo = java.util.concurrent.Executors.newSingleThreadExecutor(h -> {
+            Thread t = new Thread(h, "explorador");
+            t.setDaemon(true); // si se queda colgado, que no impida cerrar el programa
+            return t;
+        });
+        try {
+            return hilo.submit(tarea).get(segundos, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (java.util.concurrent.TimeoutException e) {
+            return siTarda + " (más de " + segundos + " s)";
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return "interrumpido";
+        } catch (java.util.concurrent.ExecutionException e) {
+            return "ha fallado: " + (e.getCause() == null ? e.getMessage() : e.getCause().getMessage());
+        } finally {
+            hilo.shutdownNow();
+        }
+    }
+
+    /** Escape, por si ha quedado un menú desplegado esperando a que alguien elija. */
+    private static void escapar() {
+        try {
+            new es.amagna.asistente.manos.ManosRobot(false).tecla("Escape", 2);
+            esperarQuieto(0.4);
+        } catch (RuntimeException e) {
+            // Si no se puede, se sigue igual.
+        }
     }
 
     /** Espera a que aparezca una ventana que antes no estaba, mirando de verdad. Devuelve cuál, o null. */
