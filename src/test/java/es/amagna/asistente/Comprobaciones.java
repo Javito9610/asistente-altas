@@ -344,6 +344,13 @@ public final class Comprobaciones {
         ok(!juntado.get(3).seguro(), "y lo que la IA duda, tampoco: ante la duda no se entra");
         ok(!juntado.get(4).seguro() && juntado.get(4).motivo().contains("fichaje"),
                 "si la IA se equivoca y aprueba una peligrosa, el código la para igual: tienen que estar de acuerdo las dos");
+        ok(es.amagna.asistente.guion.Explorador.porQueNoSeToca(List.of("Lexnet")) != null
+                && es.amagna.asistente.guion.Explorador.porQueNoSeToca(List.of("Correo")) != null,
+                "los módulos que hablan con fuera (Lexnet, Correo) no se abren: al entrar pueden bajar o mandar cosas");
+        var recortado = es.amagna.asistente.guion.Explorador.soloEstas(
+                es.amagna.asistente.guion.Explorador.juntar(plano, juicios), List.of("Clientes"));
+        ok(recortado.get(0).seguro() && recortado.stream().filter(es.amagna.asistente.guion.Explorador.Pantalla::seguro).count() == 1,
+                "se puede pedir que entre SOLO en lo que hace falta, y el resto se queda fuera");
         var sinClasificar = es.amagna.asistente.guion.Explorador.juntar(plano, Map.of());
         ok(sinClasificar.stream().noneMatch(es.amagna.asistente.guion.Explorador.Pantalla::seguro),
                 "y si la IA se deja opciones sin clasificar, esas no se tocan");

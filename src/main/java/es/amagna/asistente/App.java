@@ -72,7 +72,7 @@ public final class App {
                           asistente explorar "<ventana>" <plano.json> [--hondo 8] [--sin-ia]
                                                         (el plano de TODO el programa, sin abrir nada; la IA dice
                                                          cuáles abren pantalla y cuáles ejecutan algo)
-                          asistente explorar "<ventana>" <plano.json> --recorrer <carpeta>
+                          asistente explorar "<ventana>" <plano.json> --recorrer <carpeta> [--solo "Clientes,Expedientes"]
                                                         (entra en las pantallas aprobadas y guarda sus controles;
                                                          solo en la empresa de prueba)
                           asistente aprender "<ventana>" <mapa.json> [--programa "<exe>"]
@@ -282,6 +282,11 @@ public final class App {
         Controles ctrl = new Controles(ventanas);
         if (a.contains("--recorrer")) {
             var plano = es.amagna.asistente.guion.Explorador.leerPlano(fichero);
+            if (a.contains("--solo")) {
+                List<String> quiero = Arrays.asList(a.get(a.indexOf("--solo") + 1).split(","));
+                plano = es.amagna.asistente.guion.Explorador.soloEstas(plano, quiero);
+                System.out.println("Solo se entra en lo que contenga: " + String.join(" · ", quiero));
+            }
             long aprobadas = plano.stream().filter(es.amagna.asistente.guion.Explorador.Pantalla::seguro).count();
             System.out.println("Plano: " + plano.size() + " pantallas, " + aprobadas + " aprobadas para entrar.");
             System.out.println(es.amagna.asistente.guion.Explorador.recorrer(ctrl, ventanas, ventana, plano,

@@ -46,7 +46,10 @@ public final class Explorador {
             "fichaje", "inicio jornada", "fin jornada", "inicio descanso", "fin descanso",
             "cierre", "apertura", "invertir", "papelera", "eliminar", "borrar", "vaciar",
             "importar", "importacion", "exportar", "traspaso", "generar", "actualizar",
-            "enviar", "remesa", "cobro", "pago", "facturar", "contabilizar", "chequeo", "copia");
+            "enviar", "remesa", "cobro", "pago", "facturar", "contabilizar", "chequeo", "copia",
+            // Los módulos que hablan con el mundo exterior: abrirlos puede bajar o mandar cosas sin preguntar.
+            // En un despacho, que Lexnet descargue una notificación al entrar arranca un plazo. No se tocan.
+            "lexnet", "correo", "whatsapp", "sign", "notificacion");
 
     private Explorador() {
     }
@@ -150,6 +153,16 @@ public final class Explorador {
         public String comoTexto() {
             return String.join(" > ", ruta);
         }
+    }
+
+    /** Deja en el plano solo las pantallas cuya ruta contenga uno de estos textos (y marca el resto como no aprobadas). */
+    public static List<Pantalla> soloEstas(List<Pantalla> plano, List<String> quiero) {
+        List<Pantalla> r = new ArrayList<>();
+        for (Pantalla p : plano) {
+            boolean pedida = quiero.stream().anyMatch(q -> p.comoTexto().toLowerCase(Locale.ROOT).contains(q.toLowerCase(Locale.ROOT).trim()));
+            r.add(pedida ? p : new Pantalla(p.ruta(), false, "no está en la lista de las que se piden"));
+        }
+        return r;
     }
 
     /** Paso 1: el plano. Solo mira. */
