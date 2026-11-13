@@ -121,7 +121,7 @@ public final class Win32 {
         return User32.I.SendMessageTimeoutW(hwnd, msg, new Pointer(wParam), new Pointer(lParam), SMTO_ABORTIFHUNG, MS_TOPE, r) != null;
     }
 
-    static String titulo(Pointer hwnd) {
+    public static String titulo(Pointer hwnd) {
         char[] b = new char[512];
         int n = User32.I.GetWindowTextW(hwnd, b, b.length);
         return new String(b, 0, Math.max(0, n));
