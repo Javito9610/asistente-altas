@@ -57,11 +57,6 @@ public final class VentanaDePrueba {
         eNif.setBounds(20, 50, 70, 24);
         java.awt.TextField cNif = new java.awt.TextField("");
         cNif.setBounds(100, 50, 220, 24);
-        // Un panel que se llama igual que la etiqueta y envuelve al cuadro: es lo que hace MN en su pantalla de
-        // entrada, y lo que hizo que el asistente escribiera el correo en la casilla de la contraseña.
-        java.awt.Panel envoltorio = new java.awt.Panel();
-        envoltorio.setName("NIF");
-        envoltorio.setBounds(100, 50, 220, 24);
         Label eImporte = new Label("Importe:");
         eImporte.setBounds(20, 90, 70, 24);
         java.awt.TextField cImporte = new java.awt.TextField("");
@@ -71,6 +66,7 @@ public final class VentanaDePrueba {
         for (java.awt.Component c : new java.awt.Component[] {eNif, cNif, eImporte, cImporte, guardar}) {
             f.add(c);
         }
+        cNif.setName("NIF");  // como MN: el propio cuadro se llama igual que su etiqueta
         // Un menú de los de toda la vida (los que usa MN, que es WinForms): al desplegarse crea una ventana
         // «#32768» de Windows. El Bloc de notas moderno no lo hace, así que para probar eso hace falta este.
         java.awt.MenuBar barra = new java.awt.MenuBar();

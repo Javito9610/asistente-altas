@@ -607,6 +607,10 @@ public final class PruebasWindows {
                     "y el cuadro de DEBAJO (Importe) se queda vacío: no se ha confundido de casilla");
             ok("00000000T".equals(ctrl.valorDe(vEti, "campo[1]")) && "".equals(ctrl.valorDe(vEti, "campo[2]")),
                     "lo escrito está en el primer cuadro, no en el segundo");
+            // Y el caso exacto de MN: el propio cuadro se llama como su etiqueta.
+            String r2 = ctrl.leer(vEti, "campo junto a NIF");
+            System.out.println("   " + r2);
+            ok(r2.contains("00000000T"), "cuando el cuadro se llama igual que su etiqueta, se coge el cuadro, no el de debajo");
         } finally {
             pEti.destroy();
         }

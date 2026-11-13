@@ -410,13 +410,12 @@ public final class Controles {
             }
         }
 
-        // Y la etiqueta NUNCA puede ser un cuadro ni el panel que lo envuelve: si no, se toma por etiqueta el propio
-        // recuadro del campo y se acaba escribiendo en el de debajo. Que es exactamente lo que pasó con MN: el panel
-        // que envuelve el cuadro del correo se llama «Correo electrónico», igual que su etiqueta.
+        // La etiqueta puede ser de cualquier tipo MENOS un cuadro de los que buscamos (si no, se tomaría por etiqueta
+        // el propio campo). Que sea un panel sí vale: en los programas de toda la vida las etiquetas se ven así.
         Candidato etiqueta = null;
         int mejor = 0;
         for (Candidato c : todos) {
-            if (tiposBuenos.contains(c.tipo()) || c.tipo().equals("panel")) {
+            if (tiposBuenos.contains(c.tipo())) {
                 continue;
             }
             String n = llano(c.nombre());
@@ -430,6 +429,26 @@ public final class Controles {
             return new Encontrado(null, "No se ve ninguna etiqueta «" + anclaje + "» en esa ventana. Mira las que hay con ver_controles.");
         }
         int[] r = etiqueta.recuadro();
+
+        // Si lo que hemos encontrado ENVUELVE a un cuadro del tipo que buscamos, ese cuadro de dentro es el bueno.
+        // Es lo que hace MN: un panel llamado «Correo electrónico» con el cuadro del correo dentro. Antes se miraba
+        // qué había DEBAJO del panel, y debajo estaba la contraseña: así se escribió un correo en esa casilla.
+        Candidato dentro = null;
+        for (Candidato c : todos) {
+            int[] q = c.recuadro();
+            if (!tiposBuenos.contains(c.tipo()) || q == null || q[2] <= 0
+                    || q[0] < r[0] || q[1] < r[1] || q[0] + q[2] > r[0] + r[2] + 2 || q[1] + q[3] > r[1] + r[3] + 2) {
+                continue;
+            }
+            if (dentro == null || q[2] * (long) q[3] > dentro.recuadro()[2] * (long) dentro.recuadro()[3]) {
+                dentro = c;
+            }
+        }
+        if (dentro != null) {
+            guardado = dentro.e();
+            return new Encontrado(guardado, dentro.comoSeLlama() + " (dentro de «" + etiqueta.nombre() + "»)");
+        }
+
         int centroY = r[1] + r[3] / 2;
         List<Candidato> cerca = new ArrayList<>();
         for (Candidato c : todos) {
