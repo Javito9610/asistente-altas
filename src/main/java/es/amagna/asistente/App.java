@@ -307,7 +307,23 @@ public final class App {
             return;
         }
         int hondo = a.contains("--hondo") ? Integer.parseInt(a.get(a.indexOf("--hondo") + 1)) : 8;
-        var plano = es.amagna.asistente.guion.Explorador.plano(ctrl, ventana, hondo);
+        String titulo = ventanas.tituloDe(ventana);
+        if (titulo == null) {
+            throw new IllegalStateException("No hay ninguna ventana cuyo título contenga «" + ventana + "». Mira cuáles hay con «asistente ventanas».");
+        }
+        System.out.println("Mirando los menús de «" + titulo + "»…");
+        if (ventanas.abiertas().contains("BLOQUEADA")) {
+            System.out.println("AVISO: ese programa tiene un aviso o un menú abierto encima esperando respuesta. Mientras esté así "
+                    + "no contesta a nada. Ciérralo y vuelve a lanzar esto.");
+        }
+        // Con tiempo máximo: si el programa está bloqueado, preguntarle por dentro no vuelve nunca, y quedarse mudo
+        // para siempre es la peor forma de fallar.
+        var plano = es.amagna.asistente.guion.Explorador.conTiempo(45,
+                () -> es.amagna.asistente.guion.Explorador.plano(ctrl, ventana, hondo), null);
+        if (plano == null) {
+            throw new IllegalStateException("«" + titulo + "» no contesta (45 s). Casi seguro tiene un menú desplegado o un "
+                    + "aviso esperando: míralo en pantalla, ciérralo (o cierra y vuelve a abrir el programa) y repite.");
+        }
         if (plano.isEmpty()) {
             throw new IllegalStateException("No se ve ningún menú en «" + ventana + "». ¿Es la ventana principal del programa?");
         }

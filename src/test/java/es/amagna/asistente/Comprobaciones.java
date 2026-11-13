@@ -347,6 +347,18 @@ public final class Comprobaciones {
         ok(es.amagna.asistente.guion.Explorador.porQueNoSeToca(List.of("Lexnet")) != null
                 && es.amagna.asistente.guion.Explorador.porQueNoSeToca(List.of("Correo")) != null,
                 "los módulos que hablan con fuera (Lexnet, Correo) no se abren: al entrar pueden bajar o mandar cosas");
+        // Nunca quedarse mudo para siempre: si el programa no contesta, se deja por imposible y se avisa.
+        long t0espera = System.currentTimeMillis();
+        String tarde = es.amagna.asistente.guion.Explorador.conTiempo(1, () -> {
+            Thread.sleep(30_000);
+            return "esto no debería llegar";
+        }, "no contesta");
+        long esperado = System.currentTimeMillis() - t0espera;
+        ok("no contesta".equals(tarde) && esperado < 5000,
+                "si el programa no contesta, se deja por imposible al segundo (" + esperado + " ms), no se cuelga para siempre");
+        ok("ya".equals(es.amagna.asistente.guion.Explorador.conTiempo(5, () -> "ya", "no contesta")),
+                "y si contesta a tiempo, se devuelve lo suyo");
+
         // Un submenú no es una pantalla: pulsarlo deja el menú desplegado y al programa esperando.
         var menus = List.of(List.of("Bases de Datos"), List.of("Bases de Datos", "Clientes"),
                 List.of("Bases de Datos", "Ficheros"), List.of("Bases de Datos", "Ficheros", "Contrarios"),

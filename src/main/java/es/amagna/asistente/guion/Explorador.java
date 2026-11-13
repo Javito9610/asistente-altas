@@ -346,6 +346,26 @@ public final class Explorador {
     }
 
     /** Hace algo dándole un tiempo máximo; si se pasa, lo deja por imposible en vez de colgar el recorrido entero. */
+    public static <T> T conTiempo(int segundos, java.util.concurrent.Callable<T> tarea, T siTarda) {
+        java.util.concurrent.ExecutorService hilo = java.util.concurrent.Executors.newSingleThreadExecutor(h -> {
+            Thread t = new Thread(h, "explorador");
+            t.setDaemon(true);
+            return t;
+        });
+        try {
+            return hilo.submit(tarea).get(segundos, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (java.util.concurrent.TimeoutException e) {
+            return siTarda;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return siTarda;
+        } catch (java.util.concurrent.ExecutionException e) {
+            throw new IllegalStateException(e.getCause() == null ? e : e.getCause());
+        } finally {
+            hilo.shutdownNow();
+        }
+    }
+
     private static String conTiempo(int segundos, java.util.concurrent.Callable<String> tarea, String siTarda) {
         java.util.concurrent.ExecutorService hilo = java.util.concurrent.Executors.newSingleThreadExecutor(h -> {
             Thread t = new Thread(h, "explorador");
