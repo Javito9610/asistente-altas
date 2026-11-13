@@ -62,7 +62,8 @@ public final class App {
                           asistente guardar-clave
                           asistente ventanas            (lista las ventanas abiertas, sin IA)
                           asistente campo               (lee el campo donde hagas clic, sin IA)
-                          asistente controles "<ventana>" [--hondo N]   (los controles por dentro, sin IA)
+                          asistente controles "<ventana>" [--hondo N] [--a arbol.txt]
+                                                        (los controles por dentro, sin IA)
                           asistente probar-windows      (pruebas de manos y ventanas en el Bloc de notas, sin IA)
                           asistente agentes             (los especialistas que hay)
                           asistente agente "tarea" [--como cartografo] [--vista] [--pasos 20] [--tope-tokens 200000]
