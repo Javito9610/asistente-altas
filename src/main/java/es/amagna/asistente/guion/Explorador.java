@@ -414,7 +414,21 @@ public final class Explorador {
     }
 
     /** Lo que sale al pulsar: la pantalla, un menú desplegado, o nada. */
-    record Salio(Long ventana, boolean menu, String cargando) {
+    public record Salio(Long ventana, boolean menu, String cargando) {
+    }
+
+    /** Las ventanas que hay ahora mismo, para saber después cuál es nueva. */
+    public static java.util.Set<Long> ventanasAhora() {
+        return new java.util.HashSet<>(VentanasNativas.instantanea().keySet());
+    }
+
+    /** Espera a que salga una pantalla nueva (saltándose menús y carteles de «Cargando…»). */
+    public static Salio esperarPantalla(java.util.Set<Long> antes, double segundos) {
+        return esperarVentanaNueva(antes, segundos);
+    }
+
+    public static String tituloDe(long handle) {
+        return VentanasNativas.instantanea().get(handle);
     }
 
     /** Para las comprobaciones. */

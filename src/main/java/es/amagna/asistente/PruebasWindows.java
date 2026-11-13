@@ -474,6 +474,30 @@ public final class PruebasWindows {
         ok(estado.startsWith("ERROR") || estado.contains("AsistenteAltas"),
                 "se puede consultar si el arranque automático está puesto, sin tocarlo");
 
+        System.out.println("14g) Llegar solo hasta una pantalla: abrir el programa, entrar por el menú y leerla");
+        // Lo mismo que hará con MN: si el programa no está abierto, lo abre él; después entra por el menú.
+        String vIr = "prueba-navegar";
+        Path mIr = dirG.resolve("navegar.json");
+        Files.writeString(mIr, """
+                {"nombre": "Navegar", "ventana": "%s",
+                 "programa": {"ejecutable": "%s", "argumentos": ["-cp", "%s", "es.amagna.asistente.VentanaDePrueba", "%s", "formulario"]},
+                 "controles": {"guardar": ["boton:Guardar"]}}""".formatted(vIr, exeJava, cp, vIr),
+                java.nio.charset.StandardCharsets.UTF_8);
+        var sesionIr = new es.amagna.asistente.guion.Sesion(ctrl, (VentanasNativas) v,
+                es.amagna.asistente.guion.Mapa.leer(mIr), "", l -> System.out.println("   " + l));
+        ok(!sesionIr.mirar().lista(), "de partida el programa no está abierto");
+        ok(sesionIr.asegurar().lista(), "lo abre él solo, sin que nadie lo abra a mano");
+        // Y una vez dentro, distingue la pantalla del menú desplegado.
+        v.activar(clave);
+        var antesMenu = es.amagna.asistente.guion.Explorador.ventanasAhora();
+        ctrl.pulsarRuta(clave, List.of(menuArchivo));
+        var queSalio = es.amagna.asistente.guion.Explorador.esperarPantalla(antesMenu, 4);
+        System.out.println("   al pulsar un menú: ventana=" + queSalio.ventana() + " menu=" + queSalio.menu());
+        ok(queSalio.ventana() == null && queSalio.menu(),
+                "sabe que lo que se ha abierto es un menú desplegado, no una pantalla");
+        manos.tecla("Escape", 1);
+        ((VentanasNativas) v).cerrarSiEsNuestra(vIr);
+
         System.out.println("15) No se lía con su propia consola, y despierta la ventana si está minimizada");
         // El título de una consola lleva dentro el comando que se escribió, así que buscar «MNprogram» encontraba
         // la consola donde se había escrito «MNprogram»: el asistente se leía a sí mismo.

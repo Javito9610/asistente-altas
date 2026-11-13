@@ -50,6 +50,7 @@ public final class App {
                 case "secreto" -> guardarSecreto(Arrays.asList(args).subList(1, args.length));
                 case "sesion" -> sesion(Arrays.asList(args).subList(1, args.length));
                 case "arranque" -> arranque(Arrays.asList(args).subList(1, args.length));
+                case "pantalla" -> pantalla(Arrays.asList(args).subList(1, args.length));
                 case "secretos" -> {
                     var n = es.amagna.asistente.manos.Secreto.nombres();
                     System.out.println(n.isEmpty() ? "No hay ningún secreto guardado." : "Secretos guardados (solo los nombres):");
@@ -82,6 +83,10 @@ public final class App {
                           asistente agentes             (los especialistas que hay)
                           asistente agente "tarea" [--como cartografo] [--vista] [--pasos 20] [--tope-tokens 200000]
                                                    [--modelo claude-sonnet-5-5] [--sin-expediente]
+                          asistente pantalla <mapa.json> --ruta "Bases de Datos > Clientes" [--luego "boton:Crear"]
+                                         [--a fichero.txt] [--esperar 60]
+                                                        (abre el programa si hace falta, navega hasta la pantalla y
+                                                         enseña sus controles: sin tocar nada a mano)
                           asistente arranque --instalar <mapa.json> [--entrar <g>] [--debe-decir "..."] | --quitar | --ver
                                                         (que al encender el ordenador se abra solo y entre)
                           asistente sesion <mapa.json> [--entrar guion-entrada.json] [--debe-decir "Empresa de prueba"]
@@ -298,6 +303,73 @@ public final class App {
                     cosa tuya o hay que decidir algo que no te corresponde, termina con PARADO explicándolo.
                     """.formatted(vent, queSeQueria, porQue)).mensaje();
         };
+    }
+
+    /**
+     * Llega él solo hasta una pantalla y la enseña: abre el programa si está cerrado, entra por el menú, y si hace
+     * falta pulsa algo más (el botón de crear de un listado, para llegar a la ficha en blanco).
+     */
+    private static void pantalla(List<String> a) throws IOException {
+        if (a.isEmpty() || !a.contains("--ruta")) {
+            throw new IllegalArgumentException("Uso: asistente pantalla <mapa.json> --ruta \"Bases de Datos > Clientes\" [--luego \"boton:Crear\"] [--a fichero.txt]");
+        }
+        es.amagna.asistente.guion.Mapa mapa = es.amagna.asistente.guion.Mapa.leer(Path.of(a.get(0)));
+        double espera = a.contains("--esperar") ? Double.parseDouble(a.get(a.indexOf("--esperar") + 1)) : 60;
+        VentanasNativas ventanas = new VentanasNativas(false);
+        Controles ctrl = new Controles(ventanas);
+
+        // 1. Que el programa esté vivo y responda. Si está cerrado, lo abre.
+        var sesion = new es.amagna.asistente.guion.Sesion(ctrl, ventanas, mapa, "", System.out::println);
+        var estado = sesion.asegurar();
+        if (!estado.lista()) {
+            throw new IllegalStateException("No se ha podido dejar el programa listo: " + estado.comoEsta());
+        }
+        System.out.println("Programa listo (" + estado.comoEsta() + ").");
+
+        // 2. Entrar por el menú.
+        List<String> ruta = Arrays.asList(a.get(a.indexOf("--ruta") + 1).split("\\s*>\\s*"));
+        System.out.println("Entrando en: " + String.join(" > ", ruta) + "…");
+        var antes = es.amagna.asistente.guion.Explorador.ventanasAhora();
+        String r = ctrl.pulsarRuta(mapa.ventana(), ruta);
+        if (!r.startsWith("Pulsado")) {
+            throw new IllegalStateException("No se ha podido entrar: " + r);
+        }
+        var salio = es.amagna.asistente.guion.Explorador.esperarPantalla(antes, espera);
+        if (salio.ventana() == null) {
+            throw new IllegalStateException(salio.menu() ? "Eso es un submenú, no una pantalla: pon la ruta entera."
+                    : salio.cargando() != null ? "Se ha quedado en «" + salio.cargando() + "» y no ha llegado a abrirse en " + espera + " s."
+                    : "No se ha abierto ninguna pantalla en " + espera + " s.");
+        }
+        String pantalla = es.amagna.asistente.guion.Explorador.tituloDe(salio.ventana());
+        System.out.println("Se ha abierto: «" + pantalla + "»");
+
+        // 3. Y si hay que dar un paso más dentro (el botón de crear del listado → la ficha en blanco).
+        if (a.contains("--luego")) {
+            String boton = a.get(a.indexOf("--luego") + 1);
+            System.out.println("Pulsando «" + boton + "» dentro…");
+            var antes2 = es.amagna.asistente.guion.Explorador.ventanasAhora();
+            String r2 = ctrl.pulsar(pantalla, boton);
+            System.out.println("  " + r2);
+            var salio2 = es.amagna.asistente.guion.Explorador.esperarPantalla(antes2, espera);
+            if (salio2.ventana() != null) {
+                pantalla = es.amagna.asistente.guion.Explorador.tituloDe(salio2.ventana());
+                System.out.println("Se ha abierto: «" + pantalla + "»");
+            } else {
+                System.out.println("  (no se ha abierto otra ventana: la ficha debe de estar dentro de la misma)");
+            }
+        }
+
+        // 4. Enseñarla.
+        String arbol = ctrl.arbol(pantalla, 14, 3000);
+        if (a.contains("--a")) {
+            Path f = Path.of(a.get(a.indexOf("--a") + 1));
+            Files.writeString(f, "Pantalla: " + String.join(" > ", ruta) + "\nVentana: " + pantalla + "\n\n" + arbol,
+                    java.nio.charset.StandardCharsets.UTF_8);
+            System.out.println("Escrito en " + f.toAbsolutePath() + " · " + arbol.lines().count() + " líneas.");
+            System.out.println("OJO: ahí va lo que hubiera en pantalla. Míralo antes de mandárselo a nadie.");
+        } else {
+            System.out.println(arbol);
+        }
     }
 
     /** Que al iniciar sesión en Windows el asistente se ponga en marcha él solo. */
