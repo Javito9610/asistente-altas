@@ -69,8 +69,9 @@ public final class App {
                           asistente agentes             (los especialistas que hay)
                           asistente agente "tarea" [--como cartografo] [--vista] [--pasos 20] [--tope-tokens 200000]
                                                    [--modelo claude-sonnet-5-5] [--sin-expediente]
-                          asistente explorar "<ventana>" <plano.json> [--hondo 8]
-                                                        (el plano de TODO el programa, sin abrir nada)
+                          asistente explorar "<ventana>" <plano.json> [--hondo 8] [--sin-ia]
+                                                        (el plano de TODO el programa, sin abrir nada; la IA dice
+                                                         cuáles abren pantalla y cuáles ejecutan algo)
                           asistente explorar "<ventana>" <plano.json> --recorrer <carpeta>
                                                         (entra en las pantallas aprobadas y guarda sus controles;
                                                          solo en la empresa de prueba)
@@ -291,6 +292,13 @@ public final class App {
         var plano = es.amagna.asistente.guion.Explorador.plano(ctrl, ventana, hondo);
         if (plano.isEmpty()) {
             throw new IllegalStateException("No se ve ningún menú en «" + ventana + "». ¿Es la ventana principal del programa?");
+        }
+        if (!a.contains("--sin-ia")) {
+            System.out.println("Leyendo el menú con la IA (" + plano.size() + " opciones), para distinguir las que abren una "
+                    + "pantalla de las que ejecutan algo…");
+            var juicios = es.amagna.asistente.guion.Explorador.clasificar(new ClaudeApi(Clave.leer()), MODELO_POR_DEFECTO, plano);
+            plano = es.amagna.asistente.guion.Explorador.juntar(plano, juicios);
+            System.out.println("La IA ha clasificado " + juicios.size() + " de " + plano.size() + ".");
         }
         es.amagna.asistente.guion.Explorador.guardarPlano(fichero, ventana, plano);
         long seguras = plano.stream().filter(es.amagna.asistente.guion.Explorador.Pantalla::seguro).count();

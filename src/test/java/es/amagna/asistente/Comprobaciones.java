@@ -321,6 +321,33 @@ public final class Comprobaciones {
             ok(false, "el plano se puede guardar: " + e.getMessage());
         }
 
+        // --- Y aquí entra la IA: lee el menú y dice qué abre pantalla y qué ejecuta algo ---
+        var plano = List.of(
+                new es.amagna.asistente.guion.Explorador.Pantalla(List.of("Bases de Datos", "Clientes"), true, null),
+                new es.amagna.asistente.guion.Explorador.Pantalla(List.of("Agenda"), true, null),
+                new es.amagna.asistente.guion.Explorador.Pantalla(List.of("Utilidades", "Recalcular saldos"), true, null),
+                new es.amagna.asistente.guion.Explorador.Pantalla(List.of("Informes", "Resumen"), true, null),
+                new es.amagna.asistente.guion.Explorador.Pantalla(List.of("Fichaje", "Inicio Jornada"), true, null));
+        var juicios = es.amagna.asistente.guion.Explorador.clasificar(p4 -> respuesta(texto("""
+                {"opciones": [
+                  {"ruta": "Bases de Datos > Clientes", "que_hace": "abre", "por_que": "es un listado"},
+                  {"ruta": "Agenda", "que_hace": "abre", "por_que": "es una pantalla"},
+                  {"ruta": "Utilidades > Recalcular saldos", "que_hace": "hace", "por_que": "recalcula datos de todos"},
+                  {"ruta": "Informes > Resumen", "que_hace": "duda", "por_que": "podría lanzar un proceso largo"},
+                  {"ruta": "Fichaje > Inicio Jornada", "que_hace": "abre", "por_que": "me he equivocado a propósito"}
+                ]}""")), "m", plano);
+        ok(juicios.size() == 5 && juicios.get("Agenda").queHace().equals("abre"), "la IA clasifica cada opción del menú");
+        var juntado = es.amagna.asistente.guion.Explorador.juntar(plano, juicios);
+        ok(juntado.get(0).seguro() && juntado.get(1).seguro(), "lo que la IA dice que abre una pantalla, se abre");
+        ok(!juntado.get(2).seguro() && juntado.get(2).motivo().contains("recalcula"),
+                "lo que la IA ve que ejecuta algo NO se abre, y dice por qué (una lista de palabras no lo habría pillado)");
+        ok(!juntado.get(3).seguro(), "y lo que la IA duda, tampoco: ante la duda no se entra");
+        ok(!juntado.get(4).seguro() && juntado.get(4).motivo().contains("fichaje"),
+                "si la IA se equivoca y aprueba una peligrosa, el código la para igual: tienen que estar de acuerdo las dos");
+        var sinClasificar = es.amagna.asistente.guion.Explorador.juntar(plano, Map.of());
+        ok(sinClasificar.stream().noneMatch(es.amagna.asistente.guion.Explorador.Pantalla::seguro),
+                "y si la IA se deja opciones sin clasificar, esas no se tocan");
+
         // --- Los especialistas: cada uno con lo suyo, y con las manos atadas para lo demás ---
         try {
             var carto = es.amagna.asistente.cerebro.Especialista.cargar("cartografo", "modelo-por-defecto", 999);

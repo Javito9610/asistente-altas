@@ -51,6 +51,101 @@ public final class Explorador {
     private Explorador() {
     }
 
+        private static final String ENCARGO = """
+            Eres el Asistente Altas de Amagna. Te paso el menú entero de un programa de gestión de un despacho de
+            abogados. Vamos a cartografiarlo, y para eso hay que ENTRAR en cada pantalla.
+
+            El peligro es este: unas opciones de menú ABREN una pantalla (inofensivo, es navegar) y otras HACEN algo
+            (fichan una entrada, cierran un ejercicio contable, borran, envían, recalculan datos de todo el despacho).
+            Por fuera son iguales. Tu trabajo es distinguirlas, UNA POR UNA.
+
+            Contesta SOLO con un JSON, sin explicaciones ni ```:
+            {"opciones": [{"ruta": "Bases de Datos > Clientes", "que_hace": "abre", "por_que": "es una base de datos"}, ...]}
+
+            «que_hace» solo puede ser:
+              "abre"  -> abre una pantalla, una ficha, un listado o un buscador. Entrar no cambia nada.
+              "hace"  -> ejecuta algo: fichar, cerrar, abrir ejercicio, invertir, borrar, vaciar, importar, exportar,
+                         generar, actualizar, enviar, remesar, cobrar, pagar, facturar, contabilizar, chequear, copiar.
+              "duda"  -> no lo tienes claro.
+
+            Reglas:
+            - Ante la más mínima duda, "duda". No pasa NADA por dejar una pantalla sin cartografiar; sí pasa por
+              cerrarle el ejercicio contable a un despacho.
+            - Un submenú que solo despliega otros ("Configuraciones", "Ficheros") es "abre".
+            - Devuelve TODAS las rutas que te paso, ninguna de más y ninguna de menos, con la ruta escrita igual.
+            """;
+
+    /** Lo que opina la IA de cada opción de menú. */
+    public record Juicio(String queHace, String porQue) {
+    }
+
+    /**
+     * La IA lee el menú entero y dice, una por una, cuáles abren una pantalla y cuáles ejecutan algo. Esto es criterio,
+     * no se programa con una lista de palabras: «Actualizar %IVA» y «Actualizar listado» se parecen mucho y no tienen
+     * nada que ver.
+     */
+    @SuppressWarnings("unchecked")
+    public static Map<String, Juicio> clasificar(es.amagna.asistente.cerebro.Cerebro cerebro, String modelo, List<Pantalla> plano) {
+        StringBuilder lista = new StringBuilder();
+        plano.forEach(p -> lista.append(p.comoTexto()).append('\n'));
+        Map<String, Object> r = cerebro.pensar(Json.obj(
+                "model", modelo, "max_tokens", 8192, "system", ENCARGO,
+                "messages", List.of(Json.obj("role", "user", "content", lista.toString()))));
+        StringBuilder texto = new StringBuilder();
+        for (Object o : (List<Object>) r.getOrDefault("content", List.of())) {
+            if (o instanceof Map<?, ?> b && "text".equals(b.get("type"))) {
+                texto.append(b.get("text"));
+            }
+        }
+        String t = texto.toString();
+        int a = t.indexOf('{');
+        int z = t.lastIndexOf('}');
+        if (a < 0 || z <= a) {
+            throw new IllegalStateException("La IA no ha contestado con una lista: " + (t.length() > 200 ? t.substring(0, 200) + "…" : t));
+        }
+        Map<String, Juicio> juicios = new LinkedHashMap<>();
+        Object ops = Json.objeto(t.substring(a, z + 1)).get("opciones");
+        if (ops instanceof List<?> l) {
+            for (Object o : l) {
+                if (o instanceof Map<?, ?> m && m.get("ruta") != null) {
+                    String que = (m.get("que_hace") == null ? "duda" : String.valueOf(m.get("que_hace"))).trim().toLowerCase(Locale.ROOT);
+                    juicios.put(String.valueOf(m.get("ruta")).trim(),
+                            new Juicio(que.equals("abre") || que.equals("hace") ? que : "duda",
+                                    m.get("por_que") == null ? "" : String.valueOf(m.get("por_que"))));
+                }
+            }
+        }
+        if (juicios.isEmpty()) {
+            throw new IllegalStateException("La IA no ha clasificado ninguna opción.");
+        }
+        return juicios;
+    }
+
+    /**
+     * Junta las dos opiniones. Y aquí está lo importante: para entrar en una pantalla tienen que estar de acuerdo
+     * LAS DOS. La IA pone el criterio (entiende lo que significa cada opción) y la lista de palabras pone el suelo
+     * (no depende de que la IA acierte). Si una de las dos dice que no, no se entra. Lo que la IA no haya clasificado,
+     * tampoco se toca.
+     */
+    public static List<Pantalla> juntar(List<Pantalla> plano, Map<String, Juicio> juicios) {
+        List<Pantalla> r = new ArrayList<>();
+        for (Pantalla p : plano) {
+            String porPalabra = porQueNoSeToca(p.ruta());
+            Juicio j = juicios.get(p.comoTexto());
+            if (porPalabra != null) {
+                r.add(new Pantalla(p.ruta(), false, porPalabra));
+            } else if (j == null) {
+                r.add(new Pantalla(p.ruta(), false, "la IA no la ha clasificado: no se toca"));
+            } else if (j.queHace().equals("abre")) {
+                r.add(new Pantalla(p.ruta(), true, null));
+            } else {
+                r.add(new Pantalla(p.ruta(), false, "la IA dice que «" + j.queHace() + "»"
+                        + (j.porQue().isBlank() ? "" : ": " + j.porQue())));
+            }
+        }
+        return r;
+    }
+
     public record Pantalla(List<String> ruta, boolean seguro, String motivo) {
         public String comoTexto() {
             return String.join(" > ", ruta);
