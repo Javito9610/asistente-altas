@@ -87,7 +87,7 @@ public final class App {
                           asistente sesion <mapa.json> [--entrar guion-entrada.json] [--debe-decir "Empresa de prueba"]
                                                         (comprueba que el programa está vivo y dentro; si no, lo
                                                          arregla: avisos, menús, pantallas sueltas, reiniciar y entrar)
-                          asistente secreto <nombre> [--usuario <u>] [--olvidar]
+                          asistente secreto <nombre> [--usuario <u>] [--comprobar] [--olvidar]
                                                         (guarda el usuario y su contraseña, cifrada con tu cuenta
                                                          de Windows)
                           asistente secretos            (los nombres de los secretos guardados, nunca su valor)
@@ -372,6 +372,25 @@ public final class App {
         if (a.contains("--olvidar")) {
             es.amagna.asistente.manos.Secreto.olvidar(nombre);
             System.out.println("Olvidado «" + nombre + "».");
+            return;
+        }
+        // Comprobar que está bien guardada sin enseñarla: se descifra y se dice cómo es, no qué es.
+        if (a.contains("--comprobar")) {
+            String u = es.amagna.asistente.manos.Secreto.usuario(nombre);
+            System.out.println("Usuario: " + (u == null ? "NO HAY" : u));
+            if (!es.amagna.asistente.manos.Secreto.hay(nombre)) {
+                System.out.println("Contraseña: NO HAY. Guárdala con «asistente secreto " + nombre + "».");
+                System.exit(1);
+            }
+            char[] v = es.amagna.asistente.manos.Secreto.leer(nombre);
+            if (v == null) {
+                System.out.println("Contraseña: no se ha podido descifrar.");
+                System.exit(1);
+            }
+            String pista = v.length < 3 ? "" : " · empieza por «" + v[0] + "» y acaba por «" + v[v.length - 1] + "»";
+            System.out.println("Contraseña: guardada y se descifra bien · " + v.length + " caracteres" + pista);
+            java.util.Arrays.fill(v, '\0');
+            System.out.println("(No se enseña entera a propósito: el asistente solo la descifra para teclearla en el programa.)");
             return;
         }
         Console c = System.console();
