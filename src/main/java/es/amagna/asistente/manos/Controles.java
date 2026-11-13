@@ -53,6 +53,7 @@ public final class Controles {
 
     /** Lo que el asistente «ve por dentro» de una ventana, en texto. */
     public String arbol(String tituloVentana, int profundidad) {
+        ventanas.despertar(tituloVentana);
         Pointer hwnd = ventanas.handleDe(tituloVentana);
         if (hwnd == null) {
             return "No hay ninguna ventana cuyo título contenga «" + tituloVentana + "».";
@@ -127,6 +128,7 @@ public final class Controles {
     }
 
     public Encontrado buscar(String tituloVentana, String apodo) {
+        ventanas.despertar(tituloVentana);
         Pointer hwnd = ventanas.handleDe(tituloVentana);
         if (hwnd == null) {
             return new Encontrado(null, "No hay ninguna ventana cuyo título contenga «" + tituloVentana + "».");

@@ -273,14 +273,59 @@ public final class VentanasNativas implements Ventanas {
         return buscar(titulo, visibles());
     }
 
+    /**
+     * Encuentra la ventana que mejor encaja con el título, no la primera que lo contenga.
+     *
+     * Dos cosas que parecen tonterías y no lo son:
+     *  - NUNCA devuelve nuestra propia consola. El título de la consola lleva el comando entero, así que al buscar
+     *    «MNprogram» encontraba la consola en la que se había escrito «MNprogram»: se leía a sí misma.
+     *  - Puntúa: el título exacto vale más que empezar igual, y eso más que contenerlo en medio. Y a igualdad,
+     *    gana la que se está viendo.
+     */
     private Pointer buscar(String titulo, List<Pointer> donde) {
-        String buscado = titulo.toLowerCase(Locale.ROOT);
+        String buscado = titulo.toLowerCase(Locale.ROOT).trim();
+        Pointer consola = Win32.consola();
+        Pointer mejor = null;
+        int masPuntos = 0;
         for (Pointer h : donde) {
-            if (Win32.titulo(h).toLowerCase(Locale.ROOT).contains(buscado)) {
-                return h;
+            if (consola != null && Pointer.nativeValue(h) == Pointer.nativeValue(consola)) {
+                continue;
+            }
+            String t = Win32.titulo(h).toLowerCase(Locale.ROOT).trim();
+            int p = t.equals(buscado) ? 100 : t.startsWith(buscado) ? 80 : t.contains(buscado) ? 60 : 0;
+            if (p == 0) {
+                continue;
+            }
+            if (!Win32.User32.I.IsIconic(h)) {
+                p += 5;
+            }
+            if (p > masPuntos) {
+                masPuntos = p;
+                mejor = h;
             }
         }
-        return null;
+        return mejor;
+    }
+
+    /**
+     * Si la ventana está minimizada, la restaura: para leer sus controles Windows tiene que tenerla dibujada.
+     * Antes esto se le pedía a la persona, que es justo lo que no tiene que pasar. Devuelve true si la ha restaurado.
+     */
+    public boolean despertar(String titulo) {
+        Pointer h = handleDe(titulo);
+        if (h == null || !Win32.User32.I.IsIconic(h)) {
+            return false;
+        }
+        Win32.User32.I.ShowWindow(h, Win32.SW_RESTORE);
+        for (int i = 0; i < 20 && Win32.User32.I.IsIconic(h); i++) {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        return true;
     }
 
     /**

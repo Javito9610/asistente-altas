@@ -64,6 +64,18 @@ public final class Win32 {
         Kernel32 I = Native.load("kernel32", Kernel32.class);
 
         int GetCurrentThreadId();
+
+        /** La consola desde la que nos han lanzado (para no confundirla nunca con la ventana del programa). */
+        Pointer GetConsoleWindow();
+    }
+
+    /** La ventana de nuestra propia consola, o null si no hay. */
+    public static Pointer consola() {
+        try {
+            return Kernel32.I.GetConsoleWindow();
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     /** GUITHREADINFO: qué control tiene el foco del teclado en el hilo de la ventana de delante. */
@@ -87,6 +99,7 @@ public final class Win32 {
     static final int GA_ROOT = 2;
     static final int GA_ROOTOWNER = 3;
     static final int SW_RESTORE = 9;
+    public static final int SW_MINIMIZE = 6;
     static final int WM_CLOSE = 0x0010;
     static final int WM_COMMAND = 0x0111;
     static final int IDCANCEL = 2;

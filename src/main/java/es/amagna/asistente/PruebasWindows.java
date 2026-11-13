@@ -385,6 +385,36 @@ public final class PruebasWindows {
         var releido = es.amagna.asistente.guion.Mapa.leer(fAprendido);
         ok(releido.controles().size() == 2 && releido.ventana().equals(vent), "el mapa aprendido se guarda y se vuelve a leer igual");
 
+        System.out.println("15) No se lía con su propia consola, y despierta la ventana si está minimizada");
+        // El título de una consola lleva dentro el comando que se escribió, así que buscar «MNprogram» encontraba
+        // la consola donde se había escrito «MNprogram»: el asistente se leía a sí mismo.
+        com.sun.jna.Pointer consola = es.amagna.asistente.manos.Win32.consola();
+        String tituloConsola = consola == null ? "" : es.amagna.asistente.manos.Win32.titulo(consola);
+        if (tituloConsola.isBlank()) {
+            System.out.println("   (esta consola no tiene título; no se puede probar aquí)");
+        } else {
+            com.sun.jna.Pointer salio = ((VentanasNativas) v).handleDe(tituloConsola);
+            System.out.println("   buscando el título de la propia consola: " + (salio == null ? "nada, como debe ser"
+                    : "«" + es.amagna.asistente.manos.Win32.titulo(salio) + "»"));
+            ok(salio == null || com.sun.jna.Pointer.nativeValue(salio) != com.sun.jna.Pointer.nativeValue(consola),
+                    "nunca se devuelve a sí mismo: la consola no es una ventana de trabajo");
+        }
+        // Y una ventana minimizada se despierta sola: eso no se le pide a la persona.
+        String dormida = "prueba-minimizada";
+        v.abrir(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                List.of("-cp", System.getProperty("java.class.path"), "es.amagna.asistente.VentanaDePrueba", dormida, "formulario"));
+        ok(ctrl.esperar(dormida, null, es.amagna.asistente.manos.Controles.Que.APAREZCA, null, 25).startsWith("Ya está"),
+                "se abre la ventana que vamos a minimizar");
+        com.sun.jna.Pointer hD = ((VentanasNativas) v).handleDe(dormida);
+        es.amagna.asistente.manos.Win32.User32.I.ShowWindow(hD, es.amagna.asistente.manos.Win32.SW_MINIMIZE);
+        manos.esperar(1);
+        ok(es.amagna.asistente.manos.Win32.User32.I.IsIconic(hD), "la ventana está minimizada de verdad");
+        String leido = ctrl.leer(dormida, "campo junto a NIF");
+        System.out.println("   leyendo una ventana minimizada: " + leido);
+        ok(!leido.startsWith("No ") && !es.amagna.asistente.manos.Win32.User32.I.IsIconic(hD),
+                "la despierta él solo y la lee: a la persona no se le pide nada");
+        ((VentanasNativas) v).cerrarSiEsNuestra(dormida);
+
         ((VentanasNativas) v).cerrarSiEsNuestra(vent);
 
         terminar(manos, v);
