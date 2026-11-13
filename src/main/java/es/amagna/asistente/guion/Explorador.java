@@ -436,6 +436,17 @@ public final class Explorador {
         return esCargando(titulo);
     }
 
+    /**
+     * ¿Es esta ventana un menú desplegado y no una pantalla? Los programas de siempre (como MN, que es WinForms) usan
+     * la clase «#32768»; los modernos abren el menú como una ventana flotante con otro nombre. Hay que conocer las dos.
+     */
+    public static boolean esDesplegable(String clase, String titulo) {
+        String c = clase == null ? "" : clase;
+        String t = titulo == null ? "" : titulo;
+        return "#32768".equals(c) || c.startsWith("DropDown") || c.contains("Popup") || c.contains("MenuWindow")
+                || t.equals("PopupHost") || t.equals("DropDown");
+    }
+
     /** Pantallas de «espere un momento»: no son la pantalla, hay que dejarlas pasar. */
     private static boolean esCargando(String titulo) {
         String t = titulo.toLowerCase(Locale.ROOT);
@@ -457,7 +468,7 @@ public final class Explorador {
                     continue;
                 }
                 String clase = es.amagna.asistente.manos.Win32.clase(new com.sun.jna.Pointer(e.getKey()));
-                if ("#32768".equals(clase) || clase.startsWith("DropDown")) {
+                if (esDesplegable(clase, e.getValue())) {
                     huboMenu = true; // se ha desplegado un menú: lo pulsado no era una pantalla
                     continue;
                 }

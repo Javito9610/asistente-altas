@@ -493,6 +493,16 @@ public final class PruebasWindows {
         ctrl.pulsarRuta(clave, List.of(menuArchivo));
         var queSalio = es.amagna.asistente.guion.Explorador.esperarPantalla(antesMenu, 4);
         System.out.println("   al pulsar un menú: ventana=" + queSalio.ventana() + " menu=" + queSalio.menu());
+        if (!queSalio.menu()) {
+            // Que la prueba diga QUÉ ha salido, para no andar adivinando qué clase de ventana usa este Windows.
+            for (var e : VentanasNativas.instantanea().entrySet()) {
+                if (!antesMenu.contains(e.getKey())) {
+                    System.out.println("     ventana nueva: clase «"
+                            + es.amagna.asistente.manos.Win32.clase(new com.sun.jna.Pointer(e.getKey()))
+                            + "» título «" + e.getValue() + "»");
+                }
+            }
+        }
         ok(queSalio.ventana() == null && queSalio.menu(),
                 "sabe que lo que se ha abierto es un menú desplegado, no una pantalla");
         manos.tecla("Escape", 1);
