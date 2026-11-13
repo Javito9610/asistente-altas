@@ -413,6 +413,52 @@ public final class PruebasWindows {
         ok(tardoAviso < 4000, "avisar no bloquea el trabajo (" + tardoAviso + " ms)");
         ok(java.awt.SystemTray.isSupported(), "este Windows tiene bandeja de sistema para el globito");
 
+        System.out.println("14d) Los secretos: la contraseña, cifrada por Windows y nunca a la vista");
+        String nombreSecreto = "prueba-" + System.nanoTime();
+        String laClave = "C0ntr@señaDePrueba-Ñandú!";
+        es.amagna.asistente.manos.Secreto.guardar(nombreSecreto, laClave.toCharArray());
+        ok(es.amagna.asistente.manos.Secreto.hay(nombreSecreto), "se guarda un secreto");
+        char[] vuelto = es.amagna.asistente.manos.Secreto.leer(nombreSecreto);
+        ok(vuelto != null && new String(vuelto).equals(laClave), "y se recupera EXACTO, con acentos y símbolos");
+        Path ficheroSecreto = es.amagna.asistente.manos.Secreto.carpeta().resolve(nombreSecreto + ".dat");
+        byte[] crudo = Files.readAllBytes(ficheroSecreto);
+        ok(!new String(crudo, java.nio.charset.StandardCharsets.UTF_8).contains("C0ntr@")
+                && !new String(crudo, java.nio.charset.StandardCharsets.UTF_16LE).contains("C0ntr@"),
+                "en el fichero NO está la contraseña: Windows la ha cifrado con esta cuenta");
+        ok(crudo.length > laClave.length() + 20, "lo guardado es un bloque cifrado, no el texto (" + crudo.length + " bytes)");
+        ok(es.amagna.asistente.manos.Secreto.nombres().contains(nombreSecreto)
+                && !String.join(",", es.amagna.asistente.manos.Secreto.nombres()).contains("C0ntr@"),
+                "la lista enseña los nombres, nunca los valores");
+        es.amagna.asistente.manos.Secreto.olvidar(nombreSecreto);
+        ok(!es.amagna.asistente.manos.Secreto.hay(nombreSecreto) && es.amagna.asistente.manos.Secreto.leer(nombreSecreto) == null,
+                "y se puede olvidar");
+
+        System.out.println("14e) La sesión: que se reponga él solo cuando el programa se queda tonto");
+        // Se monta un programa de mentira con su mapa, como si fuera MN.
+        String vSesion = "prueba-sesion";
+        Path mSesion = dirG.resolve("sesion.json");
+        Files.writeString(mSesion, """
+                {"nombre": "Programa de prueba", "ventana": "%s",
+                 "programa": {"ejecutable": "%s", "argumentos": ["-cp", "%s", "es.amagna.asistente.VentanaDePrueba", "%s", "formulario"]},
+                 "controles": {"nif": ["campo junto a NIF"]}}""".formatted(vSesion, exeJava, cp, vSesion),
+                java.nio.charset.StandardCharsets.UTF_8);
+        var sesion = new es.amagna.asistente.guion.Sesion(ctrl, (VentanasNativas) v,
+                es.amagna.asistente.guion.Mapa.leer(mSesion), "", l -> System.out.println("   " + l));
+        var antesDeNada = sesion.mirar();
+        System.out.println("   con el programa cerrado: " + antesDeNada.comoEsta());
+        ok(!antesDeNada.lista() && antesDeNada.comoEsta().contains("no está abierto"),
+                "se da cuenta de que el programa no está abierto");
+        var puesta = sesion.asegurar();
+        System.out.println("   después de arreglarlo: " + puesta.comoEsta() + " (escalón " + puesta.escalon() + ")");
+        ok(puesta.lista(), "lo abre él solo y lo deja listo, sin que nadie se lo diga");
+        ok(sesion.mirar().lista(), "y al volver a mirar sigue listo");
+        // Y comprueba que está donde tiene que estar, no solo que está abierto.
+        var otroSitio = new es.amagna.asistente.guion.Sesion(ctrl, (VentanasNativas) v,
+                es.amagna.asistente.guion.Mapa.leer(mSesion), "Empresa de prueba", l -> { }).mirar();
+        ok(!otroSitio.lista() && otroSitio.comoEsta().contains("sitio equivocado"),
+                "y si el título no dice lo que tiene que decir, NO da la sesión por buena");
+        ((VentanasNativas) v).cerrarSiEsNuestra(vSesion);
+
         System.out.println("15) No se lía con su propia consola, y despierta la ventana si está minimizada");
         // El título de una consola lleva dentro el comando que se escribió, así que buscar «MNprogram» encontraba
         // la consola donde se había escrito «MNprogram»: el asistente se leía a sí mismo.

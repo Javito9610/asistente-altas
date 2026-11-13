@@ -110,6 +110,19 @@ public final class Guion {
             return new Parte(false, "El guion no tiene pasos.", lineas, 0, 0, 0);
         }
 
+        // Antes de tocar nada: ¿están todos los secretos que el guion va a necesitar? Es mejor no empezar que
+        // quedarse a medias de un alta porque falta una contraseña.
+        for (Object o : pasos) {
+            if (o instanceof Map<?, ?> crudo && crudo.get("valor") != null) {
+                String v = String.valueOf(crudo.get("valor"));
+                if (v.startsWith("secreto:") && !es.amagna.asistente.manos.Secreto.hay(v.substring("secreto:".length()))) {
+                    String cual = v.substring("secreto:".length());
+                    return new Parte(false, "NO SE EMPIEZA: falta la contraseña «" + cual + "». Guárdala con «asistente secreto "
+                            + cual + "» y vuelve a lanzarlo.", lineas, 0, 0, 0);
+                }
+            }
+        }
+
         // Lo escrito se apunta para la doble lectura del final.
         Map<String, String[]> escrito = new LinkedHashMap<>(); // control -> {apodo que funcionó, valor}
         java.util.Set<String> yaAvisado = new java.util.HashSet<>();
@@ -248,6 +261,11 @@ public final class Guion {
                 if (valor == null) {
                     return "el guion no dice qué valor poner";
                 }
+                // «secreto:mn» = la contraseña guardada con DPAPI. Se descifra aquí, se escribe y se borra de memoria.
+                // Nunca se enseña, nunca se apunta en el parte, y la comprobación es «hay algo escrito», no qué.
+                if (valor.startsWith("secreto:")) {
+                    return escribirSecreto(control, apodo, valor.substring("secreto:".length()), ensayo, lineas);
+                }
                 if (ensayo) {
                     lineas.add("ENSAYO escribir " + control + " (" + apodo + "): encontrado, NO se escribe");
                     return SALTADO;
@@ -276,6 +294,42 @@ public final class Guion {
             default:
                 return "«" + hacer + "» no se sabe hacer (escribir, pulsar, esperar, comprobar)";
         }
+    }
+
+    /** Escribe un secreto sin que aparezca en ningún sitio. */
+    private String escribirSecreto(String control, String apodo, String nombre, boolean ensayo, List<String> lineas) {
+        if (ensayo) {
+            lineas.add("ENSAYO escribir " + control + " (" + apodo + "): el secreto «" + nombre + "» "
+                    + (es.amagna.asistente.manos.Secreto.hay(nombre) ? "está guardado" : "NO ESTÁ GUARDADO"));
+            return es.amagna.asistente.manos.Secreto.hay(nombre) ? SALTADO
+                    : "el secreto «" + nombre + "» no está guardado: guárdalo con «asistente secreto " + nombre + "»";
+        }
+        char[] clave;
+        try {
+            clave = es.amagna.asistente.manos.Secreto.leer(nombre);
+        } catch (IOException e) {
+            return e.getMessage();
+        }
+        if (clave == null) {
+            return "el secreto «" + nombre + "» no está guardado: guárdalo con «asistente secreto " + nombre + "»";
+        }
+        try {
+            String r = controles.escribir(mapa.ventana(), apodo, new String(clave));
+            if (!r.startsWith("IGUAL")) {
+                // El mensaje de error del control podría llevar dentro lo escrito: se corta y no se repite.
+                return r.startsWith("DISTINTO") ? "lo escrito no ha quedado igual (no se enseña por ser un secreto)"
+                        : sinSecretos(r, new String(clave));
+            }
+            lineas.add("ok     escribir " + control + " = «(secreto " + nombre + ")»");
+            return null;
+        } finally {
+            java.util.Arrays.fill(clave, '\0');
+        }
+    }
+
+    /** Por si acaso: que un mensaje de error no acabe enseñando la contraseña. */
+    private static String sinSecretos(String mensaje, String secreto) {
+        return secreto.isEmpty() ? mensaje : mensaje.replace(secreto, "(secreto)");
     }
 
     private static Controles.Que que(Object v) {

@@ -347,6 +347,23 @@ public final class Comprobaciones {
         ok(es.amagna.asistente.guion.Explorador.porQueNoSeToca(List.of("Lexnet")) != null
                 && es.amagna.asistente.guion.Explorador.porQueNoSeToca(List.of("Correo")) != null,
                 "los módulos que hablan con fuera (Lexnet, Correo) no se abren: al entrar pueden bajar o mandar cosas");
+        // Un secreto en un guion no se enseña NUNCA, ni siquiera cuando algo falla.
+        try {
+            java.nio.file.Path fs = java.nio.file.Files.createTempFile("guion-secreto", ".json");
+            java.nio.file.Files.writeString(fs,
+                    "{\"pasos\": [{\"hacer\": \"escribir\", \"control\": \"clave\", \"valor\": \"secreto:no-existe\"}]}");
+            java.nio.file.Path ms = java.nio.file.Files.createTempFile("mapa-secreto", ".json");
+            java.nio.file.Files.writeString(ms, "{\"ventana\": \"x\", \"controles\": {\"clave\": [\"#c\"]}}");
+            List<String> dicho = new ArrayList<>();
+            var parte = new es.amagna.asistente.guion.Guion(new es.amagna.asistente.manos.Controles(null), null,
+                    es.amagna.asistente.guion.Mapa.leer(ms), dicho::add).ejecutar(fs, false);
+            ok(!parte.bien() && parte.resumen().startsWith("NO SE EMPIEZA") && parte.resumen().contains("no-existe"),
+                    "si falta una contraseña, el guion NO EMPIEZA: mejor eso que quedarse a medias de un alta");
+            ok(parte.resumen().contains("asistente secreto no-existe"), "y dice el comando exacto para guardarla");
+        } catch (java.io.IOException e) {
+            ok(false, "se puede probar un guion con secreto: " + e.getMessage());
+        }
+
         // Nunca quedarse mudo para siempre: si el programa no contesta, se deja por imposible y se avisa.
         long t0espera = System.currentTimeMillis();
         String tarde = es.amagna.asistente.guion.Explorador.conTiempo(1, () -> {

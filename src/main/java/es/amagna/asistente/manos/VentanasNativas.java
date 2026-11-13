@@ -317,6 +317,13 @@ public final class VentanasNativas implements Ventanas {
         return h == null ? null : Win32.titulo(h);
     }
 
+    /** ¿Estas dos ventanas son del mismo programa? (para no cerrar la de otro). */
+    public boolean mismoProgramaQue(String unTitulo, String otroTitulo) {
+        Pointer a = handleDe(unTitulo);
+        Pointer b = handleDe(otroTitulo);
+        return a != null && b != null && Win32.pid(a) == Win32.pid(b);
+    }
+
     public boolean despertar(String titulo) {
         Pointer h = handleDe(titulo);
         if (h == null || !Win32.User32.I.IsIconic(h)) {

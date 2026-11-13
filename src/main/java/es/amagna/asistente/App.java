@@ -47,6 +47,15 @@ public final class App {
                 case "guion" -> guion(Arrays.asList(args).subList(1, args.length));
                 case "aprender" -> aprender(Arrays.asList(args).subList(1, args.length));
                 case "explorar" -> explorar(Arrays.asList(args).subList(1, args.length));
+                case "secreto" -> guardarSecreto(Arrays.asList(args).subList(1, args.length));
+                case "sesion" -> sesion(Arrays.asList(args).subList(1, args.length));
+                case "secretos" -> {
+                    var n = es.amagna.asistente.manos.Secreto.nombres();
+                    System.out.println(n.isEmpty() ? "No hay ningún secreto guardado." : "Secretos guardados (solo los nombres):");
+                    n.forEach(x -> System.out.println("  " + x));
+                    System.out.println("Están en " + es.amagna.asistente.manos.Secreto.carpeta()
+                            + ", cifrados con tu cuenta de Windows: nadie más puede leerlos, ni en otro ordenador.");
+                }
                 case "agentes" -> es.amagna.asistente.cerebro.Especialista.NOMBRES.forEach(n -> {
                     try {
                         var e = es.amagna.asistente.cerebro.Especialista.cargar(n, MODELO_POR_DEFECTO, Agente.TOPE_TOKENS_POR_DEFECTO);
@@ -69,6 +78,12 @@ public final class App {
                           asistente agentes             (los especialistas que hay)
                           asistente agente "tarea" [--como cartografo] [--vista] [--pasos 20] [--tope-tokens 200000]
                                                    [--modelo claude-sonnet-5-5] [--sin-expediente]
+                          asistente sesion <mapa.json> [--entrar guion-entrada.json] [--debe-decir "Empresa de prueba"]
+                                                        (comprueba que el programa está vivo y dentro; si no, lo
+                                                         arregla: avisos, menús, pantallas sueltas, reiniciar y entrar)
+                          asistente secreto <nombre> [--olvidar]
+                                                        (guarda una contraseña cifrada con tu cuenta de Windows)
+                          asistente secretos            (los nombres de los secretos guardados, nunca su valor)
                           asistente explorar "<ventana>" <plano.json> [--hondo 8] [--sin-ia]
                                                         (el plano de TODO el programa, sin abrir nada; la IA dice
                                                          cuáles abren pantalla y cuáles ejecutan algo)
@@ -276,6 +291,58 @@ public final class App {
                     cosa tuya o hay que decidir algo que no te corresponde, termina con PARADO explicándolo.
                     """.formatted(vent, queSeQueria, porQue)).mensaje();
         };
+    }
+
+    /** Deja el programa vivo, respondiendo y dentro. Es lo que se llama antes de cada trabajo de la noche. */
+    private static void sesion(List<String> a) throws IOException {
+        if (a.isEmpty()) {
+            throw new IllegalArgumentException("Uso: asistente sesion <mapa.json> [--entrar <guion.json>] [--debe-decir \"Empresa de prueba\"]");
+        }
+        es.amagna.asistente.guion.Mapa mapa = es.amagna.asistente.guion.Mapa.leer(Path.of(a.get(0)));
+        VentanasNativas ventanas = new VentanasNativas(false);
+        String debeDecir = a.contains("--debe-decir") ? a.get(a.indexOf("--debe-decir") + 1) : "";
+        var sesion = new es.amagna.asistente.guion.Sesion(new Controles(ventanas), ventanas, mapa, debeDecir, System.out::println);
+        if (a.contains("--entrar")) {
+            sesion.conGuionDeEntrada(Path.of(a.get(a.indexOf("--entrar") + 1)));
+        }
+        var estado = sesion.asegurar();
+        System.out.println(estado.lista() ? "SESIÓN LISTA: " + estado.comoEsta() : "SESIÓN NO LISTA: " + estado.comoEsta());
+        if (!estado.lista() && !a.contains("--sin-aviso")) {
+            es.amagna.asistente.manos.Aviso.avisar("Asistente Altas", "No he podido dejar el programa listo: " + estado.comoEsta(), true);
+        }
+        System.exit(estado.lista() ? 0 : 1);
+    }
+
+    /** Guarda una contraseña para que el asistente pueda volver a entrar él solo de noche. */
+    private static void guardarSecreto(List<String> a) throws IOException {
+        if (a.isEmpty()) {
+            throw new IllegalArgumentException("Falta el nombre. Ejemplo: asistente secreto mn");
+        }
+        String nombre = a.get(0);
+        if (a.contains("--olvidar")) {
+            es.amagna.asistente.manos.Secreto.olvidar(nombre);
+            System.out.println("Olvidado «" + nombre + "».");
+            return;
+        }
+        Console c = System.console();
+        if (c == null) {
+            throw new IllegalStateException("Hace falta una consola para escribir la contraseña sin que se vea.");
+        }
+        char[] uno = c.readPassword("Contraseña de «" + nombre + "» (no se ve al escribir): ");
+        char[] dos = c.readPassword("Otra vez, para asegurar: ");
+        if (uno == null || uno.length == 0) {
+            throw new IllegalArgumentException("No has escrito nada.");
+        }
+        if (!java.util.Arrays.equals(uno, dos)) {
+            java.util.Arrays.fill(uno, '\0');
+            java.util.Arrays.fill(dos, '\0');
+            throw new IllegalArgumentException("No coinciden. No se ha guardado nada.");
+        }
+        java.util.Arrays.fill(dos, '\0');
+        es.amagna.asistente.manos.Secreto.guardar(nombre, uno);
+        System.out.println("Guardado «" + nombre + "» en " + es.amagna.asistente.manos.Secreto.carpeta() + ".");
+        System.out.println("Cifrado con tu cuenta de Windows: solo tú, y solo en este ordenador. No está en el repositorio");
+        System.out.println("ni se enseña en ningún sitio. En un guion se usa poniendo «secreto:" + nombre + "» como valor.");
     }
 
     /** El plano de todo un programa: primero mirando (gratis y sin riesgo), después entrando en lo aprobado. */
