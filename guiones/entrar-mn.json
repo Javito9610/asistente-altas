@@ -20,6 +20,9 @@
       "hacer": "pulsar",
       "control": "entrar",
       "toca": true
+    },
+    {
+      "hacer": "apartar"
     }
   ]
 }

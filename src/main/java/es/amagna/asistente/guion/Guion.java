@@ -268,17 +268,31 @@ public final class Guion {
             if (!sigueAhi) {
                 lineas.add("ok     la pantalla «" + mapa.ventana() + "» ya se ha cerrado: hizo lo que tenía que hacer");
             }
+            List<String> noSePudo = new ArrayList<>();
             for (Map.Entry<String, String[]> e : sigueAhi ? escrito.entrySet() : java.util.Map.<String, String[]>of().entrySet()) {
                 String hay = controles.valorDe(mapa.ventana(), e.getValue()[0]);
-                if (!e.getValue()[1].equals(hay)) {
+                // «No he podido leerlo» NO es «está mal», y meterlo en el mismo saco es un error de bulto: la pantalla
+                // puede haberse cerrado, haber cambiado, o tener un aviso encima que impide leerla (es justo lo que
+                // hace MN, que al entrar saca su configuración de OneDrive tapando la pantalla de entrada). Dar por
+                // fallido un trabajo bien hecho porque después no se puede releer es peor que no comprobar nada.
+                if (hay == null) {
+                    noSePudo.add("«" + e.getKey() + "»");
+                } else if (!e.getValue()[1].equals(hay)) {
                     mal.add("«" + e.getKey() + "» tenía que valer «" + e.getValue()[1] + "» y vale «" + hay + "»");
                 }
+            }
+            if (!noSePudo.isEmpty()) {
+                lineas.add("aviso  no se ha podido releer " + String.join(", ", noSePudo)
+                        + " (la pantalla ya no está, o tiene algo encima): se queda sin comprobar, no se da por malo");
             }
             if (!mal.isEmpty()) {
                 lineas.add("FALLA  doble lectura: " + String.join("; ", mal));
                 return parte(false, "PARADO en la comprobación final: " + String.join("; ", mal), lineas, hechos, avisos, rescates, clave, ensayo);
             }
-            lineas.add("ok     doble lectura: los " + escrito.size() + " datos escritos siguen siendo exactos");
+            int comprobados = escrito.size() - noSePudo.size();
+            if (sigueAhi && comprobados > 0) {
+                lineas.add("ok     doble lectura: los " + comprobados + " datos que se han podido releer siguen siendo exactos");
+            }
         }
 
         String resumen = (ensayo ? "ENSAYO CORRECTO: " : "HECHO: ") + hechos + " pasos"
@@ -342,6 +356,30 @@ public final class Guion {
                 String hay = controles.valorDe(mapa.ventana(), apodo);
                 return valor == null || valor.equals(hay) ? null
                         : "se esperaba «" + valor + "» y hay «" + hay + "»";
+            case "apartar":
+                // Cierra los avisos y diálogos que hayan salido encima. Los programas de gestión sueltan de todo
+                // justo después de entrar o de guardar, y hasta que no se despeja no se puede ni leer la pantalla.
+                if (ensayo) {
+                    lineas.add("ENSAYO apartar: no se toca nada");
+                    return SALTADO;
+                }
+                if (ventanas == null) {
+                    return "aquí no se pueden apartar ventanas";
+                }
+                for (int vuelta = 1; vuelta <= 5; vuelta++) {
+                    List<String> fuera = ventanas.cancelarBloqueos();
+                    if (fuera.isEmpty()) {
+                        break;
+                    }
+                    lineas.add("ok     apartado: " + String.join(", ", fuera));
+                    try {
+                        Thread.sleep(600);
+                    } catch (InterruptedException ex) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+                return null;
             case "tecla":
                 if (valor == null || valor.isBlank()) {
                     return "el guion no dice qué tecla pulsar";
@@ -357,7 +395,7 @@ public final class Guion {
                     return "no se ha podido pulsar «" + valor + "»: " + ex.getMessage();
                 }
             default:
-                return "«" + hacer + "» no se sabe hacer (escribir, pulsar, esperar, comprobar, tecla)";
+                return "«" + hacer + "» no se sabe hacer (escribir, pulsar, esperar, comprobar, tecla, apartar)";
         }
     }
 
