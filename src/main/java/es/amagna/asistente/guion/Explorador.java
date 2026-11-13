@@ -220,7 +220,7 @@ public final class Explorador {
      * No se ejecuta fuera de la empresa de prueba, y las peligrosas no se abren aunque vengan aprobadas.
      */
     public static String recorrer(Controles ctrl, VentanasNativas ventanas, String ventana, List<Pantalla> plano,
-            Path carpeta, Consumer<String> registro) throws IOException {
+            Path carpeta, double espera, Consumer<String> registro) throws IOException {
         String titulo = ventanas.tituloDe(ventana);
         if (titulo == null) {
             return "No hay ninguna ventana «" + ventana + "».";
@@ -232,35 +232,77 @@ public final class Explorador {
         Files.createDirectories(carpeta);
         int hechas = 0;
         int saltadas = 0;
-        List<String> fallos = new ArrayList<>();
+        int seguidosMal = 0;
+        List<String> incidencias = new ArrayList<>();
+        List<String> resumen = new ArrayList<>();
         for (Pantalla p : plano) {
             if (!p.seguro()) {
                 saltadas++;
                 continue;
             }
+            // Antes de entrar, el programa tiene que estar libre: si quedó un aviso de la pantalla anterior, se cierra.
+            List<String> bloqueos = ventanas.cancelarBloqueos();
+            if (!bloqueos.isEmpty()) {
+                registro.accept("   (venía bloqueado; se han cerrado: " + String.join(", ", bloqueos) + ")");
+            }
             registro.accept("→ " + p.comoTexto());
             String antes = ventanas.abiertas();
             String r = ctrl.pulsarRuta(ventana, p.ruta());
             if (!r.startsWith("Pulsado")) {
-                fallos.add(p.comoTexto() + ": " + r);
+                incidencias.add(p.comoTexto() + ": no se pudo entrar (" + r + ")");
+                resumen.add("- " + p.comoTexto() + " · NO SE PUDO ENTRAR");
+                if (++seguidosMal >= 3) {
+                    return parada(carpeta, resumen, incidencias, hechas, saltadas,
+                            "Tres pantallas seguidas sin poder entrar: se para para no dejar MN hecho un lío.");
+                }
                 continue;
             }
-            esperarQuieto(1.5);
+            esperarQuieto(espera);
+
+            // ¿Ha salido un aviso o un diálogo encima? Se anota, se cierra y se sigue: esa pantalla la verá una persona.
+            String ahora = ventanas.abiertas();
+            if (ahora.contains("BLOQUEADA")) {
+                List<String> cerrado = ventanas.cancelarBloqueos();
+                incidencias.add(p.comoTexto() + ": al entrar sale un aviso o pide algo (" + String.join(", ", cerrado)
+                        + "). Esta pantalla hay que verla con una persona delante.");
+                resumen.add("- " + p.comoTexto() + " · PIDE ALGO AL ENTRAR (no cartografiada)");
+                seguidosMal = 0;
+                continue;
+            }
+            seguidosMal = 0;
+
             String nueva = ventanaNueva(ventanas, antes);
             String deQuien = nueva != null ? nueva : ventana;
             String arbol = ctrl.arbol(deQuien, 14, 3000);
             Path f = carpeta.resolve(limpio(p.comoTexto()) + ".txt");
             Files.writeString(f, "Pantalla: " + p.comoTexto() + "\nVentana: " + deQuien + "\n\n" + arbol, StandardCharsets.UTF_8);
-            registro.accept("   " + arbol.lines().count() + " líneas → " + f.getFileName());
+            long lineas = arbol.lines().count();
+            registro.accept("   " + lineas + " líneas → " + f.getFileName());
+            resumen.add("- " + p.comoTexto() + " · " + lineas + " líneas · " + f.getFileName());
             hechas++;
             if (nueva != null) {
                 ventanas.cerrarVentana(nueva); // la hemos abierto nosotros al entrar
-                esperarQuieto(0.8);
+                esperarQuieto(Math.min(1.5, espera));
+                ventanas.cancelarBloqueos(); // por si al cerrar pregunta algo
             }
         }
-        return "Recorridas " + hechas + " pantallas, saltadas " + saltadas + " por no estar aprobadas o ser peligrosas"
-                + (fallos.isEmpty() ? "" : " · no se pudo entrar en: " + String.join(" · ", fallos))
-                + ". Los controles están en " + carpeta.toAbsolutePath() + ".";
+        return parada(carpeta, resumen, incidencias, hechas, saltadas, null);
+    }
+
+    /** Escribe el resumen de lo recorrido y devuelve la frase final. */
+    private static String parada(Path carpeta, List<String> resumen, List<String> incidencias, int hechas, int saltadas,
+            String corte) throws IOException {
+        StringBuilder b = new StringBuilder("# Recorrido de pantallas\n\n");
+        resumen.forEach(l -> b.append(l).append('\n'));
+        if (!incidencias.isEmpty()) {
+            b.append("\n## Lo que hay que mirar a mano\n\n");
+            incidencias.forEach(l -> b.append("- ").append(l).append('\n'));
+        }
+        Files.writeString(carpeta.resolve("resumen.md"), b.toString(), StandardCharsets.UTF_8);
+        return (corte == null ? "" : corte + " ")
+                + "Recorridas " + hechas + " pantallas, saltadas " + saltadas + " (no aprobadas o peligrosas)"
+                + (incidencias.isEmpty() ? "" : ", " + incidencias.size() + " piden algo al entrar y quedan para mirar a mano")
+                + ". Todo en " + carpeta.toAbsolutePath() + " (empieza por resumen.md).";
     }
 
     private static String ventanaNueva(VentanasNativas ventanas, String antes) {

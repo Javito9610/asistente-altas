@@ -72,7 +72,7 @@ public final class App {
                           asistente explorar "<ventana>" <plano.json> [--hondo 8] [--sin-ia]
                                                         (el plano de TODO el programa, sin abrir nada; la IA dice
                                                          cuáles abren pantalla y cuáles ejecutan algo)
-                          asistente explorar "<ventana>" <plano.json> --recorrer <carpeta> [--solo "Clientes,Expedientes"]
+                          asistente explorar "<ventana>" <plano.json> --recorrer <carpeta> [--solo "Clientes,Expedientes"] [--despacio 3]
                                                         (entra en las pantallas aprobadas y guarda sus controles;
                                                          solo en la empresa de prueba)
                           asistente aprender "<ventana>" <mapa.json> [--programa "<exe>"]
@@ -289,8 +289,9 @@ public final class App {
             }
             long aprobadas = plano.stream().filter(es.amagna.asistente.guion.Explorador.Pantalla::seguro).count();
             System.out.println("Plano: " + plano.size() + " pantallas, " + aprobadas + " aprobadas para entrar.");
+            double espera = a.contains("--despacio") ? Double.parseDouble(a.get(a.indexOf("--despacio") + 1)) : 1.5;
             System.out.println(es.amagna.asistente.guion.Explorador.recorrer(ctrl, ventanas, ventana, plano,
-                    Path.of(a.get(a.indexOf("--recorrer") + 1)), l -> System.out.println("  " + l)));
+                    Path.of(a.get(a.indexOf("--recorrer") + 1)), espera, l -> System.out.println("  " + l)));
             return;
         }
         int hondo = a.contains("--hondo") ? Integer.parseInt(a.get(a.indexOf("--hondo") + 1)) : 8;
