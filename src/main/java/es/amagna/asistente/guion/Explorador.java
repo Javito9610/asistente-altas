@@ -280,7 +280,24 @@ public final class Explorador {
             // Hay que ESPERAR a que la ventana aparezca de verdad, no un rato a ojo. Las pantallas grandes de MN
             // (Clientes, Expedientes) tardan bastante más que las pequeñas, y volcar la ventana principal mientras
             // tanto da un fichero que no sirve para nada y encima parece bueno.
-            Long nuevaH = esperarVentanaNueva(antes, Math.max(espera, 2) * 6);
+            Salio salio = esperarVentanaNueva(antes, Math.max(espera, 3) * 15);
+            Long nuevaH = salio.ventana();
+            if (nuevaH == null && salio.menu()) {
+                resumen.add("- " + p.comoTexto() + " · es un submenú (se desplegó un menú, no se abrió nada)");
+                registro.accept("   es un submenú: se ha desplegado un menú, no es una pantalla");
+                escapar();
+                saltadas++;
+                continue;
+            }
+            if (nuevaH == null && salio.cargando() != null) {
+                incidencias.add(p.comoTexto() + ": se quedó en «" + salio.cargando() + "» y no llegó a abrirse. "
+                        + "Quizá tarda muchísimo: pruébala a mano.");
+                resumen.add("- " + p.comoTexto() + " · SE QUEDÓ CARGANDO");
+                registro.accept("   se quedó en «" + salio.cargando() + "»");
+                ventanas.cancelarBloqueos();
+                seguidosMal = 0;
+                continue;
+            }
             if (nuevaH == null) {
                 String bloqueada = ventanas.abiertas().contains("BLOQUEADA")
                         ? " (hay algo bloqueando: " + String.join(", ", ventanas.cancelarBloqueos()) + ")" : "";
@@ -396,18 +413,52 @@ public final class Explorador {
         }
     }
 
-    /** Espera a que aparezca una ventana que antes no estaba, mirando de verdad. Devuelve cuál, o null. */
-    private static Long esperarVentanaNueva(java.util.Set<Long> antes, double segundos) {
+    /** Lo que sale al pulsar: la pantalla, un menú desplegado, o nada. */
+    record Salio(Long ventana, boolean menu, String cargando) {
+    }
+
+    /** Para las comprobaciones. */
+    public static boolean esCargandoPrueba(String titulo) {
+        return esCargando(titulo);
+    }
+
+    /** Pantallas de «espere un momento»: no son la pantalla, hay que dejarlas pasar. */
+    private static boolean esCargando(String titulo) {
+        String t = titulo.toLowerCase(Locale.ROOT);
+        return t.startsWith("cargando") || t.startsWith("loading") || t.startsWith("espere") || t.startsWith("abriendo");
+    }
+
+    /**
+     * Espera a que aparezca la pantalla de verdad. Distingue tres cosas que antes se mezclaban:
+     * la ventana buena, un menú que se ha desplegado (entonces lo pulsado era un submenú, no una pantalla) y los
+     * carteles de «Cargando…», que hay que dejar pasar porque detrás viene la pantalla.
+     */
+    private static Salio esperarVentanaNueva(java.util.Set<Long> antes, double segundos) {
         long fin = System.currentTimeMillis() + (long) (segundos * 1000);
+        boolean huboMenu = false;
+        String ultimoCargando = null;
         do {
             for (Map.Entry<Long, String> e : VentanasNativas.instantanea().entrySet()) {
-                if (!antes.contains(e.getKey()) && !e.getValue().isBlank()) {
-                    return e.getKey();
+                if (antes.contains(e.getKey())) {
+                    continue;
                 }
+                String clase = es.amagna.asistente.manos.Win32.clase(new com.sun.jna.Pointer(e.getKey()));
+                if ("#32768".equals(clase) || clase.startsWith("DropDown")) {
+                    huboMenu = true; // se ha desplegado un menú: lo pulsado no era una pantalla
+                    continue;
+                }
+                if (e.getValue().isBlank()) {
+                    continue;
+                }
+                if (esCargando(e.getValue())) {
+                    ultimoCargando = e.getValue();
+                    continue; // detrás viene la buena: se espera
+                }
+                return new Salio(e.getKey(), false, null);
             }
             esperarQuieto(0.3);
         } while (System.currentTimeMillis() < fin);
-        return null;
+        return new Salio(null, huboMenu, ultimoCargando);
     }
 
     /** Cierra una pantalla y comprueba que se ha ido; si pregunta algo al salir, se cancela. */

@@ -376,6 +376,11 @@ public final class Comprobaciones {
         ok("ya".equals(es.amagna.asistente.guion.Explorador.conTiempo(5, () -> "ya", "no contesta")),
                 "y si contesta a tiempo, se devuelve lo suyo");
 
+        ok(es.amagna.asistente.guion.Explorador.esCargandoPrueba("Cargando...")
+                && es.amagna.asistente.guion.Explorador.esCargandoPrueba("Espere por favor")
+                && !es.amagna.asistente.guion.Explorador.esCargandoPrueba("Clientes"),
+                "un cartel de «Cargando…» no es la pantalla: se deja pasar y se espera a la de verdad");
+
         // Un submenú no es una pantalla: pulsarlo deja el menú desplegado y al programa esperando.
         var menus = List.of(List.of("Bases de Datos"), List.of("Bases de Datos", "Clientes"),
                 List.of("Bases de Datos", "Ficheros"), List.of("Bases de Datos", "Ficheros", "Contrarios"),

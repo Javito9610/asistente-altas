@@ -127,7 +127,7 @@ public final class Win32 {
         return new String(b, 0, Math.max(0, n));
     }
 
-    static String clase(Pointer hwnd) {
+    public static String clase(Pointer hwnd) {
         char[] b = new char[256];
         int n = User32.I.GetClassNameW(hwnd, b, b.length);
         return new String(b, 0, Math.max(0, n));
