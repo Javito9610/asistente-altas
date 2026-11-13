@@ -380,16 +380,32 @@ public final class App {
         }
         // El usuario no es secreto, pero sin él la contraseña no sirve: se piden los dos juntos.
         String yaHay = es.amagna.asistente.manos.Secreto.usuario(nombre);
-        String usuario = a.contains("--usuario") ? a.get(a.indexOf("--usuario") + 1)
-                : c.readLine("Usuario de «" + nombre + "»" + (yaHay == null ? "" : " [" + yaHay + "]") + ": ").strip();
+        String usuario;
+        if (a.contains("--usuario")) {
+            usuario = a.get(a.indexOf("--usuario") + 1);
+        } else {
+            // La pregunta se escribe por la salida de siempre y se fuerza a que salga: así no depende de cómo trate
+            // la consola los mensajes, que es justo lo que hizo que a Javi no le saliera.
+            System.out.print("Usuario de «" + nombre + "»" + (yaHay == null ? "" : " [" + yaHay + ", Enter para dejarlo]") + ": ");
+            System.out.flush();
+            String leido = c.readLine();
+            usuario = leido == null ? "" : leido.strip();
+        }
         if (usuario.isBlank() && yaHay != null) {
             usuario = yaHay;
         }
         if (usuario.isBlank()) {
-            throw new IllegalArgumentException("Hace falta el usuario.");
+            throw new IllegalArgumentException("Hace falta el usuario. Si la consola no te deja escribirlo, ponlo en el "
+                    + "propio comando: asistente secreto " + nombre + " --usuario tu.usuario@amagnalegal.com");
         }
-        char[] uno = c.readPassword("Contraseña de «" + nombre + "» (no se ve al escribir): ");
-        char[] dos = c.readPassword("Otra vez, para asegurar: ");
+        System.out.println("Usuario: " + usuario);
+        System.out.print("Contraseña de «" + nombre + "» (no se ve al escribir): ");
+        System.out.flush();
+        char[] uno = c.readPassword();
+        System.out.print("Otra vez, para asegurar: ");
+        System.out.flush();
+        char[] dos = c.readPassword();
+        System.out.println();
         if (uno == null || uno.length == 0) {
             throw new IllegalArgumentException("No has escrito nada.");
         }
