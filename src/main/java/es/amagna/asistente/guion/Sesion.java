@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.function.Consumer;
 
@@ -58,7 +59,10 @@ public final class Sesion {
         this.controles = controles;
         this.ventanas = ventanas;
         this.mapa = mapa;
-        this.debeDecir = debeDecir == null ? "" : debeDecir;
+        // Si no se dice otra cosa, manda lo que el propio mapa exija. Para MN es «Empresa de prueba»: si el programa
+        // arrancara en otra empresa, la sesión NO se da por buena y no se trabaja. Es el cerrojo que impide tocar la
+        // empresa de verdad por un descuido.
+        this.debeDecir = debeDecir == null || debeDecir.isBlank() ? mapa.debeDecir() : debeDecir;
         this.registro = registro;
     }
 
@@ -84,12 +88,24 @@ public final class Sesion {
 
     /** Deja escrito todo lo que hay en la pantalla de entrada, para poder corregir el mapa sin adivinar. */
     private String diagnostico() {
+        // Se vuelca TODO lo que hay abierto, no solo la pantalla de entrada: cuando un trabajo pasa por cuatro
+        // ventanas seguidas, no se sabe de antemano en cuál se va a atascar, y pedir otra vuelta entera para ver la
+        // siguiente es perder el tiempo de quien espera.
         try {
+            StringBuilder b = new StringBuilder();
+            int cuantas = 0;
+            for (Map.Entry<Long, String> e : VentanasNativas.instantanea().entrySet()) {
+                String t = e.getValue();
+                if (t.isBlank() || t.contains("asistente") || t.contains("Símbolo del sistema") || cuantas >= 8) {
+                    continue;
+                }
+                b.append("\n========== ventana: «").append(t).append("» ==========\n")
+                        .append(controles.arbol(t, 12, 1200)).append('\n');
+                cuantas++;
+            }
             Path f = Path.of("diagnostico-entrada.txt");
-            Files.writeString(f, "Pantalla de entrada: " + mapaEntrada.ventana() + "\n\n"
-                    + controles.arbol(mapaEntrada.ventana(), 12, 2000), java.nio.charset.StandardCharsets.UTF_8);
-            return "\n   He dejado lo que hay en esa pantalla en " + f.toAbsolutePath()
-                    + " · pásamelo y corrijo el mapa.";
+            Files.writeString(f, "Lo que hay abierto cuando se ha atascado:\n" + b, java.nio.charset.StandardCharsets.UTF_8);
+            return "\n   He dejado TODAS las ventanas abiertas (" + cuantas + ") en " + f.toAbsolutePath() + ".";
         } catch (IOException | RuntimeException e) {
             return "";
         }

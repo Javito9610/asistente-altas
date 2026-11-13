@@ -1,5 +1,5 @@
 {
-  "_nota": "Entrar en MN de carrerilla. Cada paso dice en qué ventana trabaja, porque son cuatro distintas.",
+  "_nota": "Entrar en MN de carrerilla: acceso, empresa, ejercicio y el anuncio. Elegir la fila es OPCIONAL porque MN ya suele traerla elegida; lo que NO es opcional es que al final el título diga «Empresa de prueba», y eso lo comprueba la sesión.",
   "pasos": [
     {
       "hacer": "esperar",
@@ -25,7 +25,7 @@
     {
       "hacer": "esperar",
       "ventana": "Selección de Empresa",
-      "apodo": "fila:Empresa de prueba",
+      "apodo": "boton:Seleccionar",
       "que": "aparezca",
       "segundos": 90
     },
@@ -33,7 +33,15 @@
       "hacer": "pulsar",
       "ventana": "Selección de Empresa",
       "apodo": "fila:Empresa de prueba",
-      "toca": true
+      "toca": true,
+      "opcional": true
+    },
+    {
+      "hacer": "pulsar",
+      "ventana": "Selección de Empresa",
+      "apodo": "opcion:Empresa de prueba",
+      "toca": true,
+      "opcional": true
     },
     {
       "hacer": "pulsar",
@@ -52,7 +60,8 @@
       "hacer": "pulsar",
       "ventana": "Ejercicio Contable",
       "apodo": "fila[-1]",
-      "toca": true
+      "toca": true,
+      "opcional": true
     },
     {
       "hacer": "pulsar",

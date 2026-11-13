@@ -1,6 +1,8 @@
 {
   "nombre": "MN program Cloud (escritorio)",
   "ventana": "MNprogram - Abogados",
+  "debe_decir": "Empresa de prueba",
+  "_nota": "«debe_decir» es el cerrojo: si MN no arranca en la empresa de prueba, la sesión NO se da por buena y no se trabaja.",
   "programa": {
     "ejecutable": "C:\\MnProgram\\MNprogramCloud\\Correo\\MNprogram.exe",
     "argumentos": []

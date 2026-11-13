@@ -36,7 +36,7 @@ import java.util.Map;
  * @package Amagna\Altas
  */
 public record Mapa(String nombre, String ventana, String ejecutable, List<String> argumentos, Map<String, List<String>> controles,
-        Path entradaMapa, Path entradaGuion) {
+        Path entradaMapa, Path entradaGuion, String debeDecir) {
 
     @SuppressWarnings("unchecked")
     public static Mapa leer(Path fichero) throws IOException {
@@ -81,7 +81,7 @@ public record Mapa(String nombre, String ventana, String ejecutable, List<String
             eGuion = e.get("guion") == null ? null : base.resolve(String.valueOf(e.get("guion"))).normalize();
         }
         return new Mapa(texto(m.getOrDefault("nombre", fichero.getFileName().toString())), ventana, exe, List.copyOf(args),
-                Map.copyOf(controles), eMapa, eGuion);
+                Map.copyOf(controles), eMapa, eGuion, texto(m.getOrDefault("debe_decir", "")));
     }
 
     /** Las formas de encontrar un control, de la mejor a la peor. */

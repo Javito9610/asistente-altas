@@ -324,6 +324,9 @@ public final class App {
         if (!estado.lista()) {
             throw new IllegalStateException("No se ha podido dejar el programa listo: " + estado.comoEsta());
         }
+        if (!mapa.debeDecir().isBlank()) {
+            System.out.println("Comprobado que estamos en «" + mapa.debeDecir() + "».");
+        }
         System.out.println("Programa listo (" + estado.comoEsta() + ").");
 
         // 2. Entrar por el menú.

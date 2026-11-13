@@ -382,6 +382,17 @@ public final class Comprobaciones {
             ok(false, "se puede leer un mapa con entrada: " + e.getMessage());
         }
 
+        // El cerrojo de la empresa: si el mapa dice dónde hay que estar, eso manda.
+        try {
+            java.nio.file.Path dd = java.nio.file.Files.createTempFile("mapa-dd", ".json");
+            java.nio.file.Files.writeString(dd,
+                    "{\"ventana\": \"MN\", \"debe_decir\": \"Empresa de prueba\", \"controles\": {\"a\": [\"b\"]}}");
+            ok("Empresa de prueba".equals(es.amagna.asistente.guion.Mapa.leer(dd).debeDecir()),
+                    "el mapa puede exigir dónde hay que estar («Empresa de prueba»), y eso no se negocia");
+        } catch (java.io.IOException e) {
+            ok(false, "se puede leer «debe_decir»: " + e.getMessage());
+        }
+
         // Nunca quedarse mudo para siempre: si el programa no contesta, se deja por imposible y se avisa.
         long t0espera = System.currentTimeMillis();
         String tarde = es.amagna.asistente.guion.Explorador.conTiempo(1, () -> {

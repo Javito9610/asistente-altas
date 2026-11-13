@@ -175,11 +175,20 @@ public final class Guion {
                 hechos++;
                 continue;
             }
+            boolean opcional = Boolean.TRUE.equals(m.get("opcional"));
             String apodo;
             try {
                 apodo = apodoSuelto != null ? esperarA(ventanaPaso, apodoSuelto, hacer.equals("esperar") ? segundos : 0)
                         : resolver(control, hacer.equals("esperar") ? segundos : 0, ventanaPaso);
             } catch (Fallo f) {
+                // Un paso «opcional» es el que, si no está, no pasa nada: elegir una fila que el programa ya trae
+                // elegida, cerrar un anuncio que hoy no ha salido. Lo que NO es opcional es comprobar dónde hemos
+                // acabado, y eso se hace siempre al final.
+                if (opcional) {
+                    lineas.add("ok     " + hacer + " " + (control.isBlank() ? apodoSuelto : control)
+                            + ": no está, y es opcional. Se sigue.");
+                    continue;
+                }
                 lineas.add("FALLA  " + hacer + " " + control + ": " + f.getMessage());
                 return parte(false, "PARADO en «" + hacer + " " + control + "»: " + f.getMessage(), lineas, hechos, avisos, rescates, clave, ensayo);
             }
@@ -228,6 +237,10 @@ public final class Guion {
                 if (error == null) {
                     lineas.add("ok     RESCATADO por la IA: " + hacer + " " + control);
                 }
+            }
+            if (error != null && opcional) {
+                lineas.add("ok     " + hacer + " " + control + ": no ha salido («" + error + "»), y es opcional. Se sigue.");
+                error = null;
             }
             if (error != null) {
                 lineas.add("FALLA  " + hacer + " " + control + ": " + error);

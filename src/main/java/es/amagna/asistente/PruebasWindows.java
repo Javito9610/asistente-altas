@@ -615,6 +615,37 @@ public final class PruebasWindows {
             pEti.destroy();
         }
 
+        System.out.println("14l) Pasos opcionales: lo que puede no estar no para el trabajo");
+        String vOpc = "prueba-opcional";
+        Process pOpc = new ProcessBuilder(exeJava, "-cp", cp, "es.amagna.asistente.VentanaDePrueba", vOpc, "formulario").inheritIO().start();
+        try {
+            ok(ctrl.esperar(vOpc, null, es.amagna.asistente.manos.Controles.Que.APAREZCA, null, 25).startsWith("Ya está"),
+                    "se abre la ventana");
+            Path mOpc = dirG.resolve("opcional.json");
+            Path gOpc = dirG.resolve("guion-opcional.json");
+            Files.writeString(mOpc, """
+                    {"ventana": "%s", "controles": {"nif": ["campo[1]"]}}""".formatted(vOpc),
+                    java.nio.charset.StandardCharsets.UTF_8);
+            Files.writeString(gOpc, """
+                    {"pasos": [
+                      {"hacer": "pulsar",   "apodo": "boton:Este boton no existe", "opcional": true},
+                      {"hacer": "escribir", "control": "nif", "valor": "SE HA SEGUIDO"}
+                    ]}""", java.nio.charset.StandardCharsets.UTF_8);
+            var parteOpc = new es.amagna.asistente.guion.Guion(ctrl, (VentanasNativas) v,
+                    es.amagna.asistente.guion.Mapa.leer(mOpc), l -> System.out.println("   " + l)).ejecutar(gOpc, false);
+            ok(parteOpc.bien() && "SE HA SEGUIDO".equals(ctrl.valorDe(vOpc, "campo[1]")),
+                    "un paso opcional que no está no para el trabajo: " + parteOpc.resumen());
+            // Pero uno NO opcional sí lo para: la red de seguridad sigue puesta.
+            Files.writeString(gOpc, """
+                    {"pasos": [{"hacer": "pulsar", "apodo": "boton:Este boton no existe"}]}""",
+                    java.nio.charset.StandardCharsets.UTF_8);
+            var parteObl = new es.amagna.asistente.guion.Guion(ctrl, (VentanasNativas) v,
+                    es.amagna.asistente.guion.Mapa.leer(mOpc), l -> System.out.println("   " + l)).ejecutar(gOpc, false);
+            ok(!parteObl.bien(), "y uno que NO es opcional sigue parando el trabajo");
+        } finally {
+            pOpc.destroy();
+        }
+
         System.out.println("15) No se lía con su propia consola, y despierta la ventana si está minimizada");
         // El título de una consola lleva dentro el comando que se escribió, así que buscar «MNprogram» encontraba
         // la consola donde se había escrito «MNprogram»: el asistente se leía a sí mismo.
