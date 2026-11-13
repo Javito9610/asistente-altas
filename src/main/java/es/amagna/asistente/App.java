@@ -139,7 +139,21 @@ public final class App {
             throw new IllegalArgumentException("Falta la ventana. Ejemplo: asistente controles \"Bloc de notas\"");
         }
         int hondo = a.contains("--hondo") ? Integer.parseInt(a.get(a.indexOf("--hondo") + 1)) : 4;
-        System.out.println(new Controles(new VentanasNativas(false)).arbol(a.get(0), hondo));
+        // Al volcarlo a un fichero no hay motivo para quedarse corto: una ficha de gestión tiene cientos de controles.
+        int tope = a.contains("--tope") ? Integer.parseInt(a.get(a.indexOf("--tope") + 1)) : a.contains("--a") ? 3000 : 300;
+        String arbol = new Controles(new VentanasNativas(false)).arbol(a.get(0), hondo, tope);
+        if (!a.contains("--a")) {
+            System.out.println(arbol);
+            return;
+        }
+        Path f = Path.of(a.get(a.indexOf("--a") + 1));
+        try {
+            Files.writeString(f, arbol, java.nio.charset.StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new IllegalStateException("No se ha podido escribir en " + f + ": " + e.getMessage(), e);
+        }
+        System.out.println("Escrito en " + f.toAbsolutePath() + " · " + arbol.lines().count() + " líneas.");
+        System.out.println("OJO: ahí va lo que hubiera en pantalla. Míralo antes de mandárselo a nadie.");
     }
 
     private static void guardarClave() throws IOException {
