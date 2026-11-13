@@ -311,6 +311,12 @@ public final class VentanasNativas implements Ventanas {
      * Si la ventana está minimizada, la restaura: para leer sus controles Windows tiene que tenerla dibujada.
      * Antes esto se le pedía a la persona, que es justo lo que no tiene que pasar. Devuelve true si la ha restaurado.
      */
+    /** El título completo de la ventana que encaja con ese texto, o null. */
+    public String tituloDe(String titulo) {
+        Pointer h = handleDe(titulo);
+        return h == null ? null : Win32.titulo(h);
+    }
+
     public boolean despertar(String titulo) {
         Pointer h = handleDe(titulo);
         if (h == null || !Win32.User32.I.IsIconic(h)) {

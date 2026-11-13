@@ -46,6 +46,7 @@ public final class App {
                 case "agente" -> agente(Arrays.asList(args).subList(1, args.length));
                 case "guion" -> guion(Arrays.asList(args).subList(1, args.length));
                 case "aprender" -> aprender(Arrays.asList(args).subList(1, args.length));
+                case "explorar" -> explorar(Arrays.asList(args).subList(1, args.length));
                 case "agentes" -> es.amagna.asistente.cerebro.Especialista.NOMBRES.forEach(n -> {
                     try {
                         var e = es.amagna.asistente.cerebro.Especialista.cargar(n, MODELO_POR_DEFECTO, Agente.TOPE_TOKENS_POR_DEFECTO);
@@ -68,6 +69,11 @@ public final class App {
                           asistente agentes             (los especialistas que hay)
                           asistente agente "tarea" [--como cartografo] [--vista] [--pasos 20] [--tope-tokens 200000]
                                                    [--modelo claude-sonnet-5-5] [--sin-expediente]
+                          asistente explorar "<ventana>" <plano.json> [--hondo 8]
+                                                        (el plano de TODO el programa, sin abrir nada)
+                          asistente explorar "<ventana>" <plano.json> --recorrer <carpeta>
+                                                        (entra en las pantallas aprobadas y guarda sus controles;
+                                                         solo en la empresa de prueba)
                           asistente aprender "<ventana>" <mapa.json> [--programa "<exe>"]
                                                         (la IA mira el programa y escribe su mapa; el programa
                                                          comprueba una a una que todas sus formas funcionan)
@@ -262,6 +268,38 @@ public final class App {
                     cosa tuya o hay que decidir algo que no te corresponde, termina con PARADO explicándolo.
                     """.formatted(vent, queSeQueria, porQue)).mensaje();
         };
+    }
+
+    /** El plano de todo un programa: primero mirando (gratis y sin riesgo), después entrando en lo aprobado. */
+    private static void explorar(List<String> a) throws IOException {
+        if (a.size() < 2) {
+            throw new IllegalArgumentException("Uso: asistente explorar \"<ventana>\" <plano.json> [--hondo 8] [--recorrer <carpeta>]");
+        }
+        String ventana = a.get(0);
+        Path fichero = Path.of(a.get(1));
+        VentanasNativas ventanas = new VentanasNativas(false);
+        Controles ctrl = new Controles(ventanas);
+        if (a.contains("--recorrer")) {
+            var plano = es.amagna.asistente.guion.Explorador.leerPlano(fichero);
+            long aprobadas = plano.stream().filter(es.amagna.asistente.guion.Explorador.Pantalla::seguro).count();
+            System.out.println("Plano: " + plano.size() + " pantallas, " + aprobadas + " aprobadas para entrar.");
+            System.out.println(es.amagna.asistente.guion.Explorador.recorrer(ctrl, ventanas, ventana, plano,
+                    Path.of(a.get(a.indexOf("--recorrer") + 1)), l -> System.out.println("  " + l)));
+            return;
+        }
+        int hondo = a.contains("--hondo") ? Integer.parseInt(a.get(a.indexOf("--hondo") + 1)) : 8;
+        var plano = es.amagna.asistente.guion.Explorador.plano(ctrl, ventana, hondo);
+        if (plano.isEmpty()) {
+            throw new IllegalStateException("No se ve ningún menú en «" + ventana + "». ¿Es la ventana principal del programa?");
+        }
+        es.amagna.asistente.guion.Explorador.guardarPlano(fichero, ventana, plano);
+        long seguras = plano.stream().filter(es.amagna.asistente.guion.Explorador.Pantalla::seguro).count();
+        System.out.println("Plano de «" + ventana + "»: " + plano.size() + " opciones de menú.");
+        System.out.println("  " + seguras + " parecen pantallas (abrir: true)");
+        System.out.println("  " + (plano.size() - seguras) + " NO se tocan (hacen algo, no abren nada):");
+        plano.stream().filter(p -> !p.seguro()).limit(25).forEach(p -> System.out.println("     · " + p.comoTexto() + " — " + p.motivo()));
+        System.out.println("Escrito en " + fichero.toAbsolutePath() + ".");
+        System.out.println("REPÁSALO: pon «abrir»: false en lo que no quieras que toque, y luego --recorrer.");
     }
 
     /** Cartografiar un programa: lo mira la IA, lo verifica el programa. */

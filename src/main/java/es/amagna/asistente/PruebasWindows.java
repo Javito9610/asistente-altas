@@ -385,6 +385,23 @@ public final class PruebasWindows {
         var releido = es.amagna.asistente.guion.Mapa.leer(fAprendido);
         ok(releido.controles().size() == 2 && releido.ventana().equals(vent), "el mapa aprendido se guarda y se vuelve a leer igual");
 
+        System.out.println("14b) El plano del programa: leer los menús enteros sin abrir ni uno");
+        // El Bloc de notas tiene menús (Archivo, Editar, Ver) y vale para probar lo mismo que haremos con MN.
+        v.activar(clave);
+        var rutas = ctrl.rutasDeMenu(clave, 6);
+        System.out.println("   menús que se ven sin tocar nada: " + rutas.size());
+        rutas.stream().limit(6).forEach(r -> System.out.println("     · " + String.join(" > ", r)));
+        ok(rutas.size() >= 3, "se leen las opciones de menú de un programa sin abrir ninguna");
+        ok(rutas.stream().anyMatch(r -> r.get(r.size() - 1).equalsIgnoreCase("Archivo")),
+                "entre ellas está «Archivo»");
+        // Y pulsar por RUTA, no por nombre suelto (en MN hay nombres repetidos en sitios distintos).
+        String porRuta = ctrl.pulsarRuta(clave, List.of("Archivo"));
+        System.out.println("   pulsar por ruta: " + porRuta);
+        ok(porRuta.startsWith("Pulsado") || porRuta.startsWith("Desplegado"), "se pulsa una opción siguiendo su ruta");
+        manos.tecla("Escape", 1);
+        String noExiste = ctrl.pulsarRuta(clave, List.of("Archivo", "Esto No Existe"));
+        ok(noExiste.startsWith("No se encuentra"), "y si la ruta no existe lo dice, sin pulsar nada al azar");
+
         System.out.println("15) No se lía con su propia consola, y despierta la ventana si está minimizada");
         // El título de una consola lleva dentro el comando que se escribió, así que buscar «MNprogram» encontraba
         // la consola donde se había escrito «MNprogram»: el asistente se leía a sí mismo.

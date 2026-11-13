@@ -124,6 +124,119 @@ public final class Controles {
         }
     }
 
+    /** Todas las rutas de menú de una ventana: ["Bases de Datos", "Clientes"], etc. Solo mira: no abre nada. */
+    public List<List<String>> rutasDeMenu(String tituloVentana, int hondo) {
+        ventanas.despertar(tituloVentana);
+        Pointer hwnd = ventanas.handleDe(tituloVentana);
+        List<List<String>> rutas = new ArrayList<>();
+        if (hwnd == null) {
+            return rutas;
+        }
+        Uia.Elemento raiz = Uia.deVentana(hwnd);
+        if (raiz == null) {
+            return rutas;
+        }
+        try {
+            recogerMenus(raiz, new ArrayList<>(), rutas, Math.max(2, hondo));
+        } finally {
+            raiz.close();
+        }
+        return rutas;
+    }
+
+    private void recogerMenus(Uia.Elemento e, List<String> camino, List<List<String>> fuera, int quedan) {
+        for (Uia.Elemento h : e.hijos()) {
+            try {
+                if (fuera.size() > 600) {
+                    return;
+                }
+                boolean esMenu = h.tipo().equals("opcion-de-menu");
+                String nombre = h.nombre().strip();
+                List<String> aqui = camino;
+                if (esMenu && !nombre.isBlank()) {
+                    aqui = new ArrayList<>(camino);
+                    aqui.add(nombre);
+                    if (!fuera.contains(aqui)) {
+                        fuera.add(aqui);
+                    }
+                }
+                if (quedan > 1) {
+                    recogerMenus(h, aqui, fuera, quedan - 1);
+                }
+            } finally {
+                h.close();
+            }
+        }
+    }
+
+    /** Pulsa una opción de menú siguiendo su ruta exacta, no por su nombre suelto (en MN hay nombres repetidos). */
+    public String pulsarRuta(String tituloVentana, List<String> ruta) {
+        ventanas.despertar(tituloVentana);
+        Pointer hwnd = ventanas.handleDe(tituloVentana);
+        if (hwnd == null) {
+            return "No hay ninguna ventana cuyo título contenga «" + tituloVentana + "».";
+        }
+        Uia.Elemento raiz = Uia.deVentana(hwnd);
+        if (raiz == null) {
+            return sinUia();
+        }
+        try {
+            Uia.Elemento actual = null;
+            for (int i = 0; i < ruta.size(); i++) {
+                Uia.Elemento donde = actual == null ? raiz : actual;
+                Uia.Elemento hijo = hijoLlamado(donde, ruta.get(i), 6);
+                if (actual != null) {
+                    actual.close();
+                }
+                if (hijo == null) {
+                    return "No se encuentra «" + ruta.get(i) + "» dentro de " + String.join(" > ", ruta.subList(0, i))
+                            + " (ruta: " + String.join(" > ", ruta) + ").";
+                }
+                actual = hijo;
+                if (i < ruta.size() - 1) {
+                    actual.desplegar();
+                    try {
+                        Thread.sleep(250);
+                    } catch (InterruptedException ex) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+            }
+            if (actual == null) {
+                return "Ruta vacía.";
+            }
+            try (Uia.Elemento fin = actual) {
+                if (!fin.activo()) {
+                    return "La opción «" + String.join(" > ", ruta) + "» está desactivada.";
+                }
+                return fin.pulsar() ? "Pulsado " + String.join(" > ", ruta)
+                        : fin.desplegar() ? "Desplegado " + String.join(" > ", ruta)
+                        : "No se ha dejado pulsar «" + String.join(" > ", ruta) + "».";
+            }
+        } finally {
+            raiz.close();
+        }
+    }
+
+    private Uia.Elemento hijoLlamado(Uia.Elemento e, String nombre, int quedan) {
+        String buscado = llano(nombre);
+        for (Uia.Elemento h : e.hijos()) {
+            if (llano(h.nombre()).equals(buscado)) {
+                return h;
+            }
+            if (quedan > 1) {
+                Uia.Elemento dentro = hijoLlamado(h, nombre, quedan - 1);
+                h.close();
+                if (dentro != null) {
+                    return dentro;
+                }
+            } else {
+                h.close();
+            }
+        }
+        return null;
+    }
+
     // ---------- buscar ----------
 
     /** Quita acentos, símbolos de atajo y los dos puntos del final: «&Nombre:» y «nombre» se parecen. */

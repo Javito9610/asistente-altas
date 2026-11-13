@@ -293,6 +293,34 @@ public final class Comprobaciones {
             ok(true, "una respuesta sin mapa se rechaza en vez de dar por bueno un mapa vacío");
         }
 
+        // --- El explorador: qué menú abre una pantalla y qué menú HACE algo ---
+        ok(es.amagna.asistente.guion.Explorador.porQueNoSeToca(List.of("Bases de Datos", "Clientes")) == null
+                && es.amagna.asistente.guion.Explorador.porQueNoSeToca(List.of("Expedientes", "Expedientes")) == null,
+                "una pantalla normal se puede abrir");
+        ok(es.amagna.asistente.guion.Explorador.porQueNoSeToca(List.of("Fichaje", "Inicio Jornada")) != null,
+                "«Fichaje > Inicio Jornada» NO se abre: te fichar\u00eda la entrada");
+        ok(es.amagna.asistente.guion.Explorador.porQueNoSeToca(List.of("Contabilidad", "Utilidades", "Cierre/Apertura Ejercicio", "Cierre Ejercicio")) != null
+                && es.amagna.asistente.guion.Explorador.porQueNoSeToca(List.of("Expedientes", "Papelera de Reciclaje")) != null,
+                "cerrar el ejercicio y la papelera tampoco se tocan");
+        ok(es.amagna.asistente.guion.Explorador.porQueNoSeToca(List.of("Contabilidad", "Utilidades", "Actualizar %IVA")) != null,
+                "ni «Actualizar %IVA», que suena inofensivo y cambia datos de todos");
+        try {
+            java.nio.file.Path fp = java.nio.file.Files.createTempFile("plano", ".json");
+            es.amagna.asistente.guion.Explorador.guardarPlano(fp, "MNprogram", List.of(
+                    new es.amagna.asistente.guion.Explorador.Pantalla(List.of("Bases de Datos", "Clientes"), true, null),
+                    new es.amagna.asistente.guion.Explorador.Pantalla(List.of("Fichaje", "Inicio Jornada"), false, "peligrosa")));
+            var leido = es.amagna.asistente.guion.Explorador.leerPlano(fp);
+            ok(leido.size() == 2 && leido.get(0).seguro() && !leido.get(1).seguro(),
+                    "el plano se guarda y se vuelve a leer con lo aprobado y lo prohibido");
+            // Y aunque alguien ponga a mano «abrir: true» en una peligrosa, sigue sin tocarse.
+            java.nio.file.Files.writeString(fp, java.nio.file.Files.readString(fp).replace("\"abrir\":false", "\"abrir\":true"));
+            var forzado = es.amagna.asistente.guion.Explorador.leerPlano(fp);
+            ok(!forzado.get(1).seguro(),
+                    "si alguien aprueba a mano una peligrosa, se sigue sin abrir: la lista negra manda sobre el fichero");
+        } catch (java.io.IOException e) {
+            ok(false, "el plano se puede guardar: " + e.getMessage());
+        }
+
         // --- Los especialistas: cada uno con lo suyo, y con las manos atadas para lo demás ---
         try {
             var carto = es.amagna.asistente.cerebro.Especialista.cargar("cartografo", "modelo-por-defecto", 999);
