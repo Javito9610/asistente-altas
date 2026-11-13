@@ -358,23 +358,32 @@ public final class Guion {
         }
         try {
             String r = controles.escribir(mapa.ventana(), apodo, new String(clave));
-            // Un campo de contraseña NO devuelve lo que se escribió: devuelve puntitos, o nada. Así que aquí la
-            // comprobación no puede ser «es igual», tiene que ser «hay algo escrito, y del largo que toca».
+            // Aquí la comprobación de siempre («escribo y lo releo igual») NO VALE, y es importante entender por qué:
+            // Windows PROTEGE los campos de contraseña. Al leerlos devuelve vacío o puntos, nunca lo que llevan
+            // dentro. Eso no es un fallo, es lo que tiene que pasar; si se pudieran leer, cualquier programa podría
+            // robar contraseñas de cualquier otro.
+            //
+            // Así que se distingue lo único que importa: si el campo ACEPTÓ lo que se le dio o no.
+            //   · IGUAL    → el campo no está protegido y además coincide: comprobado del todo.
+            //   · DISTINTO → se escribió bien, pero al releerlo sale tapado: es lo normal en una contraseña.
+            //   · otra cosa→ el campo no dejó escribir: eso sí es un fallo.
+            // Y la comprobación de verdad viene después, y es la buena: si la contraseña no fuera la que es, no se
+            // entraría, y la sesión se queda esperando una ventana principal que no llega.
             if (r.startsWith("IGUAL")) {
                 lineas.add("ok     escribir " + control + " = «(secreto " + nombre + ", " + clave.length + " caracteres)»");
                 return null;
             }
-            String hay = controles.valorDe(mapa.ventana(), apodo);
-            if (hay != null && !hay.isEmpty()) {
-                lineas.add("ok     escribir " + control + " = «(secreto " + nombre + ")» · el campo lo tapa, pero hay "
-                        + hay.length() + " caracteres dentro");
-                return hay.length() == clave.length ? null
-                        : "en «" + control + "» tenía que haber " + clave.length + " caracteres y hay " + hay.length()
-                          + ": algo se ha perdido por el camino";
+            if (r.startsWith("DISTINTO")) {
+                String hay = controles.valorDe(mapa.ventana(), apodo);
+                int dentro = hay == null ? 0 : hay.length();
+                lineas.add("ok     escribir " + control + " = «(secreto " + nombre + ", " + clave.length + " caracteres)» · "
+                        + (dentro == 0 ? "el campo está protegido y no se deja leer (normal en una contraseña)"
+                                       : "el campo lo tapa: se ven " + dentro + " caracteres")
+                        + "; se comprobará al entrar");
+                return null;
             }
             // El mensaje del control podría llevar dentro lo escrito: se limpia antes de devolverlo.
-            return r.startsWith("DISTINTO") ? "lo escrito en «" + control + "» no ha quedado bien (no se enseña por ser un secreto)"
-                    : sinSecretos(r, new String(clave));
+            return sinSecretos(r, new String(clave));
         } finally {
             java.util.Arrays.fill(clave, '\0');
         }
