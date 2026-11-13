@@ -53,6 +53,11 @@ public final class Controles {
 
     /** Lo que el asistente «ve por dentro» de una ventana, en texto. */
     public String arbol(String tituloVentana, int profundidad) {
+        return arbol(tituloVentana, profundidad, TOPE);
+    }
+
+    /** Igual, pero diciendo cuántos controles como mucho (una ficha de un programa de gestión tiene muchos). */
+    public String arbol(String tituloVentana, int profundidad, int tope) {
         ventanas.despertar(tituloVentana);
         Pointer hwnd = ventanas.handleDe(tituloVentana);
         if (hwnd == null) {
@@ -65,11 +70,11 @@ public final class Controles {
         StringBuilder b = new StringBuilder("Controles de «" + Win32.titulo(hwnd) + "»:\n");
         int[] cuenta = {0};
         try {
-            pintar(raiz, b, "", Math.max(1, profundidad), cuenta);
+            pintar(raiz, b, "", Math.max(1, profundidad), cuenta, tope);
         } finally {
             raiz.close();
         }
-        if (cuenta[0] >= TOPE) {
+        if (cuenta[0] >= tope) {
             b.append("… (hay más; busca uno concreto por su nombre)\n");
         }
         return b.toString().strip();
@@ -80,10 +85,10 @@ public final class Controles {
                 + ". Con este programa hay que mirar la pantalla y usar el ratón y el teclado.";
     }
 
-    private void pintar(Uia.Elemento e, StringBuilder b, String sangria, int quedan, int[] cuenta) {
+    private void pintar(Uia.Elemento e, StringBuilder b, String sangria, int quedan, int[] cuenta, int tope) {
         for (Uia.Elemento h : e.hijos()) {
             try {
-                if (cuenta[0]++ >= TOPE) {
+                if (cuenta[0]++ >= tope) {
                     return;
                 }
                 String nombre = h.nombre();
@@ -111,7 +116,7 @@ public final class Controles {
                     b.append('\n');
                 }
                 if (quedan > 1) {
-                    pintar(h, b, interesa ? sangria + "   " : sangria, quedan - 1, cuenta);
+                    pintar(h, b, interesa ? sangria + "   " : sangria, quedan - 1, cuenta, tope);
                 }
             } finally {
                 h.close();
