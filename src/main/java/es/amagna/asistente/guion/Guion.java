@@ -140,7 +140,9 @@ public final class Guion {
         }
 
         // Lo escrito se apunta para la doble lectura del final.
-        Map<String, String[]> escrito = new LinkedHashMap<>(); // control -> {apodo que funcionó, valor}
+        // Cada dato escrito se apunta CON SU VENTANA: un trabajo pasa por varias, y hay que releer cada cosa donde
+        // se escribió, no donde empezó todo.
+        Map<String, String[]> escrito = new LinkedHashMap<>(); // control -> {apodo, valor, ventana}
         java.util.Set<String> yaAvisado = new java.util.HashSet<>();
         int hechos = 0;
         int rescates = 0;
@@ -232,7 +234,10 @@ public final class Guion {
                 return parte(false, "PARADO en «" + hacer + " " + control + "»: " + error, lineas, hechos, avisos, rescates, clave, ensayo);
             }
             if (valor == null || !valor.startsWith("secreto:")) {
-                lineas.add("ok     " + hacer + " " + control + (valor == null ? "" : " = «" + valor + "»"));
+                String comoSeLlama = control.isBlank() ? apodoSuelto : control;
+                lineas.add("ok     " + hacer + " " + comoSeLlama
+                        + (ventanaPaso.equals(mapa.ventana()) ? "" : " [" + ventanaPaso + "]")
+                        + (valor == null ? "" : " = «" + valor + "»"));
             }
             hechos++;
 
@@ -270,13 +275,16 @@ public final class Guion {
             // Si la pantalla ya no está, no hay nada que releer: ESO es exactamente lo que tenía que pasar. Una
             // pantalla de entrada se cierra al entrar, y un diálogo se cierra al aceptarlo. Pedirle cuentas a una
             // ventana que ya ha hecho su trabajo y se ha ido no tiene ningún sentido.
-            boolean sigueAhi = ventanas != null && ventanas.handleDe(mapa.ventana()) != null;
-            if (!sigueAhi) {
-                lineas.add("ok     la pantalla «" + mapa.ventana() + "» ya se ha cerrado: hizo lo que tenía que hacer");
-            }
             List<String> noSePudo = new ArrayList<>();
-            for (Map.Entry<String, String[]> e : sigueAhi ? escrito.entrySet() : java.util.Map.<String, String[]>of().entrySet()) {
-                String hay = controles.valorDe(mapa.ventana(), e.getValue()[0]);
+            for (Map.Entry<String, String[]> e : escrito.entrySet()) {
+                // Si la pantalla donde se escribió ya no está, no hay nada que releer: eso es exactamente lo que
+                // tenía que pasar (una pantalla de entrada se cierra al entrar).
+                if (ventanas != null && ventanas.handleDe(e.getValue()[2]) == null) {
+                    lineas.add("ok     la pantalla «" + e.getValue()[2] + "» ya se ha cerrado: hizo lo que tenía que hacer");
+                    noSePudo.add("«" + e.getKey() + "»");
+                    continue;
+                }
+                String hay = controles.valorDe(e.getValue()[2], e.getValue()[0]);
                 // «No he podido leerlo» NO es «está mal», y meterlo en el mismo saco es un error de bulto: la pantalla
                 // puede haberse cerrado, haber cambiado, o tener un aviso encima que impide leerla (es justo lo que
                 // hace MN, que al entrar saca su configuración de OneDrive tapando la pantalla de entrada). Dar por
@@ -296,7 +304,7 @@ public final class Guion {
                 return parte(false, "PARADO en la comprobación final: " + String.join("; ", mal), lineas, hechos, avisos, rescates, clave, ensayo);
             }
             int comprobados = escrito.size() - noSePudo.size();
-            if (sigueAhi && comprobados > 0) {
+            if (comprobados > 0) {
                 lineas.add("ok     doble lectura: los " + comprobados + " datos que se han podido releer siguen siendo exactos");
             }
         }
@@ -345,7 +353,7 @@ public final class Guion {
                 if (!e.startsWith("IGUAL")) {
                     return e;
                 }
-                escrito.put(control, new String[] {apodo, valor});
+                escrito.put(control + " (" + ventana + ")", new String[] {apodo, valor, ventana});
                 return null;
             case "pulsar":
                 String p = controles.pulsar(ventana, apodo);
