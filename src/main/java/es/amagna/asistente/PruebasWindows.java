@@ -299,7 +299,7 @@ public final class PruebasWindows {
                     "guardar": ["boton:Guardar"]
                   }
                 }""".formatted(vent, exeJava, cp, vent), java.nio.charset.StandardCharsets.UTF_8);
-        String clave = "prueba-" + System.nanoTime();
+        String claveGuion = "prueba-" + System.nanoTime();
         Files.writeString(fGuion, """
                 {
                   "clave": "%s",
@@ -310,7 +310,7 @@ public final class PruebasWindows {
                     {"hacer": "comprobar", "control": "nif", "valor": "00000000T"},
                     {"hacer": "pulsar",    "control": "guardar", "toca": true}
                   ]
-                }""".formatted(clave), java.nio.charset.StandardCharsets.UTF_8);
+                }""".formatted(claveGuion), java.nio.charset.StandardCharsets.UTF_8);
 
         es.amagna.asistente.guion.Mapa mapa = es.amagna.asistente.guion.Mapa.leer(fMapa);
         es.amagna.asistente.guion.Guion gui = new es.amagna.asistente.guion.Guion(ctrl, (VentanasNativas) v, mapa, l -> System.out.println("   " + l));
@@ -334,7 +334,7 @@ public final class PruebasWindows {
         var otra = gui.ejecutar(fGuion, false);
         System.out.println("   al repetirlo: " + otra.resumen());
         ok(!otra.bien() && otra.resumen().startsWith("NO SE REPITE"), "un trabajo ya hecho NO se vuelve a hacer");
-        Files.deleteIfExists(es.amagna.asistente.guion.Guion.carpetaHechos().resolve(clave + ".txt"));
+        Files.deleteIfExists(es.amagna.asistente.guion.Guion.carpetaHechos().resolve(claveGuion + ".txt"));
 
         System.out.println("13) Cuando el guion se atasca, entra la IA, lo arregla y el guion sigue");
         // Un paso imposible a propósito: comprobar un valor que nadie ha puesto. En vez de la IA de verdad se pone
