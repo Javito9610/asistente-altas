@@ -72,7 +72,8 @@ public final class App {
                           asistente explorar "<ventana>" <plano.json> [--hondo 8] [--sin-ia]
                                                         (el plano de TODO el programa, sin abrir nada; la IA dice
                                                          cuáles abren pantalla y cuáles ejecutan algo)
-                          asistente explorar "<ventana>" <plano.json> --recorrer <carpeta> [--solo "Clientes,Expedientes"] [--despacio 3]
+                          asistente explorar "<ventana>" <plano.json> --recorrer <carpeta> [--solo "Clientes,Expedientes"]
+                                                        [--despacio 3] [--sin-aviso]
                                                         (entra en las pantallas aprobadas y guarda sus controles;
                                                          solo en la empresa de prueba)
                           asistente aprender "<ventana>" <mapa.json> [--programa "<exe>"]
@@ -221,6 +222,9 @@ public final class App {
         registro.accept(String.format("Pasos: %d · %.0f s · tokens: %d de entrada (+%d leídos de caché), %d de salida", r.pasos(),
                 (System.currentTimeMillis() - t0) / 1000.0, r.tokensEntrada(), r.tokensCache(), r.tokensSalida()));
         registro.accept("Registro: " + log.toAbsolutePath());
+        if (!a.contains("--sin-aviso")) {
+            es.amagna.asistente.manos.Aviso.avisar("Asistente Altas", r.mensaje(), !r.terminado());
+        }
         if (ag.expediente() != null && ag.expediente().sirve()) {
             registro.accept("Expediente (lo que hizo, con capturas): " + ag.expediente().carpeta().resolve("informe.html"));
         }
@@ -245,6 +249,9 @@ public final class App {
             System.out.println("IA de guardia: solo entra si el guion se atasca.");
         }
         var parte = guion.ejecutar(Path.of(a.get(1)), ensayo);
+        if (!a.contains("--sin-aviso")) {
+            es.amagna.asistente.manos.Aviso.avisar("Asistente Altas", parte.resumen(), !parte.bien());
+        }
         System.exit(parte.bien() ? 0 : 1);
     }
 
@@ -290,8 +297,13 @@ public final class App {
             long aprobadas = plano.stream().filter(es.amagna.asistente.guion.Explorador.Pantalla::seguro).count();
             System.out.println("Plano: " + plano.size() + " pantallas, " + aprobadas + " aprobadas para entrar.");
             double espera = a.contains("--despacio") ? Double.parseDouble(a.get(a.indexOf("--despacio") + 1)) : 1.5;
-            System.out.println(es.amagna.asistente.guion.Explorador.recorrer(ctrl, ventanas, ventana, plano,
-                    Path.of(a.get(a.indexOf("--recorrer") + 1)), espera, l -> System.out.println("  " + l)));
+            String parte = es.amagna.asistente.guion.Explorador.recorrer(ctrl, ventanas, ventana, plano,
+                    Path.of(a.get(a.indexOf("--recorrer") + 1)), espera, l -> System.out.println("  " + l));
+            System.out.println(parte);
+            // Un recorrido largo acaba cuando la persona ya se ha ido a otra cosa: hay que avisarla.
+            if (!a.contains("--sin-aviso")) {
+                es.amagna.asistente.manos.Aviso.avisarYEsperar("Asistente Altas: recorrido terminado", parte, 120);
+            }
             return;
         }
         int hondo = a.contains("--hondo") ? Integer.parseInt(a.get(a.indexOf("--hondo") + 1)) : 8;

@@ -246,7 +246,7 @@ public final class Explorador {
                 registro.accept("   (venía bloqueado; se han cerrado: " + String.join(", ", bloqueos) + ")");
             }
             registro.accept("→ " + p.comoTexto());
-            String antes = ventanas.abiertas();
+            java.util.Set<Long> antes = new java.util.HashSet<>(VentanasNativas.instantanea().keySet());
             String r = ctrl.pulsarRuta(ventana, p.ruta());
             if (!r.startsWith("Pulsado")) {
                 incidencias.add(p.comoTexto() + ": no se pudo entrar (" + r + ")");
@@ -257,33 +257,47 @@ public final class Explorador {
                 }
                 continue;
             }
-            esperarQuieto(espera);
 
-            // ¿Ha salido un aviso o un diálogo encima? Se anota, se cierra y se sigue: esa pantalla la verá una persona.
-            String ahora = ventanas.abiertas();
-            if (ahora.contains("BLOQUEADA")) {
+            // Hay que ESPERAR a que la ventana aparezca de verdad, no un rato a ojo. Las pantallas grandes de MN
+            // (Clientes, Expedientes) tardan bastante más que las pequeñas, y volcar la ventana principal mientras
+            // tanto da un fichero que no sirve para nada y encima parece bueno.
+            Long nuevaH = esperarVentanaNueva(antes, Math.max(espera, 2) * 6);
+            if (nuevaH == null) {
+                String bloqueada = ventanas.abiertas().contains("BLOQUEADA")
+                        ? " (hay algo bloqueando: " + String.join(", ", ventanas.cancelarBloqueos()) + ")" : "";
+                incidencias.add(p.comoTexto() + ": no se ha abierto ninguna ventana" + bloqueada
+                        + ". O no abre pantalla, o tarda más de la cuenta: hay que verla con una persona delante.");
+                resumen.add("- " + p.comoTexto() + " · NO ABRIÓ NINGUNA VENTANA");
+                registro.accept("   no se ha abierto ninguna ventana; se anota y se sigue");
+                seguidosMal = 0;
+                continue;
+            }
+            String nueva = VentanasNativas.instantanea().get(nuevaH);
+            esperarQuieto(espera); // un respiro para que termine de pintarse
+
+            if (ventanas.abiertas().contains("BLOQUEADA")) {
                 List<String> cerrado = ventanas.cancelarBloqueos();
-                incidencias.add(p.comoTexto() + ": al entrar sale un aviso o pide algo (" + String.join(", ", cerrado)
-                        + "). Esta pantalla hay que verla con una persona delante.");
+                incidencias.add(p.comoTexto() + ": al entrar pide algo (" + String.join(", ", cerrado)
+                        + "). Hay que verla con una persona delante.");
                 resumen.add("- " + p.comoTexto() + " · PIDE ALGO AL ENTRAR (no cartografiada)");
+                cerrarDeVerdad(ventanas, nuevaH, nueva);
                 seguidosMal = 0;
                 continue;
             }
             seguidosMal = 0;
 
-            String nueva = ventanaNueva(ventanas, antes);
-            String deQuien = nueva != null ? nueva : ventana;
-            String arbol = ctrl.arbol(deQuien, 14, 3000);
+            String arbol = ctrl.arbol(nueva, 14, 3000);
             Path f = carpeta.resolve(limpio(p.comoTexto()) + ".txt");
-            Files.writeString(f, "Pantalla: " + p.comoTexto() + "\nVentana: " + deQuien + "\n\n" + arbol, StandardCharsets.UTF_8);
+            Files.writeString(f, "Pantalla: " + p.comoTexto() + "\nVentana: " + nueva + "\n\n" + arbol, StandardCharsets.UTF_8);
             long lineas = arbol.lines().count();
-            registro.accept("   " + lineas + " líneas → " + f.getFileName());
-            resumen.add("- " + p.comoTexto() + " · " + lineas + " líneas · " + f.getFileName());
+            registro.accept("   «" + nueva + "» · " + lineas + " líneas → " + f.getFileName());
+            resumen.add("- " + p.comoTexto() + " · ventana «" + nueva + "» · " + lineas + " líneas · " + f.getFileName());
             hechas++;
-            if (nueva != null) {
-                ventanas.cerrarVentana(nueva); // la hemos abierto nosotros al entrar
-                esperarQuieto(Math.min(1.5, espera));
-                ventanas.cancelarBloqueos(); // por si al cerrar pregunta algo
+
+            // Y se cierra. Si no, se van apilando pantallas hasta que MN se atasca.
+            if (!cerrarDeVerdad(ventanas, nuevaH, nueva)) {
+                incidencias.add(p.comoTexto() + ": la pantalla «" + nueva + "» no se ha dejado cerrar; ciérrala tú.");
+                registro.accept("   OJO: «" + nueva + "» no se ha cerrado");
             }
         }
         return parada(carpeta, resumen, incidencias, hechas, saltadas, null);
@@ -305,18 +319,32 @@ public final class Explorador {
                 + ". Todo en " + carpeta.toAbsolutePath() + " (empieza por resumen.md).";
     }
 
-    private static String ventanaNueva(VentanasNativas ventanas, String antes) {
-        for (String linea : ventanas.abiertas().split("\n")) {
-            int a = linea.indexOf('«');
-            int b = linea.indexOf('»');
-            if (a >= 0 && b > a) {
-                String t = linea.substring(a + 1, b);
-                if (!antes.contains("«" + t + "»")) {
-                    return t;
+    /** Espera a que aparezca una ventana que antes no estaba, mirando de verdad. Devuelve cuál, o null. */
+    private static Long esperarVentanaNueva(java.util.Set<Long> antes, double segundos) {
+        long fin = System.currentTimeMillis() + (long) (segundos * 1000);
+        do {
+            for (Map.Entry<Long, String> e : VentanasNativas.instantanea().entrySet()) {
+                if (!antes.contains(e.getKey()) && !e.getValue().isBlank()) {
+                    return e.getKey();
                 }
             }
-        }
+            esperarQuieto(0.3);
+        } while (System.currentTimeMillis() < fin);
         return null;
+    }
+
+    /** Cierra una pantalla y comprueba que se ha ido; si pregunta algo al salir, se cancela. */
+    private static boolean cerrarDeVerdad(VentanasNativas ventanas, long handle, String titulo) {
+        for (int intento = 1; intento <= 3; intento++) {
+            ventanas.cerrarVentana(titulo);
+            esperarQuieto(0.6);
+            ventanas.cancelarBloqueos();
+            esperarQuieto(0.3);
+            if (!VentanasNativas.instantanea().containsKey(handle)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void esperarQuieto(double segundos) {

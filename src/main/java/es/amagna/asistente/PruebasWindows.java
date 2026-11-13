@@ -405,6 +405,14 @@ public final class PruebasWindows {
         String noExiste = ctrl.pulsarRuta(clave, List.of(menuArchivo, "Esto No Existe"));
         ok(noExiste.startsWith("No se encuentra"), "y si la ruta no existe lo dice, sin pulsar nada al azar");
 
+        System.out.println("14c) El aviso: que dé señales de vida al terminar algo largo");
+        long t4 = System.currentTimeMillis();
+        es.amagna.asistente.manos.Aviso.avisar("Asistente Altas (prueba)", "Esto es el globito de aviso.", false);
+        long tardoAviso = System.currentTimeMillis() - t4;
+        System.out.println("   el aviso ha tardado " + tardoAviso + " ms");
+        ok(tardoAviso < 4000, "avisar no bloquea el trabajo (" + tardoAviso + " ms)");
+        ok(java.awt.SystemTray.isSupported(), "este Windows tiene bandeja de sistema para el globito");
+
         System.out.println("15) No se lía con su propia consola, y despierta la ventana si está minimizada");
         // El título de una consola lleva dentro el comando que se escribió, así que buscar «MNprogram» encontraba
         // la consola donde se había escrito «MNprogram»: el asistente se leía a sí mismo.
