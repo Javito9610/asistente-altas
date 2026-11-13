@@ -115,10 +115,16 @@ public final class Guion {
         for (Object o : pasos) {
             if (o instanceof Map<?, ?> crudo && crudo.get("valor") != null) {
                 String v = String.valueOf(crudo.get("valor"));
-                if (v.startsWith("secreto:") && !es.amagna.asistente.manos.Secreto.hay(v.substring("secreto:".length()))) {
-                    String cual = v.substring("secreto:".length());
-                    return new Parte(false, "NO SE EMPIEZA: falta la contraseña «" + cual + "». Guárdala con «asistente secreto "
-                            + cual + "» y vuelve a lanzarlo.", lineas, 0, 0, 0);
+                String cual = v.startsWith("secreto:") ? v.substring("secreto:".length())
+                        : v.startsWith("usuario:") ? v.substring("usuario:".length()) : null;
+                if (cual != null) {
+                    boolean falta = v.startsWith("secreto:") ? !es.amagna.asistente.manos.Secreto.hay(cual)
+                            : es.amagna.asistente.manos.Secreto.usuario(cual) == null;
+                    if (falta) {
+                        return new Parte(false, "NO SE EMPIEZA: falta " + (v.startsWith("secreto:") ? "la contraseña" : "el usuario")
+                                + " de «" + cual + "». Guárdalo con «asistente secreto " + cual + "» y vuelve a lanzarlo.",
+                                lineas, 0, 0, 0);
+                    }
                 }
             }
         }
@@ -265,6 +271,19 @@ public final class Guion {
                 // Nunca se enseña, nunca se apunta en el parte, y la comprobación es «hay algo escrito», no qué.
                 if (valor.startsWith("secreto:")) {
                     return escribirSecreto(control, apodo, valor.substring("secreto:".length()), ensayo, lineas);
+                }
+                // «usuario:mn» = el usuario guardado junto a esa contraseña. Este sí se puede ver y comprobar.
+                if (valor.startsWith("usuario:")) {
+                    String cual = valor.substring("usuario:".length());
+                    try {
+                        String u = es.amagna.asistente.manos.Secreto.usuario(cual);
+                        if (u == null) {
+                            return "no hay usuario guardado para «" + cual + "»: guárdalo con «asistente secreto " + cual + "»";
+                        }
+                        valor = u;
+                    } catch (IOException e) {
+                        return "no se ha podido leer el usuario de «" + cual + "»: " + e.getMessage();
+                    }
                 }
                 if (ensayo) {
                     lineas.add("ENSAYO escribir " + control + " (" + apodo + "): encontrado, NO se escribe");

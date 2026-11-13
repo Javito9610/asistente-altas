@@ -49,10 +49,14 @@ public final class App {
                 case "explorar" -> explorar(Arrays.asList(args).subList(1, args.length));
                 case "secreto" -> guardarSecreto(Arrays.asList(args).subList(1, args.length));
                 case "sesion" -> sesion(Arrays.asList(args).subList(1, args.length));
+                case "arranque" -> arranque(Arrays.asList(args).subList(1, args.length));
                 case "secretos" -> {
                     var n = es.amagna.asistente.manos.Secreto.nombres();
                     System.out.println(n.isEmpty() ? "No hay ningún secreto guardado." : "Secretos guardados (solo los nombres):");
-                    n.forEach(x -> System.out.println("  " + x));
+                    for (String x : n) {
+                        String u = es.amagna.asistente.manos.Secreto.usuario(x);
+                        System.out.println("  " + x + (u == null ? "  (sin usuario guardado)" : "  ·  usuario: " + u));
+                    }
                     System.out.println("Están en " + es.amagna.asistente.manos.Secreto.carpeta()
                             + ", cifrados con tu cuenta de Windows: nadie más puede leerlos, ni en otro ordenador.");
                 }
@@ -78,11 +82,14 @@ public final class App {
                           asistente agentes             (los especialistas que hay)
                           asistente agente "tarea" [--como cartografo] [--vista] [--pasos 20] [--tope-tokens 200000]
                                                    [--modelo claude-sonnet-5-5] [--sin-expediente]
+                          asistente arranque --instalar <mapa.json> [--entrar <g>] [--debe-decir "..."] | --quitar | --ver
+                                                        (que al encender el ordenador se abra solo y entre)
                           asistente sesion <mapa.json> [--entrar guion-entrada.json] [--debe-decir "Empresa de prueba"]
                                                         (comprueba que el programa está vivo y dentro; si no, lo
                                                          arregla: avisos, menús, pantallas sueltas, reiniciar y entrar)
-                          asistente secreto <nombre> [--olvidar]
-                                                        (guarda una contraseña cifrada con tu cuenta de Windows)
+                          asistente secreto <nombre> [--usuario <u>] [--olvidar]
+                                                        (guarda el usuario y su contraseña, cifrada con tu cuenta
+                                                         de Windows)
                           asistente secretos            (los nombres de los secretos guardados, nunca su valor)
                           asistente explorar "<ventana>" <plano.json> [--hondo 8] [--sin-ia]
                                                         (el plano de TODO el programa, sin abrir nada; la IA dice
@@ -293,6 +300,49 @@ public final class App {
         };
     }
 
+    /** Que al iniciar sesión en Windows el asistente se ponga en marcha él solo. */
+    private static void arranque(List<String> a) throws IOException {
+        if (a.contains("--quitar")) {
+            System.out.println(es.amagna.asistente.Arranque.quitar());
+            return;
+        }
+        if (a.contains("--ver") || a.isEmpty()) {
+            System.out.println(es.amagna.asistente.Arranque.instalado()
+                    ? "Instalado:\n" + es.amagna.asistente.Arranque.ver()
+                    : "No está instalado. Ponlo con: asistente arranque --instalar <mapa.json>");
+            return;
+        }
+        if (!a.contains("--instalar")) {
+            throw new IllegalArgumentException("Uso: asistente arranque --instalar <mapa.json> [--entrar <g>] [--debe-decir \"...\"] | --quitar | --ver");
+        }
+        String mapa = a.get(a.indexOf("--instalar") + 1);
+        StringBuilder que = new StringBuilder("sesion \"" + Path.of(mapa).toAbsolutePath() + "\"");
+        if (a.contains("--entrar")) {
+            que.append(" --entrar \"").append(Path.of(a.get(a.indexOf("--entrar") + 1)).toAbsolutePath()).append('"');
+        }
+        if (a.contains("--debe-decir")) {
+            que.append(" --debe-decir \"").append(a.get(a.indexOf("--debe-decir") + 1)).append('"');
+        }
+        que.append(" --sin-aviso");
+        Path cmd = Path.of(System.getProperty("user.dir"), "asistente.cmd");
+        if (!Files.isRegularFile(cmd)) {
+            throw new IllegalStateException("No encuentro asistente.cmd en " + cmd + ". Lanza esto desde la carpeta del proyecto.");
+        }
+        String r = es.amagna.asistente.Arranque.instalar(cmd, que.toString());
+        System.out.println(r);
+        if (r.startsWith("ERROR")) {
+            System.out.println("Si dice que no tienes permiso, abre la consola como administrador y repite.");
+            System.exit(1);
+        }
+        System.out.println();
+        System.out.println("Listo: al iniciar sesión en este Windows, el asistente abrirá el programa y entrará solo.");
+        System.out.println("OJO, esto es importante para el PC dedicado:");
+        System.out.println("  · Tiene que ser una tarea AL INICIAR SESIÓN, no un servicio de Windows. Un servicio no ve");
+        System.out.println("    la pantalla y nuestro asistente trabaja como una persona: mirando y tecleando.");
+        System.out.println("  · Ese ordenador debe iniciar sesión solo al encenderse, y NO bloquear la pantalla.");
+        System.out.println("    Con la pantalla bloqueada se puede leer por dentro, pero no escribir.");
+    }
+
     /** Deja el programa vivo, respondiendo y dentro. Es lo que se llama antes de cada trabajo de la noche. */
     private static void sesion(List<String> a) throws IOException {
         if (a.isEmpty()) {
@@ -328,6 +378,16 @@ public final class App {
         if (c == null) {
             throw new IllegalStateException("Hace falta una consola para escribir la contraseña sin que se vea.");
         }
+        // El usuario no es secreto, pero sin él la contraseña no sirve: se piden los dos juntos.
+        String yaHay = es.amagna.asistente.manos.Secreto.usuario(nombre);
+        String usuario = a.contains("--usuario") ? a.get(a.indexOf("--usuario") + 1)
+                : c.readLine("Usuario de «" + nombre + "»" + (yaHay == null ? "" : " [" + yaHay + "]") + ": ").strip();
+        if (usuario.isBlank() && yaHay != null) {
+            usuario = yaHay;
+        }
+        if (usuario.isBlank()) {
+            throw new IllegalArgumentException("Hace falta el usuario.");
+        }
         char[] uno = c.readPassword("Contraseña de «" + nombre + "» (no se ve al escribir): ");
         char[] dos = c.readPassword("Otra vez, para asegurar: ");
         if (uno == null || uno.length == 0) {
@@ -340,9 +400,11 @@ public final class App {
         }
         java.util.Arrays.fill(dos, '\0');
         es.amagna.asistente.manos.Secreto.guardar(nombre, uno);
-        System.out.println("Guardado «" + nombre + "» en " + es.amagna.asistente.manos.Secreto.carpeta() + ".");
+        es.amagna.asistente.manos.Secreto.guardarUsuario(nombre, usuario);
+        System.out.println("Guardados el usuario «" + usuario + "» y su contraseña en " + es.amagna.asistente.manos.Secreto.carpeta() + ".");
         System.out.println("Cifrado con tu cuenta de Windows: solo tú, y solo en este ordenador. No está en el repositorio");
-        System.out.println("ni se enseña en ningún sitio. En un guion se usa poniendo «secreto:" + nombre + "» como valor.");
+        System.out.println("ni se enseña en ningún sitio. En un guion se usan poniendo «usuario:" + nombre + "» y «secreto:"
+                + nombre + "» como valor.");
     }
 
     /** El plano de todo un programa: primero mirando (gratis y sin riesgo), después entrando en lo aprobado. */

@@ -459,6 +459,21 @@ public final class PruebasWindows {
                 "y si el título no dice lo que tiene que decir, NO da la sesión por buena");
         ((VentanasNativas) v).cerrarSiEsNuestra(vSesion);
 
+        System.out.println("14f) El usuario junto a la contraseña, y el arranque al encender el ordenador");
+        String cuenta = "prueba-cuenta-" + System.nanoTime();
+        es.amagna.asistente.manos.Secreto.guardar(cuenta, "clave".toCharArray());
+        es.amagna.asistente.manos.Secreto.guardarUsuario(cuenta, "pbancario2@ejemplo.test");
+        ok("pbancario2@ejemplo.test".equals(es.amagna.asistente.manos.Secreto.usuario(cuenta)),
+                "el usuario se guarda junto a su contraseña: sin él, la contraseña no sirve de nada");
+        es.amagna.asistente.manos.Secreto.olvidar(cuenta);
+        ok(es.amagna.asistente.manos.Secreto.usuario(cuenta) == null && !es.amagna.asistente.manos.Secreto.hay(cuenta),
+                "y al olvidar la cuenta se van los dos");
+        String estado = es.amagna.asistente.Arranque.ver();
+        System.out.println("   arranque automático: " + (estado.startsWith("ERROR") ? "no instalado (correcto en una prueba)"
+                : "instalado"));
+        ok(estado.startsWith("ERROR") || estado.contains("AsistenteAltas"),
+                "se puede consultar si el arranque automático está puesto, sin tocarlo");
+
         System.out.println("15) No se lía con su propia consola, y despierta la ventana si está minimizada");
         // El título de una consola lleva dentro el comando que se escribió, así que buscar «MNprogram» encontraba
         // la consola donde se había escrito «MNprogram»: el asistente se leía a sí mismo.

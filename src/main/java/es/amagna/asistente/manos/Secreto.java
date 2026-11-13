@@ -113,12 +113,27 @@ public final class Secreto {
         return r;
     }
 
+    /**
+     * El usuario de esa cuenta. NO es un secreto —conviene poder ver con qué usuario trabaja el asistente— pero sin él
+     * la contraseña no sirve de nada, así que se guarda al lado.
+     */
+    public static void guardarUsuario(String nombre, String usuario) throws IOException {
+        Files.createDirectories(carpeta());
+        Files.writeString(carpeta().resolve(limpio(nombre) + ".usuario"), usuario, StandardCharsets.UTF_8);
+    }
+
+    public static String usuario(String nombre) throws IOException {
+        Path f = carpeta().resolve(limpio(nombre) + ".usuario");
+        return Files.isRegularFile(f) ? Files.readString(f, StandardCharsets.UTF_8).strip() : null;
+    }
+
     public static boolean hay(String nombre) {
         return Files.isRegularFile(carpeta().resolve(limpio(nombre) + ".dat"));
     }
 
     public static void olvidar(String nombre) throws IOException {
         Files.deleteIfExists(carpeta().resolve(limpio(nombre) + ".dat"));
+        Files.deleteIfExists(carpeta().resolve(limpio(nombre) + ".usuario"));
     }
 
     /** Los nombres de los secretos guardados. Solo los nombres: el valor no sale de aquí nunca. */

@@ -1,0 +1,11 @@
+{
+  "nombre": "MN program Cloud (escritorio)",
+  "ventana": "MNprogram - Abogados",
+  "programa": {
+    "ejecutable": "C:\\MnProgram\\MNprogramCloud\\PlaJuSQL.exe",
+    "argumentos": []
+  },
+  "controles": {
+    "_pendiente": ["esto se rellena con «asistente aprender» cuando veamos la pantalla de entrada de MN"]
+  }
+}
