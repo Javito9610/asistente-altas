@@ -696,6 +696,55 @@ public final class Controles {
         return false;
     }
 
+    /** Las palabras con las que un programa dice «sí, adelante». Nunca «borrar», «eliminar» ni «no». */
+    private static final List<String> ADELANTE = List.of("seleccionar", "aceptar", "continuar", "siguiente", "entrar",
+            "ok", "abrir", "iniciar sesion", "si", "confirmar");
+
+    /**
+     * Pasar de una pantalla cuyo único trabajo es confirmar, por las buenas o por las malas.
+     *
+     * Hay diálogos —elegir empresa, elegir ejercicio— en los que no hay nada que decidir: lo que toca ya viene
+     * marcado y solo hay que confirmar. Afinar a mano el nombre exacto del botón de cada uno es perder el tiempo y
+     * volverlo frágil. Aquí se prueba todo lo razonable, en orden, comprobando después de cada intento: los botones
+     * que dicen «adelante», luego Intro, luego Espacio (que es lo que activa el botón que tiene el foco).
+     *
+     * Solo se pulsan botones de confirmar. Nunca uno que borre, elimine o cancele: de esos no se toca ninguno.
+     */
+    public String avanzar(String ventana, java.util.function.BooleanSupplier logrado, double segundos) {
+        StringBuilder loQueSeHaProbado = new StringBuilder();
+        if (logrado.getAsBoolean()) {
+            return "Ya estaba pasada esa pantalla.";
+        }
+        double porIntento = Math.max(3, segundos / 6);
+
+        for (String palabra : ADELANTE) {
+            Encontrado f = buscar(ventana, palabra);
+            if (f.elemento() == null) {
+                continue;
+            }
+            f.elemento().close();
+            loQueSeHaProbado.append(" · ").append(palabra);
+            String r = pulsarInsistiendo(ventana, palabra, logrado, porIntento);
+            if (logrado.getAsBoolean()) {
+                return "Pasada la pantalla «" + ventana + "» con «" + palabra + "»: " + r;
+            }
+        }
+
+        // Y si ningún botón se deja: el teclado. En un diálogo, Intro acepta y Espacio pulsa lo que tenga el foco.
+        VentanasNativas vn = ventanas;
+        if (vn != null && vn.activar(ventana)) {
+            for (String tecla : new String[] {"Return", "space"}) {
+                loQueSeHaProbado.append(" · tecla ").append(tecla);
+                new ManosRobot(false).tecla(tecla, 1);
+                if (esperarA(logrado, porIntento)) {
+                    return "Pasada la pantalla «" + ventana + "» con la tecla " + tecla + ".";
+                }
+            }
+        }
+        return "No se ha podido pasar de «" + ventana + "». Probado:" + loQueSeHaProbado
+                + ". Esto es lo que hay en esa pantalla:\n" + arbol(ventana, 8, 200);
+    }
+
     // ---------- esperar (lo que hace fiable a una automatización) ----------
 
     public enum Que { APAREZCA, DESAPAREZCA, SE_ACTIVE, VALGA }

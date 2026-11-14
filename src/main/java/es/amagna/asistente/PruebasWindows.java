@@ -703,6 +703,38 @@ public final class PruebasWindows {
             pModal.destroy();
         }
 
+        System.out.println("14o) Pasar de una pantalla de confirmar sin saber cómo se llama su botón");
+        // Es el caso de MN: «Selección de Empresa» y «Ejercicio Contable» solo confirman. Afinar a mano el nombre
+        // exacto del botón de cada diálogo es frágil y es perder el tiempo: que lo resuelva él.
+        String vAv = "prueba-avanzar";
+        Process pAv = new ProcessBuilder(exeJava, "-cp", cp, "es.amagna.asistente.VentanaDePrueba", vAv, "formulario").inheritIO().start();
+        try {
+            ok(ctrl.esperar(vAv, null, es.amagna.asistente.manos.Controles.Que.APAREZCA, null, 25).startsWith("Ya está"),
+                    "se abre la pantalla de confirmar");
+            long t8 = System.currentTimeMillis();
+            String r8 = ctrl.avanzar(vAv, () -> ((VentanasNativas) v).handleDe(vAv) == null, 40);
+            long tardo8 = System.currentTimeMillis() - t8;
+            System.out.println("   " + r8 + " (" + tardo8 + " ms)");
+            ok(r8.startsWith("Pasada"), "encuentra él solo el botón de confirmar y pasa de pantalla");
+            ok(((VentanasNativas) v).handleDe(vAv) == null, "la pantalla se ha pasado de verdad");
+        } finally {
+            pAv.destroy();
+        }
+        // Y si no hay forma de pasar, lo dice y enseña qué había: no se queda insistiendo a ciegas.
+        String vNoAv = "prueba-no-avanza";
+        Process pNoAv = new ProcessBuilder(exeJava, "-cp", cp, "es.amagna.asistente.VentanaDePrueba", vNoAv, "formulario").inheritIO().start();
+        try {
+            ok(ctrl.esperar(vNoAv, null, es.amagna.asistente.manos.Controles.Que.APAREZCA, null, 25).startsWith("Ya está"),
+                    "se abre otra pantalla");
+            String r9 = ctrl.avanzar(vNoAv, () -> false, 12);
+            System.out.println("   " + r9.lines().findFirst().orElse(""));
+            ok(r9.startsWith("No se ha podido pasar") && r9.contains("Probado:") && r9.contains("campo"),
+                    "si no hay manera, dice qué ha probado y qué hay en la pantalla");
+            ((VentanasNativas) v).cerrarSiEsNuestra(vNoAv);
+        } finally {
+            pNoAv.destroy();
+        }
+
         System.out.println("15) No se lía con su propia consola, y despierta la ventana si está minimizada");
         // El título de una consola lleva dentro el comando que se escribió, así que buscar «MNprogram» encontraba
         // la consola donde se había escrito «MNprogram»: el asistente se leía a sí mismo.

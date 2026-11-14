@@ -163,7 +163,7 @@ public final class Guion {
             double segundos = m.get("segundos") instanceof Number n ? n.doubleValue() : 20;
 
             // Hay pasos que no van contra ningún control (pulsar una tecla, esperar un rato): no hay nada que buscar.
-            if (control.isBlank() && apodoSuelto == null) {
+            if ((control.isBlank() && apodoSuelto == null) || hacer.equals("avanzar")) {
                 String soloTecla = hacerPaso(hacer, control, "", valor, segundos, m, ensayo, lineas, escrito, ventanaPaso);
                 if (soloTecla != null && soloTecla != SALTADO) {
                     lineas.add("FALLA  " + hacer + ": " + soloTecla);
@@ -417,6 +417,27 @@ public final class Guion {
                 String hay = controles.valorDe(ventana, apodo);
                 return valor == null || valor.equals(hay) ? null
                         : "se esperaba «" + valor + "» y hay «" + hay + "»";
+            case "avanzar": {
+                // Pasar de una pantalla de confirmar, por las buenas o por las malas.
+                if (ensayo) {
+                    lineas.add("ENSAYO avanzar en " + ventana + ": no se toca nada");
+                    return SALTADO;
+                }
+                if (!(m.get("hasta") instanceof Map<?, ?> cr2)) {
+                    return "«avanzar» necesita decir «hasta» qué pantalla hay que llegar";
+                }
+                Map<String, Object> h = mapaDe(cr2);
+                String v3 = h.get("ventana") == null ? ventana : String.valueOf(h.get("ventana"));
+                String a3 = h.get("apodo") == null ? null : String.valueOf(h.get("apodo"));
+                String q3 = String.valueOf(h.getOrDefault("que", "aparezca"));
+                String val3 = h.get("valor") == null ? null : String.valueOf(h.get("valor"));
+                String r3 = controles.avanzar(ventana, () -> cumple(v3, a3, q3, val3), segundos);
+                if (r3.startsWith("Pasada") || r3.startsWith("Ya estaba")) {
+                    lineas.add("ok     " + r3);
+                    return null;
+                }
+                return r3;
+            }
             case "apartar":
                 // Cierra los avisos y diálogos que hayan salido encima. Los programas de gestión sueltan de todo
                 // justo después de entrar o de guardar, y hasta que no se despeja no se puede ni leer la pantalla.
@@ -456,7 +477,7 @@ public final class Guion {
                     return "no se ha podido pulsar «" + valor + "»: " + ex.getMessage();
                 }
             default:
-                return "«" + hacer + "» no se sabe hacer (escribir, pulsar, esperar, comprobar, tecla, apartar)";
+                return "«" + hacer + "» no se sabe hacer (escribir, pulsar, esperar, comprobar, tecla, apartar, avanzar)";
         }
     }
 

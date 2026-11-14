@@ -1,5 +1,5 @@
 {
-  "_nota": "Entrar en MN. OJO: al pulsar «Seleccionar» la ventana NO desaparece, se queda detrás tapada por la siguiente. Así que lo que hay que esperar es que APAREZCA la siguiente, no que se vaya la anterior.",
+  "_nota": "Entrar en MN. Las dos pantallas de selección solo confirman: se usa «avanzar», que prueba todo lo razonable (los botones de confirmar, Intro, Espacio) hasta que aparece la siguiente pantalla. El cerrojo de la empresa lo comprueba la sesión al final.",
   "pasos": [
     {
       "hacer": "esperar",
@@ -35,14 +35,13 @@
       "opcional": true
     },
     {
-      "hacer": "pulsar",
+      "hacer": "avanzar",
       "ventana": "Selección de Empresa",
-      "apodo": "boton:Seleccionar",
+      "segundos": 90,
       "toca": true,
-      "luego": {
+      "hasta": {
         "ventana": "Ejercicio Contable",
-        "que": "aparezca",
-        "segundos": 90
+        "que": "aparezca"
       }
     },
     {
@@ -53,15 +52,23 @@
       "opcional": true
     },
     {
-      "hacer": "pulsar",
+      "hacer": "avanzar",
       "ventana": "Ejercicio Contable",
-      "apodo": "boton:Seleccionar",
+      "segundos": 120,
       "toca": true,
-      "luego": {
-        "ventana": "MNprogram - Abogados",
-        "que": "aparezca",
-        "segundos": 120
+      "hasta": {
+        "ventana": "Ejercicio Contable",
+        "que": "desaparezca"
       }
+    },
+    {
+      "hacer": "apartar"
+    },
+    {
+      "hacer": "esperar",
+      "ventana": "MNprogram - Abogados",
+      "que": "aparezca",
+      "segundos": 120
     },
     {
       "hacer": "apartar"

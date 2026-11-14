@@ -87,7 +87,14 @@ public final class VentanaDePrueba {
             });
             d.setVisible(true);
         });
-        for (java.awt.Component c : new java.awt.Component[] {eNif, cNif, eImporte, cImporte, guardar, cerrar, avisar}) {
+        // Un botón de confirmar, como el «Seleccionar» de MN: lo que «avanzar» tiene que saber encontrar solo.
+        java.awt.Button aceptar = new java.awt.Button("Aceptar");
+        aceptar.setBounds(200, 172, 120, 28);
+        aceptar.addActionListener(e -> {
+            f.dispose();
+            System.exit(0);
+        });
+        for (java.awt.Component c : new java.awt.Component[] {eNif, cNif, eImporte, cImporte, guardar, cerrar, avisar, aceptar}) {
             f.add(c);
         }
         cNif.setName("NIF");  // como MN: el propio cuadro se llama igual que su etiqueta
