@@ -563,12 +563,15 @@ public final class Controles {
         if (f.elemento() == null) {
             return f.descripcion();
         }
-        try (Uia.Elemento e = f.elemento()) {
+        Uia.Elemento e = f.elemento();
+        try {
             if (!e.activo()) {
                 return "El control " + f.descripcion() + " está desactivado: no se puede pulsar ahora. Mira qué falta antes.";
             }
-            if (e.pulsar()) {
-                return "Pulsado " + f.descripcion() + ".";
+            // En un hilo aparte: un botón que abre una ventana modal no devuelve el control hasta que se cierre.
+            if (!pulsarSinColgarse(e, 4)) {
+                return "Pulsado " + f.descripcion() + " (el programa no ha devuelto el control: suele pasar cuando "
+                        + "el botón abre otra ventana encima). Comprueba qué hay en pantalla.";
             }
             if (e.desplegar()) {
                 return "Desplegado " + f.descripcion() + ".";
@@ -577,6 +580,8 @@ public final class Controles {
             return r == null ? "El control " + f.descripcion() + " no se deja pulsar por dentro y no se sabe dónde está: usa el ratón mirando la captura."
                     : "El control " + f.descripcion() + " no se deja pulsar por dentro. Está en la pantalla real en x=" + (r[0] + r[2] / 2)
                       + ", y=" + (r[1] + r[3] / 2) + ": haz clic ahí con el ratón.";
+        } finally {
+            e.close();
         }
     }
 
@@ -594,16 +599,19 @@ public final class Controles {
         if (f.elemento() == null) {
             return f.descripcion();
         }
-        int[] r;
-        try (Uia.Elemento e = f.elemento()) {
-            if (!e.activo()) {
-                return "El control " + f.descripcion() + " está desactivado: no se puede pulsar ahora.";
-            }
-            r = e.recuadro();
-            e.pulsar();
+        Uia.Elemento e = f.elemento();
+        if (!e.activo()) {
+            e.close();
+            return "El control " + f.descripcion() + " está desactivado: no se puede pulsar ahora.";
+        }
+        int[] r = e.recuadro();
+        boolean volvio = pulsarSinColgarse(e, 4);
+        if (volvio) {
+            e.close();
         }
         if (esperarA(logrado, segundosPorIntento)) {
-            return "Pulsado " + f.descripcion() + ".";
+            return "Pulsado " + f.descripcion() + (volvio ? "." : " (el programa no devolvió el control: suele pasar "
+                    + "cuando el botón abre otra ventana encima).");
         }
 
         if (r != null && r[2] > 0 && r[3] > 0) {
@@ -615,8 +623,8 @@ public final class Controles {
 
         Encontrado otra = buscar(ventana, apodo);
         if (otra.elemento() != null) {
-            try (Uia.Elemento e = otra.elemento()) {
-                e.enfocar();
+            try (Uia.Elemento otroE = otra.elemento()) {
+                otroE.enfocar();
             }
             new ManosRobot(false).tecla("Return", 1);
             if (esperarA(logrado, segundosPorIntento)) {
@@ -625,6 +633,38 @@ public final class Controles {
         }
         return "Se ha pulsado " + f.descripcion() + " de tres formas distintas (por dentro, con el ratón y con Intro) "
                 + "y el programa no ha reaccionado. Hay que mirar qué pasa en esa pantalla.";
+    }
+
+    /**
+     * Pulsa sin arriesgarse a quedarse colgado para siempre.
+     *
+     * Cuando se pulsa por dentro un botón que abre una ventana modal (elegir empresa, elegir ejercicio, un aviso),
+     * Windows NO devuelve el control hasta que esa ventana se cierre. Y como la va a cerrar el propio asistente
+     * después, la llamada se quedaría esperando a algo que depende de ella misma: colgado hasta el fin de los
+     * tiempos. Así que se pulsa en un hilo aparte y no se espera a que vuelva: lo que importa no es que la llamada
+     * termine, es que el programa reaccione, y eso se comprueba mirando.
+     *
+     * @return true si la llamada volvió sola (entonces el elemento se puede soltar sin riesgo)
+     */
+    private static boolean pulsarSinColgarse(Uia.Elemento e, double segundos) {
+        final boolean[] termino = {false};
+        Thread t = new Thread(() -> {
+            try {
+                e.pulsar();
+            } catch (RuntimeException ignorado) {
+                // Si la llamada falla, da igual: lo que cuenta es si el programa ha reaccionado.
+            } finally {
+                termino[0] = true;
+            }
+        }, "pulsar");
+        t.setDaemon(true); // si se queda dentro de Windows, que no impida cerrar el programa
+        t.start();
+        try {
+            t.join((long) (segundos * 1000));
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        }
+        return termino[0];
     }
 
     private static boolean esperarA(java.util.function.BooleanSupplier logrado, double segundos) {

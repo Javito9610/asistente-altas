@@ -678,6 +678,31 @@ public final class PruebasWindows {
             pNo.destroy();
         }
 
+        System.out.println("14n) Un botón que abre una ventana modal NO puede dejar colgado al asistente");
+        // Es el caso exacto de MN: pulsar «Seleccionar» abre el diálogo del ejercicio, y la llamada de Windows no
+        // vuelve hasta que esa ventana se cierre. El asistente se quedó media hora parado sin decir nada.
+        String vModal = "prueba-modal";
+        Process pModal = new ProcessBuilder(exeJava, "-cp", cp, "es.amagna.asistente.VentanaDePrueba", vModal, "formulario").inheritIO().start();
+        try {
+            ok(ctrl.esperar(vModal, null, es.amagna.asistente.manos.Controles.Que.APAREZCA, null, 25).startsWith("Ya está"),
+                    "se abre la ventana");
+            v.activar(vModal);
+            long t7 = System.currentTimeMillis();
+            String r7 = ctrl.pulsarInsistiendo(vModal, "boton:Abrir aviso",
+                    () -> ((VentanasNativas) v).handleDe("Aviso modal de prueba") != null, 8);
+            long tardo7 = System.currentTimeMillis() - t7;
+            System.out.println("   " + r7 + " (" + tardo7 + " ms)");
+            ok(r7.startsWith("Pulsado"), "el aviso modal se ha abierto");
+            ok(tardo7 < 30_000, "y el asistente NO se queda colgado esperando a que se cierre (" + tardo7 + " ms)");
+            ok(((VentanasNativas) v).handleDe("Aviso modal de prueba") != null, "la ventana modal está ahí de verdad");
+            List<String> quitados = ((VentanasNativas) v).cancelarBloqueos();
+            System.out.println("   cancelado: " + quitados);
+            ok(!quitados.isEmpty(), "y se puede cerrar después, que es lo que haría el guion");
+        } finally {
+            ((VentanasNativas) v).cancelarBloqueos();
+            pModal.destroy();
+        }
+
         System.out.println("15) No se lía con su propia consola, y despierta la ventana si está minimizada");
         // El título de una consola lleva dentro el comando que se escribió, así que buscar «MNprogram» encontraba
         // la consola donde se había escrito «MNprogram»: el asistente se leía a sí mismo.

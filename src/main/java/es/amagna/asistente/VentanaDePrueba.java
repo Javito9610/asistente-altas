@@ -70,7 +70,24 @@ public final class VentanaDePrueba {
             f.dispose();
             System.exit(0);
         });
-        for (java.awt.Component c : new java.awt.Component[] {eNif, cNif, eImporte, cImporte, guardar, cerrar}) {
+        // Un botón que abre una ventana MODAL, como el «Seleccionar» de MN: al pulsarlo por dentro, Windows no
+        // devuelve el control hasta que la modal se cierre. Es lo que dejó al asistente colgado media hora.
+        java.awt.Button avisar = new java.awt.Button("Abrir aviso");
+        avisar.setBounds(210, 95, 120, 28);
+        avisar.addActionListener(e -> {
+            Dialog d = new Dialog(f, "Aviso modal de prueba", true);
+            d.add(new Label("Esta ventana bloquea a la de detrás."));
+            d.setSize(340, 130);
+            d.setLocation(160, 160);
+            d.addWindowListener(new java.awt.event.WindowAdapter() {
+                @Override
+                public void windowClosing(java.awt.event.WindowEvent w) {
+                    d.dispose();
+                }
+            });
+            d.setVisible(true);
+        });
+        for (java.awt.Component c : new java.awt.Component[] {eNif, cNif, eImporte, cImporte, guardar, cerrar, avisar}) {
             f.add(c);
         }
         cNif.setName("NIF");  // como MN: el propio cuadro se llama igual que su etiqueta
