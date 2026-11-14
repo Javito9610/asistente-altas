@@ -580,6 +580,69 @@ public final class Controles {
         }
     }
 
+    /**
+     * Pulsa y NO se da por satisfecho hasta que pasa lo que tiene que pasar.
+     *
+     * «Pulsado» no puede querer decir «lo he intentado»: tiene que querer decir «el programa ha reaccionado». Hay
+     * botones que por dentro dicen que sí y no hacen nada — el de entrar de MN es un «panel» pintado como botón, y
+     * Windows contestaba que lo había pulsado mientras la pantalla seguía igual. Así que se prueba por dentro,
+     * después con el ratón de verdad, y por último con Intro; y entre cada intento se comprueba.
+     */
+    public String pulsarInsistiendo(String ventana, String apodo, java.util.function.BooleanSupplier logrado,
+            double segundosPorIntento) {
+        Encontrado f = buscar(ventana, apodo);
+        if (f.elemento() == null) {
+            return f.descripcion();
+        }
+        int[] r;
+        try (Uia.Elemento e = f.elemento()) {
+            if (!e.activo()) {
+                return "El control " + f.descripcion() + " está desactivado: no se puede pulsar ahora.";
+            }
+            r = e.recuadro();
+            e.pulsar();
+        }
+        if (esperarA(logrado, segundosPorIntento)) {
+            return "Pulsado " + f.descripcion() + ".";
+        }
+
+        if (r != null && r[2] > 0 && r[3] > 0) {
+            new ManosRobot(false).clicEnPantalla(r[0] + r[2] / 2, r[1] + r[3] / 2);
+            if (esperarA(logrado, segundosPorIntento)) {
+                return "Pulsado " + f.descripcion() + " (por dentro no reaccionaba; ha hecho falta el ratón).";
+            }
+        }
+
+        Encontrado otra = buscar(ventana, apodo);
+        if (otra.elemento() != null) {
+            try (Uia.Elemento e = otra.elemento()) {
+                e.enfocar();
+            }
+            new ManosRobot(false).tecla("Return", 1);
+            if (esperarA(logrado, segundosPorIntento)) {
+                return "Pulsado " + f.descripcion() + " (ha hecho falta Intro).";
+            }
+        }
+        return "Se ha pulsado " + f.descripcion() + " de tres formas distintas (por dentro, con el ratón y con Intro) "
+                + "y el programa no ha reaccionado. Hay que mirar qué pasa en esa pantalla.";
+    }
+
+    private static boolean esperarA(java.util.function.BooleanSupplier logrado, double segundos) {
+        long fin = System.currentTimeMillis() + (long) (Math.max(1, segundos) * 1000);
+        do {
+            if (logrado.getAsBoolean()) {
+                return true;
+            }
+            try {
+                Thread.sleep(400);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        } while (System.currentTimeMillis() < fin);
+        return false;
+    }
+
     // ---------- esperar (lo que hace fiable a una automatización) ----------
 
     public enum Que { APAREZCA, DESAPAREZCA, SE_ACTIVE, VALGA }

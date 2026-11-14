@@ -1,5 +1,5 @@
 {
-  "_nota": "Entrar en MN de carrerilla: acceso, empresa, ejercicio y el anuncio. Elegir la fila es OPCIONAL porque MN ya suele traerla elegida; lo que NO es opcional es que al final el título diga «Empresa de prueba», y eso lo comprueba la sesión.",
+  "_nota": "Entrar en MN: acceso, empresa, ejercicio y el anuncio. Cada pulsación dice QUÉ tiene que pasar después, y si no pasa se insiste (por dentro, con el ratón y con Intro).",
   "pasos": [
     {
       "hacer": "esperar",
@@ -20,14 +20,12 @@
     {
       "hacer": "pulsar",
       "control": "entrar",
-      "toca": true
-    },
-    {
-      "hacer": "esperar",
-      "ventana": "Selección de Empresa",
-      "apodo": "boton:Seleccionar",
-      "que": "aparezca",
-      "segundos": 90
+      "toca": true,
+      "luego": {
+        "ventana": "Selección de Empresa",
+        "que": "aparezca",
+        "segundos": 90
+      }
     },
     {
       "hacer": "pulsar",
@@ -47,14 +45,12 @@
       "hacer": "pulsar",
       "ventana": "Selección de Empresa",
       "apodo": "boton:Seleccionar",
-      "toca": true
-    },
-    {
-      "hacer": "esperar",
-      "ventana": "Ejercicio Contable",
-      "apodo": "boton:Seleccionar",
-      "que": "aparezca",
-      "segundos": 90
+      "toca": true,
+      "luego": {
+        "ventana": "Selección de Empresa",
+        "que": "desaparezca",
+        "segundos": 90
+      }
     },
     {
       "hacer": "pulsar",
@@ -67,7 +63,13 @@
       "hacer": "pulsar",
       "ventana": "Ejercicio Contable",
       "apodo": "boton:Seleccionar",
-      "toca": true
+      "toca": true,
+      "opcional": true,
+      "luego": {
+        "ventana": "Ejercicio Contable",
+        "que": "desaparezca",
+        "segundos": 90
+      }
     },
     {
       "hacer": "apartar"

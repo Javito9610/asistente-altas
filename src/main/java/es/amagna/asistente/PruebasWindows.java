@@ -646,6 +646,38 @@ public final class PruebasWindows {
             pOpc.destroy();
         }
 
+        System.out.println("14m) «Pulsado» tiene que significar que el programa REACCIONÓ, no que se intentó");
+        String vIns = "prueba-insistir";
+        Process pIns = new ProcessBuilder(exeJava, "-cp", cp, "es.amagna.asistente.VentanaDePrueba", vIns, "formulario").inheritIO().start();
+        try {
+            ok(ctrl.esperar(vIns, null, es.amagna.asistente.manos.Controles.Que.APAREZCA, null, 25).startsWith("Ya está"),
+                    "se abre la ventana");
+            v.activar(vIns);
+            // Un botón que SÍ hace algo: la ventana tiene que desaparecer. Y si no desapareciera, insistiría.
+            long t5 = System.currentTimeMillis();
+            String r5 = ctrl.pulsarInsistiendo(vIns, "boton:Cerrar", () -> ((VentanasNativas) v).handleDe(vIns) == null, 6);
+            System.out.println("   " + r5 + " (" + (System.currentTimeMillis() - t5) + " ms)");
+            ok(r5.startsWith("Pulsado"), "pulsa y comprueba que ha pasado lo que tenía que pasar");
+            ok(((VentanasNativas) v).handleDe(vIns) == null, "la ventana se ha cerrado de verdad");
+        } finally {
+            pIns.destroy();
+        }
+        // Y lo contrario: si el programa NO reacciona, no se da por pulsado por mucho que Windows diga que sí.
+        String vNo = "prueba-no-reacciona";
+        Process pNo = new ProcessBuilder(exeJava, "-cp", cp, "es.amagna.asistente.VentanaDePrueba", vNo, "formulario").inheritIO().start();
+        try {
+            ok(ctrl.esperar(vNo, null, es.amagna.asistente.manos.Controles.Que.APAREZCA, null, 25).startsWith("Ya está"),
+                    "se abre otra ventana");
+            // «Guardar» no cierra nada: se le pide una condición imposible y tiene que reconocer que no se ha logrado.
+            String r6 = ctrl.pulsarInsistiendo(vNo, "boton:Guardar", () -> false, 2);
+            System.out.println("   " + r6);
+            ok(r6.startsWith("Se ha pulsado") && r6.contains("tres formas"),
+                    "si el programa no reacciona, lo dice claro en vez de mentir con un «hecho»");
+            ((VentanasNativas) v).cerrarSiEsNuestra(vNo);
+        } finally {
+            pNo.destroy();
+        }
+
         System.out.println("15) No se lía con su propia consola, y despierta la ventana si está minimizada");
         // El título de una consola lleva dentro el comando que se escribió, así que buscar «MNprogram» encontraba
         // la consola donde se había escrito «MNprogram»: el asistente se leía a sí mismo.

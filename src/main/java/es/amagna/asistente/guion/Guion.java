@@ -257,6 +257,22 @@ public final class Guion {
             // Condición de después: no se sigue hasta que el programa reaccione de verdad.
             if (m.get("luego") instanceof Map<?, ?> crudo2) {
                 Map<String, Object> l2 = mapaDe(crudo2);
+                String ventana2 = l2.get("ventana") == null ? ventanaPaso : String.valueOf(l2.get("ventana"));
+                String apodo2Suelto = l2.get("apodo") == null ? null : String.valueOf(l2.get("apodo"));
+                if (l2.get("control") == null) {
+                    // Sin control: se espera a la ventana entera (que aparezca la siguiente pantalla, por ejemplo).
+                    double s3 = l2.get("segundos") instanceof Number n3 ? n3.doubleValue() : 60;
+                    Controles.Que q3 = que(l2.get("que"));
+                    String v3 = l2.get("valor") == null ? null : String.valueOf(l2.get("valor"));
+                    String r3 = controles.esperar(ventana2, apodo2Suelto, q3, v3, s3);
+                    if (!r3.startsWith("Ya está")) {
+                        lineas.add("FALLA  después de " + hacer + " " + control + ": " + r3);
+                        return parte(false, "PARADO: después de «" + hacer + " " + control + "»: " + r3,
+                                lineas, hechos, avisos, rescates, clave, ensayo);
+                    }
+                    lineas.add("ok     después de " + hacer + " " + control + ": " + r3);
+                    continue;
+                }
                 String ctrl2 = String.valueOf(l2.getOrDefault("control", control));
                 double s2 = l2.get("segundos") instanceof Number n2 ? n2.doubleValue() : 20;
                 Controles.Que que2 = que(l2.get("que"));
@@ -368,9 +384,22 @@ public final class Guion {
                 }
                 escrito.put(control + " (" + ventana + ")", new String[] {apodo, valor, ventana});
                 return null;
-            case "pulsar":
+            case "pulsar": {
+                // Si el paso dice qué tiene que pasar después, se insiste hasta conseguirlo: por dentro, con el
+                // ratón y con Intro. Hay botones que contestan que sí y no hacen nada.
+                if (m.get("luego") instanceof Map<?, ?> cr && ventanas != null) {
+                    Map<String, Object> l = mapaDe(cr);
+                    String v2 = l.get("ventana") == null ? ventana : String.valueOf(l.get("ventana"));
+                    String a2 = l.get("apodo") == null ? null : String.valueOf(l.get("apodo"));
+                    String q2 = String.valueOf(l.getOrDefault("que", "aparezca"));
+                    String esperado = l.get("valor") == null ? null : String.valueOf(l.get("valor"));
+                    java.util.function.BooleanSupplier logrado = () -> cumple(v2, a2, q2, esperado);
+                    String pi = controles.pulsarInsistiendo(ventana, apodo, logrado, 6);
+                    return pi.startsWith("Pulsado") ? null : pi;
+                }
                 String p = controles.pulsar(ventana, apodo);
                 return p.startsWith("Pulsado") || p.startsWith("Desplegado") ? null : p;
+            }
             case "esperar":
                 String s = controles.esperar(ventana, apodo, que(m.get("que")), valor, segundos);
                 return s.startsWith("Ya está") ? null : s;
@@ -479,6 +508,25 @@ public final class Guion {
     /** Por si acaso: que un mensaje de error no acabe enseñando la contraseña. */
     private static String sinSecretos(String mensaje, String secreto) {
         return secreto.isEmpty() ? mensaje : mensaje.replace(secreto, "(secreto)");
+    }
+
+    /** ¿Se cumple ya la condición de después? (se usa para insistir al pulsar). */
+    private boolean cumple(String ventana, String apodo, String que, String valor) {
+        boolean hayVentana = ventanas.handleDe(ventana) != null;
+        if (apodo == null) {
+            return que.equals("desaparezca") != hayVentana;
+        }
+        if (!hayVentana) {
+            return que.equals("desaparezca");
+        }
+        switch (que) {
+            case "desaparezca":
+                return !controles.existe(ventana, apodo);
+            case "valga":
+                return valor != null && valor.equals(controles.valorDe(ventana, apodo));
+            default:
+                return controles.existe(ventana, apodo);
+        }
     }
 
     private static Controles.Que que(Object v) {

@@ -185,6 +185,23 @@ public final class ManosRobot implements Manos {
         return modoVista;
     }
 
+    /**
+     * Un clic en un punto REAL de la pantalla (los que da Windows cuando le preguntas dónde está un control), no en
+     * coordenadas de la captura. Hace falta cuando un botón no se deja pulsar por dentro y hay que ir al ratón.
+     */
+    public void clicEnPantalla(int px, int py) {
+        freno();
+        if (vista("clic real en " + px + "," + py)) {
+            return;
+        }
+        robot.mouseMove(px, py);
+        robot.delay(80);
+        robot.mousePress(java.awt.event.InputEvent.BUTTON1_DOWN_MASK);
+        robot.delay(60);
+        robot.mouseRelease(java.awt.event.InputEvent.BUTTON1_DOWN_MASK);
+        pausa();
+    }
+
     private void moverReal(int x, int y) {
         int[] p = escala.aPantalla(x, y);
         robot.mouseMove(pantalla.x + p[0], pantalla.y + p[1]);
