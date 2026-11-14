@@ -1,5 +1,5 @@
 {
-  "_nota": "Entrar en MN: acceso, empresa, ejercicio y el anuncio. Elegir una fila SÍ es opcional (MN ya la trae elegida); pulsar «Seleccionar» NO lo es nunca, porque sin eso no se pasa de pantalla.",
+  "_nota": "Entrar en MN. OJO: al pulsar «Seleccionar» la ventana NO desaparece, se queda detrás tapada por la siguiente. Así que lo que hay que esperar es que APAREZCA la siguiente, no que se vaya la anterior.",
   "pasos": [
     {
       "hacer": "esperar",
@@ -40,18 +40,10 @@
       "apodo": "boton:Seleccionar",
       "toca": true,
       "luego": {
-        "ventana": "Selección de Empresa",
-        "que": "desaparezca",
+        "ventana": "Ejercicio Contable",
+        "que": "aparezca",
         "segundos": 90
       }
-    },
-    {
-      "hacer": "esperar",
-      "ventana": "Ejercicio Contable",
-      "apodo": "boton:Seleccionar",
-      "que": "aparezca",
-      "segundos": 60,
-      "opcional": true
     },
     {
       "hacer": "pulsar",
@@ -66,9 +58,9 @@
       "apodo": "boton:Seleccionar",
       "toca": true,
       "luego": {
-        "ventana": "Ejercicio Contable",
-        "que": "desaparezca",
-        "segundos": 90
+        "ventana": "MNprogram - Abogados",
+        "que": "aparezca",
+        "segundos": 120
       }
     },
     {

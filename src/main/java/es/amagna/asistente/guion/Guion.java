@@ -214,19 +214,22 @@ public final class Guion {
                 continue;
             }
             if (error != null && rescate != null && !ensayo) {
-                lineas.add("ATASCO " + hacer + " " + control + ": " + error);
-                registro.accept("   … atascado en «" + hacer + " " + control + "»: entra la inteligencia artificial");
+                String nombrePaso = control.isBlank() ? apodoSuelto : control;
+                lineas.add("ATASCO " + hacer + " " + nombrePaso + " [" + ventanaPaso + "]: " + error);
+                registro.accept("   … atascado en «" + hacer + " " + nombrePaso + "»: entra la inteligencia artificial");
                 rescates++;
                 String hizo;
                 try {
-                    hizo = rescate.intentar(mapa.ventana(), control,
-                            hacer + " «" + control + "»" + (valor == null ? "" : " con el valor exacto «" + valor + "»"), error);
+                    hizo = rescate.intentar(ventanaPaso, nombrePaso,
+                            hacer + " «" + nombrePaso + "» en la ventana «" + ventanaPaso + "»"
+                            + (valor == null ? "" : " con el valor exacto «" + valor + "»"), error);
                 } catch (RuntimeException e) {
                     hizo = "no ha podido: " + e.getMessage();
                 }
                 lineas.add("IA     " + hizo);
                 try {
-                    apodo = resolver(control, 5, ventanaPaso); // la pantalla puede haber cambiado
+                    // La pantalla puede haber cambiado mientras la IA la arreglaba.
+                    apodo = apodoSuelto != null ? esperarA(ventanaPaso, apodoSuelto, 5) : resolver(control, 5, ventanaPaso);
                     error = hacerPaso(hacer, control, apodo, valor, segundos, m, ensayo, lineas, escrito, ventanaPaso);
                     if (error == SALTADO) {
                         error = null;
@@ -235,16 +238,18 @@ public final class Guion {
                     error = f.getMessage();
                 }
                 if (error == null) {
-                    lineas.add("ok     RESCATADO por la IA: " + hacer + " " + control);
+                    lineas.add("ok     RESCATADO por la IA: " + hacer + " " + nombrePaso);
                 }
             }
+            String comoSeLlamaEste = control.isBlank() ? apodoSuelto : control;
             if (error != null && opcional) {
-                lineas.add("ok     " + hacer + " " + control + ": no ha salido («" + error + "»), y es opcional. Se sigue.");
+                lineas.add("ok     " + hacer + " " + comoSeLlamaEste + ": no ha salido («" + error + "»), y es opcional. Se sigue.");
                 error = null;
             }
             if (error != null) {
-                lineas.add("FALLA  " + hacer + " " + control + ": " + error);
-                return parte(false, "PARADO en «" + hacer + " " + control + "»: " + error, lineas, hechos, avisos, rescates, clave, ensayo);
+                lineas.add("FALLA  " + hacer + " " + comoSeLlamaEste + " [" + ventanaPaso + "]: " + error);
+                return parte(false, "PARADO en «" + hacer + " " + comoSeLlamaEste + "» (ventana «" + ventanaPaso + "»): " + error,
+                        lineas, hechos, avisos, rescates, clave, ensayo);
             }
             if (valor == null || !valor.startsWith("secreto:")) {
                 String comoSeLlama = control.isBlank() ? apodoSuelto : control;
