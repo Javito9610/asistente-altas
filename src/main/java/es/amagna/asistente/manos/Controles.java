@@ -569,9 +569,13 @@ public final class Controles {
                 return "El control " + f.descripcion() + " está desactivado: no se puede pulsar ahora. Mira qué falta antes.";
             }
             // En un hilo aparte: un botón que abre una ventana modal no devuelve el control hasta que se cierre.
-            if (!pulsarSinColgarse(e, 4)) {
+            Pulsacion como = pulsarSinColgarse(e, 4);
+            if (como == Pulsacion.SIN_VOLVER) {
                 return "Pulsado " + f.descripcion() + " (el programa no ha devuelto el control: suele pasar cuando "
                         + "el botón abre otra ventana encima). Comprueba qué hay en pantalla.";
+            }
+            if (como == Pulsacion.HECHA) {
+                return "Pulsado " + f.descripcion() + ".";
             }
             if (e.desplegar()) {
                 return "Desplegado " + f.descripcion() + ".";
@@ -605,13 +609,13 @@ public final class Controles {
             return "El control " + f.descripcion() + " está desactivado: no se puede pulsar ahora.";
         }
         int[] r = e.recuadro();
-        boolean volvio = pulsarSinColgarse(e, 4);
-        if (volvio) {
+        Pulsacion como = pulsarSinColgarse(e, 4);
+        if (como != Pulsacion.SIN_VOLVER) {
             e.close();
         }
         if (esperarA(logrado, segundosPorIntento)) {
-            return "Pulsado " + f.descripcion() + (volvio ? "." : " (el programa no devolvió el control: suele pasar "
-                    + "cuando el botón abre otra ventana encima).");
+            return "Pulsado " + f.descripcion() + (como != Pulsacion.SIN_VOLVER ? "."
+                    : " (el programa no devolvió el control: suele pasar cuando el botón abre otra ventana encima).");
         }
 
         if (r != null && r[2] > 0 && r[3] > 0) {
@@ -646,15 +650,24 @@ public final class Controles {
      *
      * @return true si la llamada volvió sola (entonces el elemento se puede soltar sin riesgo)
      */
-    private static boolean pulsarSinColgarse(Uia.Elemento e, double segundos) {
-        final boolean[] termino = {false};
+    private enum Pulsacion {
+        /** Volvió y funcionó. */
+        HECHA,
+        /** Volvió y ese control no se deja pulsar así. */
+        NO_SE_DEJA,
+        /** No ha vuelto: se ha quedado dentro de Windows, casi seguro porque ha abierto una ventana modal. */
+        SIN_VOLVER
+    }
+
+    private static Pulsacion pulsarSinColgarse(Uia.Elemento e, double segundos) {
+        final boolean[] fue = {false, false}; // {volvió, funcionó}
         Thread t = new Thread(() -> {
             try {
-                e.pulsar();
+                fue[1] = e.pulsar();
             } catch (RuntimeException ignorado) {
                 // Si la llamada falla, da igual: lo que cuenta es si el programa ha reaccionado.
             } finally {
-                termino[0] = true;
+                fue[0] = true;
             }
         }, "pulsar");
         t.setDaemon(true); // si se queda dentro de Windows, que no impida cerrar el programa
@@ -664,7 +677,7 @@ public final class Controles {
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
         }
-        return termino[0];
+        return !fue[0] ? Pulsacion.SIN_VOLVER : fue[1] ? Pulsacion.HECHA : Pulsacion.NO_SE_DEJA;
     }
 
     private static boolean esperarA(java.util.function.BooleanSupplier logrado, double segundos) {
