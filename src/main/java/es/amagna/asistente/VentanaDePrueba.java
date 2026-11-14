@@ -73,7 +73,7 @@ public final class VentanaDePrueba {
         // Un botón que abre una ventana MODAL, como el «Seleccionar» de MN: al pulsarlo por dentro, Windows no
         // devuelve el control hasta que la modal se cierre. Es lo que dejó al asistente colgado media hora.
         java.awt.Button avisar = new java.awt.Button("Abrir aviso");
-        avisar.setBounds(210, 95, 120, 28);
+        avisar.setBounds(20, 172, 160, 28);
         avisar.addActionListener(e -> {
             Dialog d = new Dialog(f, "Aviso modal de prueba", true);
             d.add(new Label("Esta ventana bloquea a la de detrás."));
@@ -106,7 +106,7 @@ public final class VentanaDePrueba {
                 System.exit(0);
             }
         });
-        f.setSize(380, 200);
+        f.setSize(420, 250);
         f.setLocation(80, 80);
         f.setVisible(true);
         Thread.sleep(90_000);
