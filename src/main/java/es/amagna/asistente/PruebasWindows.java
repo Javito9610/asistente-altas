@@ -655,7 +655,7 @@ public final class PruebasWindows {
             v.activar(vIns);
             // Un botón que SÍ hace algo: la ventana tiene que desaparecer. Y si no desapareciera, insistiría.
             long t5 = System.currentTimeMillis();
-            String r5 = ctrl.pulsarInsistiendo(vIns, "boton:Cerrar", () -> ((VentanasNativas) v).handleDe(vIns) == null, 6);
+            String r5 = ctrl.pulsarInsistiendo(vIns, "boton:Cerrar ventana", () -> ((VentanasNativas) v).handleDe(vIns) == null, 6);
             System.out.println("   " + r5 + " (" + (System.currentTimeMillis() - t5) + " ms)");
             ok(r5.startsWith("Pulsado"), "pulsa y comprueba que ha pasado lo que tenía que pasar");
             ok(((VentanasNativas) v).handleDe(vIns) == null, "la ventana se ha cerrado de verdad");

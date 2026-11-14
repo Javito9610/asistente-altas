@@ -51,7 +51,7 @@ public final class VentanaDePrueba {
 
     /** Una ficha con etiquetas y cuadros al lado, como las de un programa de gestión. Se cierra sola a los 90 s. */
     private static void formulario(String nombre) throws Exception {
-        Frame f = new Frame(nombre);
+        final Frame f = new Frame(nombre);
         f.setLayout(null);
         Label eNif = new Label("NIF:");
         eNif.setBounds(20, 50, 70, 24);
@@ -63,7 +63,14 @@ public final class VentanaDePrueba {
         cImporte.setBounds(100, 90, 220, 24);
         java.awt.Button guardar = new java.awt.Button("Guardar");
         guardar.setBounds(100, 130, 100, 28);
-        for (java.awt.Component c : new java.awt.Component[] {eNif, cNif, eImporte, cImporte, guardar}) {
+        // Un botón que SÍ hace algo visible: sirve para comprobar que «pulsado» significa que el programa reaccionó.
+        java.awt.Button cerrar = new java.awt.Button("Cerrar ventana");
+        cerrar.setBounds(210, 130, 120, 28);
+        cerrar.addActionListener(e -> {
+            f.dispose();
+            System.exit(0);
+        });
+        for (java.awt.Component c : new java.awt.Component[] {eNif, cNif, eImporte, cImporte, guardar, cerrar}) {
             f.add(c);
         }
         cNif.setName("NIF");  // como MN: el propio cuadro se llama igual que su etiqueta
