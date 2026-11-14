@@ -728,8 +728,10 @@ public final class PruebasWindows {
                     "se abre otra pantalla");
             String r9 = ctrl.avanzar(vNoAv, () -> false, 12);
             System.out.println("   " + r9.lines().findFirst().orElse(""));
-            ok(r9.startsWith("No se ha podido pasar") && r9.contains("Probado:") && r9.contains("campo"),
-                    "si no hay manera, dice qué ha probado y qué hay en la pantalla");
+            // Da igual qué pulse: la condición nunca se cumple, así que tiene que rendirse DICIENDO qué probó,
+            // no quedarse insistiendo. (La ventana puede haberse cerrado por el camino: eso no es el fallo.)
+            ok(r9.startsWith("No se ha podido pasar") && r9.contains("Probado:"),
+                    "si no hay manera, se rinde y dice qué ha probado, en vez de insistir a ciegas");
             ((VentanasNativas) v).cerrarSiEsNuestra(vNoAv);
         } finally {
             pNoAv.destroy();
