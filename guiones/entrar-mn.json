@@ -1,5 +1,5 @@
 {
-  "_nota": "Entrar en MN: acceso, empresa, ejercicio y el anuncio. Cada pulsación dice QUÉ tiene que pasar después, y si no pasa se insiste (por dentro, con el ratón y con Intro).",
+  "_nota": "Entrar en MN: acceso, empresa, ejercicio y el anuncio. Elegir una fila SÍ es opcional (MN ya la trae elegida); pulsar «Seleccionar» NO lo es nunca, porque sin eso no se pasa de pantalla.",
   "pasos": [
     {
       "hacer": "esperar",
@@ -37,13 +37,6 @@
     {
       "hacer": "pulsar",
       "ventana": "Selección de Empresa",
-      "apodo": "opcion:Empresa de prueba",
-      "toca": true,
-      "opcional": true
-    },
-    {
-      "hacer": "pulsar",
-      "ventana": "Selección de Empresa",
       "apodo": "boton:Seleccionar",
       "toca": true,
       "luego": {
@@ -51,6 +44,14 @@
         "que": "desaparezca",
         "segundos": 90
       }
+    },
+    {
+      "hacer": "esperar",
+      "ventana": "Ejercicio Contable",
+      "apodo": "boton:Seleccionar",
+      "que": "aparezca",
+      "segundos": 60,
+      "opcional": true
     },
     {
       "hacer": "pulsar",
@@ -64,7 +65,6 @@
       "ventana": "Ejercicio Contable",
       "apodo": "boton:Seleccionar",
       "toca": true,
-      "opcional": true,
       "luego": {
         "ventana": "Ejercicio Contable",
         "que": "desaparezca",

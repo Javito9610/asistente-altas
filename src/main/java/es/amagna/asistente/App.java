@@ -320,6 +320,11 @@ public final class App {
 
         // 1. Que el programa esté vivo y responda. Si está cerrado, lo abre.
         var sesion = new es.amagna.asistente.guion.Sesion(ctrl, ventanas, mapa, "", System.out::println).conEntradaDelMapa();
+        // La IA de guardia: solo entra si el guion se atasca con algo que no estaba previsto.
+        if (!a.contains("--sin-ia") && Clave.hay()) {
+            sesion.conRescate(rescateConIa(mapa.ventana()));
+            System.out.println("IA de guardia: solo entra si algo se atasca.");
+        }
         var estado = sesion.asegurar();
         if (!estado.lista()) {
             throw new IllegalStateException("No se ha podido dejar el programa listo: " + estado.comoEsta());
@@ -428,6 +433,10 @@ public final class App {
         String debeDecir = a.contains("--debe-decir") ? a.get(a.indexOf("--debe-decir") + 1) : "";
         var sesion = new es.amagna.asistente.guion.Sesion(new Controles(ventanas), ventanas, mapa, debeDecir, System.out::println)
                 .conEntradaDelMapa();
+        if (!a.contains("--sin-ia") && Clave.hay()) {
+            sesion.conRescate(rescateConIa(mapa.ventana()));
+            System.out.println("IA de guardia: solo entra si algo se atasca.");
+        }
         if (a.contains("--entrar")) {
             sesion.conGuionDeEntrada(Path.of(a.get(a.indexOf("--entrar") + 1)));
         }

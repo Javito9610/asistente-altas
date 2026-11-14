@@ -50,6 +50,7 @@ public final class Sesion {
     private final String debeDecir;
     private Path guionEntrada;
     private Mapa mapaEntrada;
+    private Guion.Rescate rescate;
 
     /**
      * @param debeDecir texto que tiene que aparecer en el título para dar la sesión por buena (por ejemplo
@@ -68,6 +69,16 @@ public final class Sesion {
 
     public Sesion conGuionDeEntrada(Path guion) {
         this.guionEntrada = guion;
+        return this;
+    }
+
+    /**
+     * La IA de guardia para entrar. Un guion no puede adivinar TODAS las pantallas que un programa de gestión decide
+     * enseñar un día cualquiera: un aviso nuevo, una pregunta que no estaba, una actualización. Para eso está ella:
+     * mira lo que hay, lo resuelve, y el guion sigue por donde iba.
+     */
+    public Sesion conRescate(Guion.Rescate r) {
+        this.rescate = r;
         return this;
     }
 
@@ -122,8 +133,11 @@ public final class Sesion {
             return "está pidiendo usuario y contraseña y no hay nada configurado para entrar solo";
         }
         try {
-            var parte = new Guion(controles, ventanas, mapaEntrada, l -> registro.accept("     " + l))
-                    .ejecutar(guionEntrada, false);
+            Guion g = new Guion(controles, ventanas, mapaEntrada, l -> registro.accept("     " + l));
+            if (rescate != null) {
+                g.conRescate(rescate);
+            }
+            var parte = g.ejecutar(guionEntrada, false);
             if (!parte.bien()) {
                 // Si no ha encontrado un campo, lo útil no es rendirse: es dejar escrito QUÉ hay en esa pantalla,
                 // para poder corregir el mapa en un minuto en vez de ir adivinando.

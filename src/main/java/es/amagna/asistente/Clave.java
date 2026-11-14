@@ -19,6 +19,12 @@ public final class Clave {
         return Path.of(base != null ? base : System.getProperty("user.home"), "AsistenteAltas", "clave.txt");
     }
 
+    /** ¿Hay clave guardada? (para decidir si se puede contar con la IA, sin reventar si no la hay). */
+    public static boolean hay() {
+        String env = System.getenv("ANTHROPIC_API_KEY");
+        return env != null && !env.isBlank() || java.nio.file.Files.isRegularFile(fichero());
+    }
+
     public static String leer() {
         String env = System.getenv("ANTHROPIC_API_KEY");
         if (env != null && !env.isBlank()) {
