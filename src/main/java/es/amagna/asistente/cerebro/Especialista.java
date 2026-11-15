@@ -30,12 +30,15 @@ import java.util.Set;
  *
  * «puede» es una lista blanca: lo que no esté ahí, no se puede hacer. Si no se pone, puede todo.
  *
+ * «base: no» es para un especialista que no toca el ordenador: el que lee documentos, por ejemplo, no necesita saber
+ * nada de ventanas ni de ratones, y contarle todo eso solo le da ruido donde tiene que haber precisión.
+ *
  * @package Amagna\Altas
  */
 public record Especialista(String nombre, String modelo, int pasos, long topeTokens, Set<String> puede, String instrucciones) {
 
-    /** Los que hay. Cuando tengamos MN delante se añadirá «altas». */
-    public static final List<String> NOMBRES = List.of("cartografo", "desatascador", "consulta");
+    /** Los que hay. */
+    public static final List<String> NOMBRES = List.of("cartografo", "desatascador", "consulta", "altas");
 
     public static Especialista cargar(String nombre, String modeloPorDefecto, long topePorDefecto) throws IOException {
         String bruto = leer("/instrucciones/agentes/" + nombre + ".md");
@@ -47,6 +50,7 @@ public record Especialista(String nombre, String modelo, int pasos, long topeTok
         int pasos = 20;
         long tope = topePorDefecto;
         Set<String> puede = new LinkedHashSet<>();
+        boolean conBase = true;
         String cuerpo = bruto;
         if (bruto.startsWith("---")) {
             int fin = bruto.indexOf("\n---", 3);
@@ -62,6 +66,7 @@ public record Especialista(String nombre, String modelo, int pasos, long topeTok
                         case "modelo" -> modelo = v;
                         case "pasos" -> pasos = Integer.parseInt(v);
                         case "tope-tokens" -> tope = Long.parseLong(v);
+                        case "base" -> conBase = !v.equalsIgnoreCase("no");
                         case "puede" -> {
                             for (String h : v.split(",")) {
                                 if (!h.isBlank()) {
@@ -75,9 +80,10 @@ public record Especialista(String nombre, String modelo, int pasos, long topeTok
                 cuerpo = bruto.substring(bruto.indexOf('\n', fin + 1) + 1);
             }
         }
-        String base = leer("/instrucciones/base.md");
+        String base = conBase ? leer("/instrucciones/base.md") : null;
         return new Especialista(nombre, modelo, pasos, tope, Set.copyOf(puede),
-                (base == null ? "" : base) + "\n\n# Tu especialidad: " + nombre + "\n" + cuerpo.strip());
+                base == null ? cuerpo.strip()
+                        : base + "\n\n# Tu especialidad: " + nombre + "\n" + cuerpo.strip());
     }
 
     private static String leer(String ruta) throws IOException {

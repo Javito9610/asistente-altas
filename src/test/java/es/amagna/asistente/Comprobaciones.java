@@ -1,5 +1,6 @@
 package es.amagna.asistente;
 
+import es.amagna.asistente.altas.Lectura;
 import es.amagna.asistente.cerebro.Agente;
 import es.amagna.asistente.cerebro.Cerebro;
 import es.amagna.asistente.manos.Escala;
@@ -33,6 +34,7 @@ public final class Comprobaciones {
         agente();
         filas();
         zips();
+        lectura();
         System.out.println("\nTODO BIEN: " + bien + " comprobaciones.");
     }
 
@@ -997,6 +999,113 @@ public final class Comprobaciones {
                     "una carpeta vacía sigue sin abrir nada");
         } catch (java.io.IOException e) {
             ok(false, "los ZIPs se listan sin romperse: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Leer los papeles: que se le enseñen los documentos como lo que son, que se entienda lo que contesta y, sobre
+     * todo, que un alta con dudas o sin NIF NO siga.
+     */
+    static void lectura() {
+        ok(Lectura.comoSeManda("pdf").equals("application/pdf")
+                        && Lectura.comoSeManda("jpg").equals("image/jpeg")
+                        && Lectura.comoSeManda("JPG".toLowerCase(java.util.Locale.ROOT)).equals("image/jpeg")
+                        && Lectura.comoSeManda("png").equals("image/png")
+                        && Lectura.comoSeManda("txt").equals("texto")
+                        && Lectura.comoSeManda("docx") == null,
+                "cada documento se manda como lo que es (el PDF como PDF y la foto como foto)");
+
+        try {
+            Path dir = Files.createTempDirectory("lectura");
+            byte[] kviku = zipDe("contrato.pdf", "%PDF-1.4 contrato");
+            Path zip = guardarZip(dir, "bloque.zip",
+                    "Garcia Prueba/dni.pdf", "%PDF-1.4 dni",
+                    "Garcia Prueba/justificante.jpg", new byte[] {(byte) 0xFF, (byte) 0xD8, 1, 2},
+                    "Garcia Prueba/notas.txt", "llamar por la tarde",
+                    "Garcia Prueba/KVIKU.zip", kviku);
+            Zips.Bloque bloque = Zips.abrir(zip);
+            ok(bloque.vale() && bloque.documentos().size() == 4, "del bloque salen los documentos con su contenido");
+            ok(bloque.documentos().stream().anyMatch(d -> d.nombre().equals("contrato.pdf") && d.entidad().equals("KVIKU")
+                            && d.ruta().contains("KVIKU.zip")),
+                    "un documento del ZIP de dentro trae su entidad");
+            ok(bloque.documentos().stream().allMatch(d -> d.datos().length > 0), "los documentos vienen con sus bytes");
+
+            List<Object> partes = Lectura.comoSeLeEnsena(bloque);
+            String todo = Json.escribir(Json.obj("x", partes));
+            ok(todo.contains("Garcia Prueba/dni.pdf")
+                            && todo.contains("Garcia Prueba/KVIKU.zip") && todo.contains("contrato.pdf"),
+                    "cada documento va con su ruta delante, para poder decir después qué es cada uno");
+            ok(todo.contains("[entidad/expediente: KVIKU]"), "la carpeta de dentro se le enseña como pista de la entidad");
+            ok(todo.contains("application/pdf") && todo.contains("image/jpeg"), "los PDF y las fotos van tal cual");
+            ok(todo.contains("llamar por la tarde"), "un .txt va como texto, sin base64");
+            long documentos = partes.stream().filter(x -> x instanceof Map<?, ?> m
+                    && ("document".equals(m.get("type")) || "image".equals(m.get("type")))).count();
+            ok(documentos == 3, "van los tres documentos de verdad (el .txt es texto, no adjunto)");
+
+            Lectura.Resultado bueno = Lectura.deJson("""
+                    Aquí va lo que he leído:
+                    {"cliente": {"nombre": "Angela", "apellidos": "Garcia Prueba", "nif": "00000000t",
+                                 "telefono": "600 11 22 33", "correo": "a@b.test", "domicilio": "", "fecha_nacimiento": "14/03/1985"},
+                     "expedientes": [{"entidad": "KVIKU", "tipo": "usura", "contrato": "KV-2024-0098765"}],
+                     "ficheros": [{"ruta": "Garcia Prueba/dni.pdf", "que_es": "identidad"},
+                                  {"ruta": "Garcia Prueba/KVIKU.zip -> contrato.pdf", "que_es": "contrato"}],
+                     "dudas": []}
+                    """);
+            ok(bueno.cliente().get("nif").equals("00000000t") && bueno.cliente().get("nombre").equals("Angela"),
+                    "del JSON salen los datos del cliente tal como vienen, sin tocarlos");
+            ok(bueno.expedientes().size() == 1 && bueno.ficheros().size() == 2, "salen los expedientes y los ficheros");
+            ok(bueno.completo(), "con nombre, apellidos, NIF y sin dudas, el alta sigue");
+            String cuenta = Lectura.comoSeCuenta(bloque, bueno);
+            ok(cuenta.contains("LISTO") && cuenta.contains("identidad") && cuenta.contains("KVIKU"),
+                    "el resumen que ve una persona dice lo que ha salido");
+
+            Lectura.Resultado conDuda = Lectura.deJson("""
+                    {"cliente": {"nombre": "Angela", "apellidos": "Garcia", "nif": "00000000T"},
+                     "expedientes": [], "ficheros": [],
+                     "dudas": ["La letra del DNI no cuadra con el número"]}
+                    """);
+            ok(!conDuda.completo() && conDuda.queFalta().isEmpty(),
+                    "una sola duda para el alta, aunque no falte ningún dato");
+            ok(Lectura.comoSeCuenta(bloque, conDuda).contains("NO SE SIGUE")
+                            && Lectura.comoSeCuenta(bloque, conDuda).contains("no cuadra"),
+                    "cuando no se sigue, se dice por qué y con las palabras de la duda");
+
+            Lectura.Resultado sinNif = Lectura.deJson("""
+                    {"cliente": {"nombre": "Angela", "apellidos": "Garcia", "nif": ""},
+                     "expedientes": [], "ficheros": [], "dudas": []}
+                    """);
+            ok(!sinNif.completo() && sinNif.queFalta().equals(List.of("nif")),
+                    "sin NIF no se da de alta a nadie, y se dice qué falta");
+
+            Lectura.Resultado vacio = Lectura.deJson("{}");
+            ok(!vacio.completo() && vacio.queFalta().size() == 3 && vacio.dudas().isEmpty(),
+                    "si no contesta nada, faltan los tres datos imprescindibles");
+
+            try {
+                Lectura.deJson("No he podido leer los documentos.");
+                ok(false, "una contestación sin datos no se da por buena");
+            } catch (IllegalStateException e) {
+                ok(e.getMessage().contains("ningún dato"), "una contestación sin datos no se da por buena");
+            }
+
+            Cerebro miente = peticion -> respuesta(Json.obj("type", "text", "text",
+                    "{\"cliente\": {\"nombre\": \"Angela\", \"apellidos\": \"Garcia\", \"nif\": \"00000000T\"},"
+                    + " \"expedientes\": [], \"ficheros\": [], \"dudas\": []}"));
+            Lectura.Resultado delCerebro = Lectura.leer(miente, "modelo-de-prueba", "instrucciones", bloque);
+            ok(delCerebro.completo() && delCerebro.cliente().get("nif").equals("00000000T"),
+                    "la lectura entera funciona de punta a punta");
+
+            Path malo = guardarZip(Files.createTempDirectory("lectura-mal"), "mal.zip",
+                    "Cliente/Entidad/DeMas/contrato.pdf", "de-mas");
+            ok(!Zips.abrir(malo).vale(), "un bloque que no pasa las normas tampoco se lee");
+            try {
+                Lectura.leer(miente, "m", "i", Zips.abrir(malo));
+                ok(false, "no se le enseñan a la IA los papeles de un bloque rechazado");
+            } catch (IllegalArgumentException e) {
+                ok(true, "no se le enseñan a la IA los papeles de un bloque rechazado");
+            }
+        } catch (java.io.IOException e) {
+            ok(false, "leer los papeles no se rompe: " + e.getMessage());
         }
     }
 

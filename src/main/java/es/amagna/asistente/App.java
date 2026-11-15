@@ -1,5 +1,6 @@
 package es.amagna.asistente;
 
+import es.amagna.asistente.altas.Lectura;
 import es.amagna.asistente.cerebro.Agente;
 import es.amagna.asistente.cerebro.ClaudeApi;
 import es.amagna.asistente.manos.Escala;
@@ -44,6 +45,7 @@ public final class App {
                 case "guardar-clave" -> guardarClave();
                 case "ventanas" -> System.out.println(new VentanasNativas(false).abiertas());
                 case "zips" -> zips(Arrays.asList(args).subList(1, args.length));
+                case "leer" -> leer(Arrays.asList(args).subList(1, args.length));
                 case "campo" -> campo();
                 case "controles" -> controles(Arrays.asList(args).subList(1, args.length));
                 case "probar-windows" -> PruebasWindows.main(new String[0]);
@@ -83,6 +85,10 @@ public final class App {
                           asistente zips [--carpeta <ruta>] [--ver <nombre.zip>]
                                                         (los .zip de la bandeja; --ver enseña uno por dentro.
                                                          Si solo hay un .zip, también. La ruta está en entrada.json)
+                          asistente leer [<nombre.zip>] [--carpeta <ruta>] [--a fichero.txt] [--json]
+                                                        (la IA abre los papeles de un bloque y saca los datos del
+                                                         alta: cliente, expedientes y qué es cada fichero. Si falta
+                                                         algo o hay dudas, no sigue: lo dice)
                           asistente campo               (lee el campo donde hagas clic, sin IA)
                           asistente controles "<ventana>" [--hondo N] [--a arbol.txt]
                                                         (los controles por dentro, sin IA)
@@ -139,6 +145,54 @@ public final class App {
     /** Los .zip de la bandeja. --carpeta cambia la ruta solo esta vez. --ver enseña uno; si solo hay uno, también. */
     private static void zips(List<String> a) {
         System.out.println(Zips.informe(Zips.carpeta(a), a));
+    }
+
+    /** Leer los papeles de un bloque y sacar los datos del alta. */
+    private static void leer(List<String> a) throws IOException {
+        Path carpeta = Zips.carpeta(a);
+        Path zip = zipQueToca(carpeta, a);
+        System.out.println("Bloque: " + zip.toAbsolutePath());
+        Zips.Bloque bloque = Zips.abrir(zip);
+        if (!bloque.vale()) {
+            throw new IllegalStateException("Ese bloque no se puede abrir. " + bloque.problema());
+        }
+        System.out.println("Documentos: " + bloque.documentos().size() + " · leyendo…");
+        var esp = es.amagna.asistente.cerebro.Especialista.cargar("altas", MODELO_POR_DEFECTO, Agente.TOPE_TOKENS_POR_DEFECTO);
+        long t0 = System.currentTimeMillis();
+        Lectura.Resultado r = Lectura.leer(new ClaudeApi(Clave.leer()), esp.modelo(), esp.instrucciones(), bloque);
+        String informe = Lectura.comoSeCuenta(bloque, r)
+                + String.format("%n(%.0f s · modelo %s)%n", (System.currentTimeMillis() - t0) / 1000.0, esp.modelo());
+        System.out.println();
+        System.out.println(a.contains("--json") ? r.crudo() : informe);
+        if (a.contains("--a")) {
+            Path destino = Path.of(a.get(a.indexOf("--a") + 1));
+            Files.writeString(destino, a.contains("--json") ? r.crudo() : informe, StandardCharsets.UTF_8);
+            System.out.println("Guardado en " + destino.toAbsolutePath());
+        }
+        System.exit(r.completo() ? 0 : 1);
+    }
+
+    /** El .zip que toca: el que te digan, o el único que haya. */
+    private static Path zipQueToca(Path carpeta, List<String> a) {
+        for (String t : a) {
+            if (t.toLowerCase(java.util.Locale.ROOT).endsWith(".zip")) {
+                Path suelto = Path.of(t);
+                return Files.isRegularFile(suelto) ? suelto : carpeta.resolve(t);
+            }
+        }
+        try (var hijos = Files.list(carpeta)) {
+            List<Path> zips = hijos.filter(h -> h.getFileName().toString().toLowerCase(java.util.Locale.ROOT).endsWith(".zip"))
+                    .sorted().toList();
+            if (zips.size() == 1) {
+                return zips.get(0);
+            }
+            throw new IllegalArgumentException(zips.isEmpty()
+                    ? "No hay ningún .zip en " + carpeta.toAbsolutePath()
+                    : "Hay " + zips.size() + " bloques en " + carpeta.toAbsolutePath() + ". Di cuál: "
+                            + zips.stream().map(x -> x.getFileName().toString()).collect(java.util.stream.Collectors.joining(", ")));
+        } catch (IOException e) {
+            throw new IllegalStateException("No se puede mirar la carpeta " + carpeta.toAbsolutePath() + ": " + e.getMessage());
+        }
     }
 
     private static void probarManos() throws Exception {

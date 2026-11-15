@@ -162,6 +162,110 @@ public final class Zips {
         }
     }
 
+    /** Un documento del bloque, ya con su contenido en la mano. */
+    public record Doc(String ruta, String entidad, String nombre, byte[] datos) {
+        /** La extensión en minúsculas, sin el punto. */
+        public String extension() {
+            int p = nombre.lastIndexOf('.');
+            return p < 0 ? "" : nombre.substring(p + 1).toLowerCase(Locale.ROOT);
+        }
+    }
+
+    /**
+     * El bloque abierto: el cliente, sus documentos con el contenido, y —si no vale— por qué.
+     * Cuando {@code problema} no es null no hay nada que leer: el bloque entero se rechaza.
+     */
+    public record Bloque(String zip, String cliente, List<Doc> documentos, String problema) {
+        public boolean vale() {
+            return problema == null;
+        }
+    }
+
+    /**
+     * Igual que {@link #ver}, pero devolviendo el contenido de cada documento en vez de un dibujo del árbol.
+     * Mismas reglas y mismos rechazos: lo que no se puede enseñar, tampoco se puede leer.
+     */
+    public static Bloque abrir(Path zip) {
+        String nombre = zip.getFileName() == null ? zip.toString() : zip.getFileName().toString();
+        Path p = zip.toAbsolutePath().normalize();
+        if (!Files.isRegularFile(p)) {
+            return new Bloque(nombre, "", List.of(), "no está «" + nombre + "»");
+        }
+        // Se exige que el árbol se pueda pintar: así una sola regla decide qué bloques valen.
+        String arbol = ver(p);
+        if (arbol.contains("No se abre") || arbol.contains("no es un bloque de documentación")
+                || arbol.contains("Esto es el paquete de alta que sale")) {
+            return new Bloque(nombre, "", List.of(), arbol.lines().skip(1).findFirst().orElse(arbol).strip());
+        }
+        try (ZipFile z = new ZipFile(p.toFile(), StandardCharsets.UTF_8)) {
+            List<Doc> docs = new ArrayList<>();
+            String cliente = "";
+            for (ZipEntry e : Collections.list(z.entries())) {
+                if (e.isDirectory()) {
+                    continue;
+                }
+                Ruta ruta = Ruta.de(e.getName());
+                if (ruta.problema != null || ruta.segmentos.isEmpty() || basura(ruta.segmentos)) {
+                    continue;
+                }
+                List<String> s = ruta.segmentos;
+                if (s.size() > 1 && cliente.isEmpty()) {
+                    cliente = s.get(0);
+                }
+                String ultimo = s.get(s.size() - 1);
+                if (esZip(ultimo)) {
+                    String problema = abrirInteriorConDatos(z, e, docs);
+                    if (problema != null) {
+                        return new Bloque(nombre, cliente, List.of(), problema);
+                    }
+                    continue;
+                }
+                if (!cuenta(ultimo)) {
+                    continue;
+                }
+                String entidad = s.size() >= 3 ? s.get(1) : "";
+                try (InputStream in = z.getInputStream(e)) {
+                    docs.add(new Doc(e.getName(), entidad, ultimo, in.readAllBytes()));
+                }
+            }
+            if (docs.isEmpty()) {
+                return new Bloque(nombre, cliente, List.of(), "no hay ningún documento legible dentro");
+            }
+            docs.sort(Comparator.comparing(Doc::entidad, POR_NOMBRE).thenComparing(Doc::nombre, POR_NOMBRE));
+            return new Bloque(nombre, cliente, List.copyOf(docs), null);
+        } catch (IOException e) {
+            return new Bloque(nombre, "", List.of(), "no se ha podido leer (" + mensaje(e) + ")");
+        }
+    }
+
+    /** El ZIP interior, sacando también el contenido. Su nombre es la entidad. */
+    private static String abrirInteriorConDatos(ZipFile zip, ZipEntry entry, List<Doc> docs) throws IOException {
+        Ruta exterior = Ruta.de(entry.getName());
+        String entidad = sinZip(exterior.segmentos.get(exterior.segmentos.size() - 1));
+        byte[] datos;
+        try (InputStream in = zip.getInputStream(entry)) {
+            datos = in.readAllBytes();
+        }
+        try (ZipInputStream zin = new ZipInputStream(new ByteArrayInputStream(datos), StandardCharsets.UTF_8)) {
+            for (ZipEntry ie = zin.getNextEntry(); ie != null; ie = zin.getNextEntry()) {
+                Ruta ruta = Ruta.de(ie.getName());
+                if (ruta.problema != null) {
+                    return ruta.problema;
+                }
+                if (ruta.segmentos.isEmpty() || basura(ruta.segmentos)) {
+                    zin.closeEntry();
+                    continue;
+                }
+                String ultimo = ruta.segmentos.get(ruta.segmentos.size() - 1);
+                if (cuenta(ultimo)) {
+                    docs.add(new Doc(entry.getName() + " → " + ie.getName(), entidad, ultimo, zin.readAllBytes()));
+                }
+                zin.closeEntry();
+            }
+        }
+        return null;
+    }
+
     private static String leer(String nombreZip, ZipFile zip) {
         try {
             List<ZipEntry> utiles = new ArrayList<>();
