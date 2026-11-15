@@ -3,6 +3,7 @@ package es.amagna.asistente.manos;
 import com.sun.jna.Pointer;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -270,7 +271,65 @@ public final class VentanasNativas implements Ventanas {
 
     /** La ventana (a la vista) cuyo título contiene el texto: la de más delante que coincide. */
     public Pointer handleDe(String titulo) {
+        if (esTituloDeEjercicio(titulo)) {
+            return dialogoEjercicio();
+        }
         return buscar(titulo, visibles());
+    }
+
+    /**
+     * El diálogo «Selección de Ejercicio Contable» por su título de Windows, y solo ese.
+     * No pregunta a UI Automation: tras un Invoke modal esa llamada se queda dentro de COM
+     * y el hilo no vuelve, así que el tope de Java no llega a ejecutarse.
+     */
+    public Pointer handleEjercicio() {
+        Pointer h = buscar("Selección de Ejercicio Contable", visibles());
+        if (h != null && tituloEsEjercicio(Win32.titulo(h))) {
+            return h;
+        }
+        Pointer mn = buscar("MNprogram", visibles());
+        if (mn == null) {
+            return null;
+        }
+        long pid = Win32.pid(mn);
+        for (Pointer d : visibles()) {
+            if (d.equals(mn) || Win32.pid(d) != pid) {
+                continue;
+            }
+            if (tituloEsEjercicio(Win32.titulo(d))) {
+                return d;
+            }
+        }
+        return null;
+    }
+
+    /** ¿Sigue a la vista el diálogo del ejercicio? Solo Win32, sin COM. */
+    public boolean ejercicioVisible() {
+        return Win32.visible(handleEjercicio());
+    }
+
+    /**
+     * El diálogo «Selección de Ejercicio Contable», y solo ese.
+     * No vale la consola, ni Cursor, ni la principal «MNprogram - Abogados» que está detrás.
+     */
+    private Pointer dialogoEjercicio() {
+        return handleEjercicio();
+    }
+
+    private static boolean esTituloDeEjercicio(String titulo) {
+        String t = sinAcentos(titulo);
+        if (t.contains("cierre")) {
+            return false;
+        }
+        return t.contains("seleccion de ejercicio contable") || t.equals("ejercicio contable");
+    }
+
+    private static boolean tituloEsEjercicio(String titulo) {
+        String t = sinAcentos(titulo);
+        if (t.isEmpty() || t.contains("mnprogram") || t.contains("cierre") || esRuidoDeBusqueda(titulo)) {
+            return false;
+        }
+        return t.contains("seleccion de ejercicio contable");
     }
 
     /**
@@ -280,7 +339,8 @@ public final class VentanasNativas implements Ventanas {
      *  - NUNCA devuelve nuestra propia consola. El título de la consola lleva el comando entero, así que al buscar
      *    «MNprogram» encontraba la consola en la que se había escrito «MNprogram»: se leía a sí misma.
      *  - Puntúa: el título exacto vale más que empezar igual, y eso más que contenerlo en medio. Y a igualdad,
-     *    gana la que se está viendo.
+     *    gana la que se está viendo. Un diálogo (#32770 o propiedad de otra) gana a la principal o a Cursor:
+     *    «Ejercicio Contable» tiene que ser «Selección de Ejercicio Contable», no un menú ni la consola.
      */
     private Pointer buscar(String titulo, List<Pointer> donde) {
         String buscado = titulo.toLowerCase(Locale.ROOT).trim();
@@ -291,20 +351,69 @@ public final class VentanasNativas implements Ventanas {
             if (consola != null && Pointer.nativeValue(h) == Pointer.nativeValue(consola)) {
                 continue;
             }
-            String t = Win32.titulo(h).toLowerCase(Locale.ROOT).trim();
-            int p = t.equals(buscado) ? 100 : t.startsWith(buscado) ? 80 : t.contains(buscado) ? 60 : 0;
-            if (p == 0) {
+            String t = Win32.titulo(h);
+            if (esRuidoDeBusqueda(t)) {
                 continue;
             }
-            if (!Win32.User32.I.IsIconic(h)) {
-                p += 5;
-            }
+            boolean dialogo = esDialogo(h);
+            int p = puntosDeVentana(buscado, t, dialogo, Win32.User32.I.IsIconic(h));
             if (p > masPuntos) {
                 masPuntos = p;
                 mejor = h;
             }
         }
         return mejor;
+    }
+
+    /** Consola, el propio asistente, Cursor: no son el diálogo de MN. */
+    public static boolean esRuidoDeBusqueda(String titulo) {
+        if (titulo == null || titulo.isBlank()) {
+            return true;
+        }
+        String n = titulo.toLowerCase(Locale.ROOT);
+        return n.contains("asistente") || n.contains("símbolo del sistema") || n.contains("simbolo del sistema")
+                || n.contains("cursor agents") || n.contains("qa osd");
+    }
+
+    public static boolean esDialogoPorClase(String clase, boolean tieneDuenioDistinto) {
+        return tieneDuenioDistinto || "#32770".equals(clase);
+    }
+
+    static boolean esDialogo(Pointer h) {
+        Pointer dueno = Win32.User32.I.GetAncestor(h, Win32.GA_ROOTOWNER);
+        return esDialogoPorClase(Win32.clase(h), dueno != null && !dueno.equals(h));
+    }
+
+    /**
+     * Cómo de bien encaja un título visible con lo que se busca. El diálogo real
+     * «Selección de Ejercicio Contable» tiene que ganar a un contiene suelto.
+     */
+    public static int puntosDeVentana(String buscado, String titulo, boolean dialogo, boolean iconizada) {
+        if (buscado == null || buscado.isBlank() || esRuidoDeBusqueda(titulo)) {
+            return 0;
+        }
+        String t = sinAcentos(titulo);
+        String b = sinAcentos(buscado);
+        int p = t.equals(b) ? 100 : t.startsWith(b) ? 80 : t.contains(b) ? 60 : 0;
+        if (p == 0) {
+            return 0;
+        }
+        if (!iconizada) {
+            p += 5;
+        }
+        if (dialogo) {
+            p += 25;
+        }
+        if (t.contains("seleccion de ejercicio contable")) {
+            p += 15;
+        }
+        return p;
+    }
+
+    /** «Selección» y «Seleccion» (o la ó descompuesta) son el mismo título. */
+    private static String sinAcentos(String s) {
+        String n = Normalizer.normalize(s == null ? "" : s, Normalizer.Form.NFD).replaceAll("\\p{M}", "");
+        return n.toLowerCase(Locale.ROOT).trim();
     }
 
     /**
@@ -412,14 +521,7 @@ public final class VentanasNativas implements Ventanas {
             System.out.println("    [modo vista, no se hace] activar ventana «" + titulo + "»");
             return false;
         }
-        String buscado = titulo.toLowerCase(Locale.ROOT);
-        Pointer h = null;
-        for (Pointer v : visibles()) {
-            if (Win32.titulo(v).toLowerCase(Locale.ROOT).contains(buscado)) {
-                h = v;
-                break; // la de más delante que coincide
-            }
-        }
+        Pointer h = handleDe(titulo);
         if (h == null) {
             return false;
         }

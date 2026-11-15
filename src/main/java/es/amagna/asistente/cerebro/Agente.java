@@ -54,6 +54,8 @@ public final class Agente {
     private final Ventanas ventanas;
     private Controles controles;
     private final long topeTokens;
+    private boolean enEntrada;
+    private boolean yaMiroUia;
 
     public static final long TOPE_TOKENS_POR_DEFECTO = 200_000;
     static final int AVISO_SIN_CAMBIOS = 3;
@@ -71,6 +73,47 @@ public final class Agente {
     public Agente conControles(Controles c) {
         this.controles = c;
         return this;
+    }
+
+    /**
+     * Rescate de la entrada (login / empresa / ejercicio): primero UIA, nunca captura, nunca Contabilidad.
+     */
+    public Agente enEntrada(boolean si) {
+        this.enEntrada = si;
+        return this;
+    }
+
+    /**
+     * En la entrada la captura no es el primer paso y no se abren menús peligrosos.
+     * El programa lo impide: no basta con decírselo a la IA.
+     */
+    public static String rechazoEnEntrada(boolean enEntrada, boolean yaMiroUia, String accion, String control) {
+        if (!enEntrada || accion == null) {
+            return null;
+        }
+        if (("screenshot".equals(accion) || "zoom".equals(accion) || "left_click".equals(accion)) && !yaMiroUia) {
+            return "NO: primero ventanas_abiertas y ver_controles del diálogo abierto de MN "
+                    + "(«Selección de Ejercicio Contable» o «Selección de Empresa»). La captura no es el primer paso.";
+        }
+        if (("pulsar_control".equals(accion) || "escribir_en".equals(accion)) && esMenuPeligrosoEnEntrada(control)) {
+            return "NO PERMITIDO en la entrada: no se abre Contabilidad ni Fichaje ni se pulsa "
+                    + "Mi Empresa / Alta / Baja / Modificar. Si está «Selección de Ejercicio Contable», "
+                    + "elige el último año y pulsa Seleccionar.";
+        }
+        return null;
+    }
+
+    public static boolean esMenuPeligrosoEnEntrada(String control) {
+        if (control == null || control.isBlank()) {
+            return false;
+        }
+        String n = control.toLowerCase(java.util.Locale.ROOT);
+        if (n.contains("seleccionar") || n.contains("aceptar")) {
+            return false;
+        }
+        return n.contains("contabilidad") || n.contains("fichaje") || n.contains("mi empresa")
+                || n.contains("empresa 3") || n.contains("empresa 4")
+                || n.contains("modificar") || n.contains("alta") || n.contains("baja");
     }
 
     public Agente(Cerebro cerebro, Manos manos, Ventanas ventanas, String modelo, String instrucciones, int pasosMax, long topeTokens,
@@ -254,6 +297,14 @@ public final class Agente {
                         resultados.add(resultado(id, List.of(textoBloque(no)), true, ordenador));
                         continue;
                     }
+                    String noEntrada = rechazoEnEntrada(enEntrada, yaMiroUia, accion,
+                            in.get("control") == null ? (String) in.get("titulo") : String.valueOf(in.get("control")));
+                    if (noEntrada != null) {
+                        registro.accept("    " + noEntrada);
+                        anotar(x -> x.error(noEntrada));
+                        resultados.add(resultado(id, List.of(textoBloque(noEntrada)), true, ordenador));
+                        continue;
+                    }
                     try {
                         List<Object> salida = ordenador ? ejecutarAccion(accion, in) : ejecutarPropia(accion, in);
                         final int nPaso = paso;
@@ -375,8 +426,10 @@ public final class Agente {
                         ? vn.cerrarSiEsNuestra((String) in.get("titulo"))
                         : "Aquí no se pueden cerrar ventanas."));
             case "ventana_activa":
+                yaMiroUia = true;
                 return List.of(textoBloque("Ventana activa: «" + ventanas.activa() + "»"));
             case "leer_campo": {
+                yaMiroUia = true;
                 Ventanas.Campo c = ventanas.campoConFoco();
                 String donde = "Control con el foco: «" + c.nombre() + "» (" + c.tipo() + ") en la ventana «" + c.ventana() + "». ";
                 if (c.valor() == null) {
@@ -386,10 +439,24 @@ public final class Agente {
                 return List.of(textoBloque(donde + (esperado == null ? "Texto: «" + c.valor() + "»" : comparar(String.valueOf(esperado), c.valor()))));
             }
             case "ventanas_abiertas":
+                yaMiroUia = true;
                 return List.of(textoBloque("Ventanas abiertas:\n" + ventanas.abiertas()));
-            case "ver_controles":
-                return List.of(textoBloque(controles.arbol((String) in.get("ventana"), (int) num(in.getOrDefault("profundidad", 3L)))));
+            case "ver_controles": {
+                yaMiroUia = true;
+                String pedida = (String) in.get("ventana");
+                String arbol = controles.arbol(pedida, (int) num(in.getOrDefault("profundidad", 3L)));
+                if (enEntrada && pedida != null && !pedida.toLowerCase(java.util.Locale.ROOT).contains("ejercicio")) {
+                    String ej = controles.arbol(Controles.DIALOGO_EJERCICIO, 8, 400);
+                    if (ej != null && !ej.startsWith("No hay ninguna ventana")) {
+                        arbol = "HAY un diálogo «" + Controles.DIALOGO_EJERCICIO + "». Usa ESTE, no «"
+                                + pedida + "». No abras Contabilidad.\n" + ej + "\n-----\nPedido «"
+                                + pedida + "»:\n" + arbol;
+                    }
+                }
+                return List.of(textoBloque(arbol));
+            }
             case "leer_control":
+                yaMiroUia = true;
                 return List.of(textoBloque(controles.leer((String) in.get("ventana"), (String) in.get("control"))));
             case "escribir_en":
                 return List.of(textoBloque(controles.escribir((String) in.get("ventana"), (String) in.get("control"), (String) in.get("texto"))));

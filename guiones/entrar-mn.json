@@ -1,63 +1,57 @@
 {
-  "_nota": "Entrar en MN. Las dos pantallas de selección solo confirman: se usa «avanzar», que prueba todo lo razonable (los botones de confirmar, Intro, Espacio) hasta que aparece la siguiente pantalla. El cerrojo de la empresa lo comprueba la sesión al final.",
+  "_nota": "Entrar en MN. La empresa se elige POR NOMBRE (el valor de la fila, no «Fila 0»). Nunca la última: esa es la empresa 4. El ejercicio sí es el último, en el diálogo real «Selección de Ejercicio Contable» (no basta el trozo «Ejercicio Contable»). Ese diálogo no se salta porque se vea «MNprogram - Abogados» detrás: 2026 ya está marcado y hay que pulsar Seleccionar. Si a los ~25 s el diálogo sigue abierto, PARADO y se sale: no se llama a la IA ni se mata MN. «Ya estaba pasada» solo si ese diálogo ya no existe. Si ya está el diálogo de empresa o el de ejercicio, se salta el login.",
   "pasos": [
     {
       "hacer": "esperar",
       "control": "clave",
       "que": "aparezca",
-      "segundos": 90
+      "segundos": 90,
+      "saltar_si": ["Selección de Empresa", "Selección de Ejercicio Contable", "MNprogram - Abogados"]
     },
     {
       "hacer": "escribir",
       "control": "usuario",
-      "valor": "usuario:mn"
+      "valor": "usuario:mn",
+      "saltar_si": ["Selección de Empresa", "Selección de Ejercicio Contable", "MNprogram - Abogados"]
     },
     {
       "hacer": "escribir",
       "control": "clave",
-      "valor": "secreto:mn"
+      "valor": "secreto:mn",
+      "saltar_si": ["Selección de Empresa", "Selección de Ejercicio Contable", "MNprogram - Abogados"]
     },
     {
       "hacer": "pulsar",
       "control": "entrar",
       "toca": true,
+      "saltar_si": ["Selección de Empresa", "Selección de Ejercicio Contable", "MNprogram - Abogados"],
       "luego": {
         "ventana": "Selección de Empresa",
+        "o_ventana": "MNprogram - Abogados",
         "que": "aparezca",
         "segundos": 90
       }
     },
     {
-      "hacer": "pulsar",
-      "ventana": "Selección de Empresa",
-      "apodo": "fila:Empresa de prueba",
-      "toca": true,
-      "opcional": true
-    },
-    {
       "hacer": "avanzar",
       "ventana": "Selección de Empresa",
+      "fila": "Empresa de prueba",
+      "saltar_si": ["Selección de Ejercicio Contable", "MNprogram - Abogados"],
       "segundos": 90,
       "toca": true,
       "hasta": {
-        "ventana": "Ejercicio Contable",
+        "ventana": "Selección de Ejercicio Contable",
         "que": "aparezca"
       }
     },
     {
-      "hacer": "pulsar",
-      "ventana": "Ejercicio Contable",
-      "apodo": "fila[-1]",
-      "toca": true,
-      "opcional": true
-    },
-    {
       "hacer": "avanzar",
-      "ventana": "Ejercicio Contable",
-      "segundos": 120,
+      "ventana": "Selección de Ejercicio Contable",
+      "ultima": true,
+      "segundos": 25,
       "toca": true,
       "hasta": {
-        "ventana": "Ejercicio Contable",
+        "ventana": "Selección de Ejercicio Contable",
         "que": "desaparezca"
       }
     },

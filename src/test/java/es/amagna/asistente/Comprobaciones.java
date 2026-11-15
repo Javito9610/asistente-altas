@@ -6,9 +6,18 @@ import es.amagna.asistente.manos.Escala;
 import es.amagna.asistente.manos.Manos;
 import es.amagna.asistente.manos.Teclas;
 import java.awt.event.KeyEvent;
+import java.io.ByteArrayOutputStream;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.zip.CRC32;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 /**
  * Comprobaciones sin pantalla ni API (se pueden pasar en cualquier sitio): JSON, escala de coordenadas, teclas y el bucle
@@ -22,6 +31,8 @@ public final class Comprobaciones {
         escala();
         teclas();
         agente();
+        filas();
+        zips();
         System.out.println("\nTODO BIEN: " + bien + " comprobaciones.");
     }
 
@@ -393,6 +404,63 @@ public final class Comprobaciones {
             ok(false, "se puede leer «debe_decir»: " + e.getMessage());
         }
 
+        // El guion de entrada de MN: la empresa va POR NOMBRE; la última fila es solo el ejercicio.
+        try {
+            java.nio.file.Path fg = java.nio.file.Path.of("guiones", "entrar-mn.json");
+            Map<String, Object> g = Json.objeto(java.nio.file.Files.readString(fg));
+            boolean empresaPorNombre = false;
+            boolean empresaUltima = false;
+            boolean ejercicioUltimo = false;
+            boolean loginSaltaSiEmpresa = false;
+            boolean loginSaltaSiEjercicioReal = false;
+            boolean empresaNoUsaUltima = true;
+            boolean tituloEjercicioReal = false;
+            boolean hastaEjercicioReal = false;
+            boolean ejercicioHastaDesaparece = false;
+            boolean ejercicioNoSaltaPorPrincipal = true;
+            for (Object o : (List<?>) g.get("pasos")) {
+                Map<?, ?> p = (Map<?, ?>) o;
+                String hacer = String.valueOf(p.get("hacer"));
+                if ("escribir".equals(hacer) && "clave".equals(String.valueOf(p.get("control")))) {
+                    String saltar = String.valueOf(p.get("saltar_si"));
+                    loginSaltaSiEmpresa = saltar.contains("Selección de Empresa");
+                    loginSaltaSiEjercicioReal = saltar.contains("Selección de Ejercicio Contable");
+                }
+                if (!"avanzar".equals(hacer)) {
+                    continue;
+                }
+                String dialogo = String.valueOf(p.get("ventana"));
+                if (dialogo.contains("Empresa")) {
+                    empresaPorNombre = "Empresa de prueba".equals(p.get("fila"));
+                    empresaUltima = Boolean.TRUE.equals(p.get("ultima"));
+                    empresaNoUsaUltima = p.get("ultima") == null || Boolean.FALSE.equals(p.get("ultima"));
+                    if (p.get("hasta") instanceof Map<?, ?> h) {
+                        hastaEjercicioReal = "Selección de Ejercicio Contable".equals(String.valueOf(h.get("ventana")));
+                    }
+                }
+                if (dialogo.contains("Ejercicio")) {
+                    tituloEjercicioReal = "Selección de Ejercicio Contable".equals(dialogo);
+                    ejercicioUltimo = Boolean.TRUE.equals(p.get("ultima"));
+                    if (p.get("hasta") instanceof Map<?, ?> h) {
+                        ejercicioHastaDesaparece = "desaparezca".equals(String.valueOf(h.get("que")))
+                                && "Selección de Ejercicio Contable".equals(String.valueOf(h.get("ventana")));
+                    }
+                    String saltarEj = String.valueOf(p.get("saltar_si"));
+                    ejercicioNoSaltaPorPrincipal = p.get("saltar_si") == null
+                            || !saltarEj.contains("MNprogram");
+                }
+            }
+            ok(empresaPorNombre && !empresaUltima && empresaNoUsaUltima,
+                    "el guion de entrada elige «Empresa de prueba», no la última fila (la empresa 4)");
+            ok(ejercicioUltimo && tituloEjercicioReal && ejercicioHastaDesaparece,
+                    "y el ejercicio sí es el último, en «Selección de Ejercicio Contable», hasta que desaparezca");
+            ok(loginSaltaSiEmpresa && loginSaltaSiEjercicioReal && hastaEjercicioReal
+                    && ejercicioNoSaltaPorPrincipal,
+                    "si ya está Selección de Empresa o de Ejercicio Contable, no se vuelve a escribir la contraseña detrás; el ejercicio no se salta porque se vea MN");
+        } catch (java.io.IOException e) {
+            ok(false, "se puede leer el guion de entrada: " + e.getMessage());
+        }
+
         // Nunca quedarse mudo para siempre: si el programa no contesta, se deja por imposible y se avisa.
         long t0espera = System.currentTimeMillis();
         String tarde = es.amagna.asistente.guion.Explorador.conTiempo(1, () -> {
@@ -450,6 +518,9 @@ public final class Comprobaciones {
                     "el cartógrafo puede mirar pero NO puede escribir ni pulsar");
             var desa = es.amagna.asistente.cerebro.Especialista.cargar("desatascador", "m", 999);
             ok(desa.puede().isEmpty() && desa.pasos() == 12, "el desatascador sí puede tocar, pero con poca cuerda");
+            ok(desa.instrucciones().contains("Selección de Ejercicio Contable")
+                    && desa.instrucciones().toLowerCase().contains("nunca la captura"),
+                    "el desatascador mira UIA del diálogo real, no captura primero ni Contabilidad");
             try {
                 es.amagna.asistente.cerebro.Especialista.cargar("el-que-no-existe", "m", 1);
                 ok(false, "pedir un especialista que no existe avisa");
@@ -495,6 +566,515 @@ public final class Comprobaciones {
 
     static Map<String, Object> pensar() {
         return Json.obj("type", "thinking", "thinking", "...", "signature", "firma");
+    }
+
+    static void filas() {
+        ok(es.amagna.asistente.manos.Controles.cuentaComoFila("fila", "Ejercicio Fila 0"),
+                "un DataItem de MN cuenta como fila");
+        ok(es.amagna.asistente.manos.Controles.cuentaComoFila("opcion", "2026"),
+                "un ListItem con el año también: si no, el diálogo del ejercicio no ve ninguna fila");
+        ok(es.amagna.asistente.manos.Controles.cuentaComoFila("otro", "2.026"),
+                "y un Custom con el año a la española (2.026) también");
+        ok(es.amagna.asistente.manos.Controles.cuentaComoFila("otro", "Row 3"),
+                "y un Custom llamado Row N, que es lo que pone DevExpress a veces");
+        ok(!es.amagna.asistente.manos.Controles.cuentaComoFila("otro", "Fila superior"),
+                "la cabecera «Fila superior» de un DataGridView NO es una fila de datos");
+        ok(es.amagna.asistente.manos.Controles.elValorEsLaFila("1;Empresa de prueba", "Empresa de prueba"),
+                "en MN el nombre de la empresa está en el valor de la fila, no en «Fila 0»");
+        ok(es.amagna.asistente.manos.Controles.elValorEsLaFila("Empresa de prueba", "Empresa de prueba"),
+                "y si el valor es solo el nombre, también");
+        ok(!es.amagna.asistente.manos.Controles.elValorEsLaFila("4;Empresa 4", "Empresa de prueba"),
+                "«Empresa 4» no vale por «Empresa de prueba»");
+        ok(!es.amagna.asistente.manos.Controles.elValorEsLaFila("1;Empresa de prueba", "Empresa"),
+                "un trozo suelto («Empresa») no elige una fila: coincidiría con la 3 y la 4");
+        ok(es.amagna.asistente.manos.Controles.esLaFilaEntera("Fila 0")
+                && !es.amagna.asistente.manos.Controles.esLaFilaEntera("Nombre Fila 0"),
+                "«Fila 0» es la fila entera; «Nombre Fila 0» es la celda");
+        ok(es.amagna.asistente.manos.Controles.esCeldaDeFila("Nombre Fila 0")
+                && es.amagna.asistente.manos.Controles.esCeldaDeFila("Número Fila 0")
+                && !es.amagna.asistente.manos.Controles.esCeldaDeFila("Fila 0"),
+                "y no se confunden: si se puntúan igual, el asistente no tocaba ninguna");
+        ok(!es.amagna.asistente.manos.Controles.cuentaComoFila("boton", "Seleccionar"),
+                "un botón de confirmar NO es una fila");
+        ok(!es.amagna.asistente.manos.Controles.cuentaComoFila("panel", "Iniciar Sesión"),
+                "ni el panel de entrar");
+        var confirmar = es.amagna.asistente.manos.Controles.apodosDeConfirmar();
+        ok(confirmar.get(0).startsWith("boton:") && confirmar.contains("panel:Seleccionar") && confirmar.contains("#btnAceptar"),
+                "confirmar se busca por tipo o identificador, no por un trozo de nombre suelto");
+        ok(!confirmar.contains("abrir") && !confirmar.contains("si"),
+                "no se pulsa «abrir» ni «sí» a secas: en un diálogo de MN eso es un combo o un texto");
+        ok(confirmar.stream().noneMatch(es.amagna.asistente.manos.Controles::esBotonPeligrosoDeEmpresa)
+                && confirmar.stream().noneMatch(a -> a.toLowerCase().contains("modificar")),
+                "confirmar nunca incluye Modificar (ni Alta ni Baja)");
+
+        // El caso real de MN: nombre «Fila 0», valor «1;Empresa de prueba». El texto de ayuda
+        // contiene las mismas palabras y, si se puntúa, empata y no se toca ninguna.
+        ok(es.amagna.asistente.manos.Controles.esFraseDeAyuda(
+                "La empresa de prueba incluye ejemplos para realizar pruebas."),
+                "la frase de ayuda del diálogo NO es una fila");
+        ok(!es.amagna.asistente.manos.Controles.esFraseDeAyuda("Empresa de prueba")
+                && !es.amagna.asistente.manos.Controles.esFraseDeAyuda("Fila 0")
+                && !es.amagna.asistente.manos.Controles.esFraseDeAyuda("Nombre Fila 0"),
+                "y el nombre de la empresa o de la fila, sí cabe");
+        ok(!es.amagna.asistente.manos.Controles.cuentaComoFila("texto",
+                "La empresa de prueba incluye ejemplos para realizar pruebas.")
+                && !es.amagna.asistente.manos.Controles.cuentaComoFila("otro",
+                "La empresa de prueba incluye ejemplos para realizar pruebas.")
+                && !es.amagna.asistente.manos.Controles.cuentaComoFila("fila",
+                "No se puede modificar la Empresa de prueba."),
+                "ni el texto de ayuda ni el aviso de Modificar cuentan como fila");
+
+        int pFila = es.amagna.asistente.manos.Controles.puntosDeFila(
+                "otro", "Fila 0", "1;Empresa de prueba", "Empresa de prueba");
+        int pCelda = es.amagna.asistente.manos.Controles.puntosDeFila(
+                "fila", "Nombre Fila 0", "Empresa de prueba", "Empresa de prueba");
+        int pAyuda = es.amagna.asistente.manos.Controles.puntosDeFila(
+                "texto", "La empresa de prueba incluye ejemplos para realizar pruebas.",
+                null, "Empresa de prueba");
+        int pCabecera = es.amagna.asistente.manos.Controles.puntosDeFila(
+                "otro", "Fila superior", "Número;Nombre", "Empresa de prueba");
+        int pTrozo = es.amagna.asistente.manos.Controles.puntosDeFila(
+                "otro", "Fila 3", "4;Empresa 4", "Empresa");
+        int pMia = es.amagna.asistente.manos.Controles.puntosDeFila(
+                "otro", "Fila 1", "2;Mi Empresa", "Empresa de prueba");
+        ok(pFila >= 112 && pFila - pCelda >= 15,
+                "«Fila 0» = «1;Empresa de prueba» gana a la celda por más del empate (" + pFila + " vs " + pCelda + ")");
+        ok(pAyuda == 0 && pCabecera == 0 && pTrozo == 0 && pMia == 0,
+                "ayuda, cabecera, un trozo «Empresa» y «Mi Empresa» no puntúan para Empresa de prueba");
+
+        ok(es.amagna.asistente.manos.Controles.empresaProhibida("Mi Empresa")
+                && es.amagna.asistente.manos.Controles.empresaProhibida("2;Mi Empresa")
+                && es.amagna.asistente.manos.Controles.empresaProhibida("3;Empresa 3")
+                && es.amagna.asistente.manos.Controles.empresaProhibida("4;Empresa 4")
+                && es.amagna.asistente.manos.Controles.empresaProhibida(
+                        "MNprogram - Abogados - Mi Empresa [\\Usu2] Año 2026"),
+                "Mi Empresa / Empresa 3 / Empresa 4 están prohibidas, también en el título");
+        ok(!es.amagna.asistente.manos.Controles.empresaProhibida("Empresa de prueba")
+                && !es.amagna.asistente.manos.Controles.empresaProhibida("1;Empresa de prueba"),
+                "y Empresa de prueba no lo está");
+
+        ok(es.amagna.asistente.manos.Controles.esDialogoDeEmpresa("Selección de Empresa")
+                && es.amagna.asistente.manos.Controles.esBotonPeligrosoDeEmpresa("Modificar")
+                && es.amagna.asistente.manos.Controles.esBotonPeligrosoDeEmpresa("boton:Alta")
+                && es.amagna.asistente.manos.Controles.esBotonPeligrosoDeEmpresa("#btnBaja")
+                && !es.amagna.asistente.manos.Controles.esBotonPeligrosoDeEmpresa("Seleccionar")
+                && !es.amagna.asistente.manos.Controles.esBotonPeligrosoDeEmpresa("Aceptar"),
+                "en ese diálogo Alta/Baja/Modificar están prohibidos; Seleccionar y Aceptar no");
+        ok(es.amagna.asistente.manos.Controles.rechazoDeEmpresa("Selección de Empresa", "boton:Modificar") != null
+                && es.amagna.asistente.manos.Controles.rechazoDeEmpresa("Selección de Empresa", "fila:Mi Empresa") != null
+                && es.amagna.asistente.manos.Controles.rechazoDeEmpresa(
+                        "Selección de Empresa", "fila:Empresa de prueba", "otro", "Fila 0", "1;Empresa de prueba") == null
+                && es.amagna.asistente.manos.Controles.rechazoDeEmpresa(
+                        "Selección de Empresa", "fila:Fila 1", "otro", "Fila 1", "2;Mi Empresa") != null,
+                "se rechaza Modificar y Mi Empresa; se acepta la fila de Empresa de prueba");
+        ok(es.amagna.asistente.manos.Controles.esAvisoInformativo("Información")
+                && es.amagna.asistente.manos.Controles.esAvisoInformativo("Aviso"),
+                "el popup «Información» se reconoce para cerrarlo con Aceptar");
+        ok("Empresa de prueba".equals(
+                es.amagna.asistente.manos.Controles.nombrePedidoDeFila("fila:Empresa de prueba"))
+                && "Empresa de prueba".equals(
+                es.amagna.asistente.manos.Controles.nombrePedidoDeFila("Empresa de prueba")),
+                "de «fila:Empresa de prueba» se saca el nombre pedido");
+        ok(es.amagna.asistente.manos.Controles.descripcionEsLaFila(
+                "otro «Fila 0» = «1;Empresa de prueba»", "Empresa de prueba")
+                && !es.amagna.asistente.manos.Controles.descripcionEsLaFila(
+                "otro «Fila 1» = «2;Mi Empresa»", "Empresa de prueba"),
+                "la descripción de UIA («Fila 0» = «1;Empresa de prueba») basta para probar la fila");
+
+        ok(es.amagna.asistente.guion.Guion.noLlamarIa(
+                "No se encuentra «fila:Empresa de prueba». No se confirma nada.",
+                java.util.Map.of("fila", "Empresa de prueba", "hacer", "avanzar"))
+                && es.amagna.asistente.guion.Guion.noLlamarIa("PARADO: empresa real", java.util.Map.of())
+                && es.amagna.asistente.guion.Guion.noLlamarIa("lo que sea", java.util.Map.of("fila", "Empresa de prueba")),
+                "si falta Empresa de prueba, la IA no entra a pulsar otra cosa");
+        ok(!es.amagna.asistente.guion.Guion.noLlamarIa("el campo NIF no está", java.util.Map.of("hacer", "escribir")),
+                "y en un atasco que no es de empresa, sí puede entrar");
+        ok(es.amagna.asistente.guion.Guion.noLlamarIa(
+                "PARADO: «Selección de Ejercicio Contable» sigue abierto.",
+                java.util.Map.of("hacer", "avanzar", "ventana", "Selección de Ejercicio Contable")),
+                "en el diálogo de ejercicio no entra la IA: se para");
+
+        ok(es.amagna.asistente.guion.Guion.esSi(Boolean.TRUE)
+                && es.amagna.asistente.guion.Guion.esSi("true")
+                && es.amagna.asistente.guion.Guion.esSi(Json.objeto("{\"ultima\":true}").get("ultima"))
+                && !es.amagna.asistente.guion.Guion.esSi(null)
+                && !es.amagna.asistente.guion.Guion.esSi(Boolean.FALSE)
+                && !es.amagna.asistente.guion.Guion.esSi("false"),
+                "«ultima: true» del JSON es un boolean de verdad y se lee; no se pierde al pasarlo a texto");
+
+        ok(!es.amagna.asistente.guion.Guion.saltarPorqueYaEstamos("avanzar",
+                "Selección de Ejercicio Contable",
+                List.of("MNprogram - Abogados"),
+                t -> true)
+                && !es.amagna.asistente.guion.Guion.saltarPorqueYaEstamos("avanzar",
+                "Selección de Ejercicio Contable",
+                List.of("MNprogram - Abogados"),
+                t -> "MNprogram - Abogados".equals(t))
+                && es.amagna.asistente.guion.Guion.saltarPorqueYaEstamos("escribir",
+                "Control de acceso",
+                List.of("Selección de Ejercicio Contable"),
+                t -> t.contains("Ejercicio")),
+                "el ejercicio no se salta porque se vea MN detrás; el login sí se salta si ya está el diálogo");
+
+        ok(es.amagna.asistente.manos.Controles.esDialogoDeEjercicio("Selección de Ejercicio Contable")
+                && es.amagna.asistente.manos.Controles.esDialogoDeEjercicio("Ejercicio Contable")
+                && !es.amagna.asistente.manos.Controles.esDialogoDeEjercicio("Selección de Empresa")
+                && !es.amagna.asistente.manos.Controles.esDialogoDeEjercicio("Cierre Ejercicio"),
+                "el diálogo real es «Selección de Ejercicio Contable»; un cierre de ejercicio no lo es");
+
+        ok(!es.amagna.asistente.manos.Controles.arbolSirveParaAvanzar("")
+                && !es.amagna.asistente.manos.Controles.arbolSirveParaAvanzar("Controles de «x»:")
+                && !es.amagna.asistente.manos.Controles.arbolSirveParaAvanzar(
+                        "No hay ninguna ventana cuyo título contenga «Ejercicio Contable»."),
+                "un árbol vacío no vale para avanzar: hay que reiniciar UIA y esperar");
+        ok(es.amagna.asistente.manos.Controles.arbolSirveParaAvanzar(
+                "Controles de «Selección de Ejercicio Contable»:\n- boton «Seleccionar»\n- otro «Fila 0» = «2026»"),
+                "filas + Seleccionar sí: tras un modal hay que esperar a que UIA los vea");
+        ok(es.amagna.asistente.manos.Controles.arbolDeEjercicioListo(
+                "Controles de «Selección de Ejercicio Contable»:\n- boton «Seleccionar»")
+                && !es.amagna.asistente.manos.Controles.arbolDeEjercicioListo("")
+                && !es.amagna.asistente.manos.Controles.arbolDeEjercicioListo(
+                "Controles de «Selección de Ejercicio Contable»:\n- otro «Fila 0» = «2026»")
+                && es.amagna.asistente.manos.Controles.arbolDeEjercicioListo(
+                "Controles de «Selección de Ejercicio Contable»:\n- boton «Seleccionar»\n- otro «Fila 0» = «2026»"),
+                "listo para pulsar cuando se ve Seleccionar; filas solas o un árbol vacío no");
+        ok(es.amagna.asistente.manos.Controles.elAsistentePasoElEjercicio(
+                "Pasada la pantalla «Selección de Ejercicio Contable» eligiendo la última fila con «boton:Seleccionar»: Pulsado boton «Seleccionar».")
+                && es.amagna.asistente.manos.Controles.elAsistentePasoElEjercicio(
+                "Pasada la pantalla «Selección de Ejercicio Contable» eligiendo la última fila con doble clic en fila[-1].")
+                && !es.amagna.asistente.manos.Controles.elAsistentePasoElEjercicio("Ya estaba pasada esa pantalla.")
+                && !es.amagna.asistente.manos.Controles.elAsistentePasoElEjercicio(
+                "ok     avanzar: ya estamos más adelante, se salta")
+                && !es.amagna.asistente.manos.Controles.elAsistentePasoElEjercicio(
+                "No se ha visto «Selección de Ejercicio Contable» con filas y Seleccionar. "
+                        + "No se da por pasada: hay que elegir la última fila y pulsar Seleccionar.")
+                && !es.amagna.asistente.manos.Controles.elAsistentePasoElEjercicio(
+                "PARADO: «Selección de Ejercicio Contable» sigue abierto. El botón no ha cerrado el diálogo."),
+                "pasar el ejercicio es pulsar Seleccionar; «No se da por pasada» y un PARADO no cuentan");
+        String pasadaEj = "Pasada la pantalla «Selección de Ejercicio Contable» eligiendo la última fila con «boton:Seleccionar»: Pulsado boton «Seleccionar».";
+        ok(!es.amagna.asistente.manos.Controles.exitoDeEjercicio("Ya estaba pasada esa pantalla.", true)
+                && !es.amagna.asistente.manos.Controles.exitoDeEjercicio(
+                        "No se ha podido pulsar Seleccionar.", true)
+                && !es.amagna.asistente.manos.Controles.exitoDeEjercicio(pasadaEj, true),
+                "con el diálogo aún abierto no vale «Ya estaba» ni un texto que mencione Seleccionar");
+        ok(es.amagna.asistente.manos.Controles.exitoDeEjercicio(pasadaEj, false)
+                && es.amagna.asistente.manos.Controles.exitoDeEjercicio("Ya estaba pasada esa pantalla.", false)
+                && !es.amagna.asistente.manos.Controles.exitoDeEjercicio(
+                        "Se ha pulsado boton «Seleccionar» y no ha reaccionado.", false),
+                "«Ya estaba» solo si el diálogo ya no existe; un error con Seleccionar no es éxito");
+        long tUia = System.currentTimeMillis();
+        String uiaTarde = es.amagna.asistente.manos.Uia.conTope(1, () -> {
+            Thread.sleep(30_000);
+            return "esto no debería llegar";
+        }, "abandonado");
+        long tardoUia = System.currentTimeMillis() - tUia;
+        ok("abandonado".equals(uiaTarde) && tardoUia < 5000,
+                "una llamada UIA que no vuelve se abandona al segundo (" + tardoUia + " ms), no cuelga el paso");
+
+        int pDialogo = es.amagna.asistente.manos.VentanasNativas.puntosDeVentana(
+                "Ejercicio Contable", "Selección de Ejercicio Contable", true, false);
+        int pPrincipal = es.amagna.asistente.manos.VentanasNativas.puntosDeVentana(
+                "Ejercicio Contable", "MNprogram - Abogados", false, false);
+        int pExacto = es.amagna.asistente.manos.VentanasNativas.puntosDeVentana(
+                "Selección de Ejercicio Contable", "Selección de Ejercicio Contable", true, false);
+        ok(pDialogo > 80 && pDialogo > pPrincipal && pExacto > pDialogo
+                && es.amagna.asistente.manos.VentanasNativas.esRuidoDeBusqueda("Cursor Agents")
+                && es.amagna.asistente.manos.VentanasNativas.puntosDeVentana(
+                        "Ejercicio Contable", "Cursor Agents", false, false) == 0,
+                "se prefiere el diálogo visible «Selección de Ejercicio Contable», no Cursor ni la principal");
+
+        ok(Agente.rechazoEnEntrada(true, false, "screenshot", null) != null
+                && Agente.rechazoEnEntrada(true, true, "screenshot", null) == null
+                && Agente.rechazoEnEntrada(false, false, "screenshot", null) == null
+                && Agente.esMenuPeligrosoEnEntrada("opcion-de-menu:Contabilidad")
+                && Agente.esMenuPeligrosoEnEntrada("Fichaje")
+                && Agente.rechazoEnEntrada(true, true, "pulsar_control", "opcion-de-menu:Contabilidad") != null
+                && Agente.rechazoEnEntrada(true, true, "pulsar_control", "boton:Seleccionar") == null,
+                "en la entrada: UIA primero, sin captura, y Contabilidad/Fichaje bloqueados");
+    }
+
+    /** La bandeja de ZIP: se avisa si no está o está vacía, y un .zip de mentira sale con su nombre y su tamaño. */
+    static void zips() {
+        try {
+            java.nio.file.Path ausente = java.nio.file.Files.createTempDirectory("zips-padre").resolve("no-esta");
+            String falta = Zips.listar(ausente);
+            ok(falta.startsWith("No existe la carpeta de ZIPs:") && falta.contains(ausente.toAbsolutePath().normalize().toString()),
+                    "si la carpeta de ZIPs no está, se dice y no se rompe");
+
+            java.nio.file.Path vacia = java.nio.file.Files.createTempDirectory("zips-vacia");
+            java.nio.file.Files.writeString(vacia.resolve("nota.txt"), "esto no es un zip");
+            String nada = Zips.listar(vacia);
+            ok(nada.contains("está vacía") && nada.contains("no hay ningún .zip")
+                            && nada.contains(vacia.toAbsolutePath().normalize().toString()) && !nada.contains("nota.txt"),
+                    "una carpeta sin .zip se dice en claro");
+
+            java.nio.file.Path con = java.nio.file.Files.createTempDirectory("zips-con");
+            byte[] falso = new byte[] {0x50, 0x4b, 3, 4, 9};
+            java.nio.file.Files.write(con.resolve("cliente.zip"), falso);
+            String lista = Zips.listar(con);
+            ok(lista.contains("cliente.zip") && lista.contains(falso.length + " bytes") && !lista.contains("nota.txt"),
+                    "un .zip de prueba se lista con su nombre y su tamaño");
+
+            java.nio.file.Path cfg = java.nio.file.Files.createTempFile("entrada", ".json");
+            java.nio.file.Files.writeString(cfg, Json.escribir(Json.obj(Zips.CLAVE, con.toString())));
+            ok(Zips.carpeta(cfg, List.of()).toAbsolutePath().normalize().equals(con.toAbsolutePath().normalize()),
+                    "entrada.json manda la carpeta con la clave " + Zips.CLAVE);
+            java.nio.file.Path otra = java.nio.file.Path.of("C:\\Documentacion Cloud\\bandeja");
+            ok(Zips.carpeta(cfg, List.of("--carpeta", otra.toString())).equals(otra),
+                    "--carpeta cambia la ruta solo para esta vez");
+            java.nio.file.Path sin = java.nio.file.Files.createTempFile("sin-entrada", ".json");
+            java.nio.file.Files.writeString(sin, "{}");
+            ok(Zips.carpeta(sin, List.of()).equals(java.nio.file.Path.of(Zips.CARPETA_POR_DEFECTO))
+                            && Zips.carpeta(java.nio.file.Path.of("build", "entrada-que-no-existe.json"), List.of())
+                            .equals(java.nio.file.Path.of(Zips.CARPETA_POR_DEFECTO)),
+                    "sin entrada.json o sin la clave, se usa la carpeta de pruebas de este ordenador");
+
+            // Bloque de documentación: 3 niveles, sin plantilla de nombre. La basura de macOS no cuenta ni en el fondo.
+            Path doc = Files.createTempDirectory("zips-doc");
+            Path valido = guardarZip(doc, "valido.zip",
+                    "Cliente/Entidad/contrato.pdf", "pdf",
+                    "Cliente/Entidad/imagen.jpg", "jpg",
+                    "Cliente/Entidad/imagen.jpeg", "jpeg",
+                    "Cliente/Entidad/imagen.png", "png",
+                    "Cliente/Entidad/imagen.webp", "webp",
+                    "Cliente/Entidad/nota.heic", "heic",
+                    "Cliente/Entidad/no.docx", "no",
+                    "Cliente/solo.txt", "txt",
+                    "suelto.txt", "suelto",
+                    "Señal/Año/informe.pdf", "utf8",
+                    "__MACOSX/Cliente/Entidad/._contrato.pdf", "mac",
+                    "__MACOSX/Cliente/Entidad/DeMas/._contrato.pdf", "mac-hondo",
+                    "Cliente/Entidad/._oculto.pdf", "apple",
+                    "Cliente/.DS_Store", "ds",
+                    "Cliente/Entidad/Thumbs.db", "th",
+                    "Cliente/Entidad/desktop.ini", "ini",
+                    ".DS_Store", "raiz");
+            String arbol = Zips.ver(valido);
+            ok(arbol.contains("cliente «Cliente»") && arbol.contains("entidad «Entidad»") && arbol.contains("contrato.pdf")
+                            && arbol.contains("imagen.jpg") && arbol.contains("imagen.jpeg") && arbol.contains("imagen.png")
+                            && arbol.contains("imagen.webp") && arbol.contains("nota.heic")
+                            && arbol.indexOf("cliente «Cliente»") < arbol.indexOf("entidad «Entidad»")
+                            && arbol.indexOf("entidad «Entidad»") < arbol.indexOf("contrato.pdf"),
+                    "un ZIP de 3 niveles se acepta: cliente, entidad y fichero");
+            ok(arbol.contains("entidad «(sin entidad)»") && arbol.contains("solo.txt")
+                            && arbol.contains("cliente «(sin carpeta)»") && arbol.contains("suelto.txt")
+                            && arbol.indexOf("contrato.pdf") < arbol.indexOf("entidad «(sin entidad)»")
+                            && arbol.indexOf("solo.txt") < arbol.indexOf("cliente «Señal»")
+                            && arbol.indexOf("cliente «Señal»") < arbol.indexOf("cliente «(sin carpeta)»")
+                            && arbol.indexOf("cliente «(sin carpeta)»") < arbol.indexOf("suelto.txt"),
+                    "un fichero suelto va a «(sin carpeta)» y uno sin entidad, a «(sin entidad)»");
+            ok(arbol.contains("cliente «Señal»") && arbol.contains("entidad «Año»") && arbol.contains("informe.pdf"),
+                    "los nombres en UTF-8 se leen tal cual");
+            ok(!arbol.contains("__MACOSX") && !arbol.contains("._") && !arbol.contains("oculto")
+                            && !arbol.contains(".DS_Store") && !arbol.contains("Thumbs") && !arbol.contains("desktop.ini")
+                            && !arbol.contains("docx") && !arbol.contains("No se abre"),
+                    "__MACOSX, ._* , .DS_Store, Thumbs.db, desktop.ini y lo que no es pdf/jpg/… se ignora");
+            ok(!Zips.listar(doc).contains("Dentro de") && !Zips.listar(doc).contains("cliente «"),
+                    "listar sigue sin abrir el ZIP");
+            String infUno = Zips.informe(doc, List.of());
+            ok(infUno.contains("valido.zip") && infUno.contains("Dentro de «valido.zip»") && infUno.contains("cliente «Cliente»"),
+                    "si solo hay un ZIP, se lista y también se enseña");
+            String otroPedido = Zips.informe(doc, List.of("--ver", "otro.zip"));
+            ok(otroPedido.contains("No está «otro.zip»") && !otroPedido.contains("cliente «"),
+                    "si se pide uno que no está, no se enseña el único que hay");
+            try {
+                Zips.informe(doc, List.of("--ver"));
+                ok(false, "sin nombre después de --ver se avisa");
+            } catch (IllegalArgumentException e) {
+                ok(e.getMessage().contains("--ver"), "sin nombre después de --ver se avisa");
+            }
+
+            Path hondoDir = Files.createTempDirectory("zips-hondo");
+            Path hondo = guardarZip(hondoDir, "hondo.zip",
+                    "Cliente/Entidad/ok.pdf", "bien",
+                    "Cliente/Entidad/DeMas/contrato.pdf", "de-mas");
+            String rechazado = Zips.ver(hondo);
+            ok(rechazado.contains("No se abre") && rechazado.contains("3 niveles")
+                            && rechazado.contains("Cliente/Entidad/DeMas/contrato.pdf")
+                            && !rechazado.contains("cliente «") && !rechazado.contains("ok.pdf"),
+                    "un ZIP de 4 niveles se rechaza entero, también lo que sí cabía");
+
+            Path interiorDir = Files.createTempDirectory("zips-interior");
+            byte[] grupo = zipDe("demanda.pdf", "d", "foto.jpg", "f", "nota.docx", "n", "__MACOSX/._demanda.pdf", "m");
+            Path interior = guardarZip(interiorDir, "interior.zip",
+                    "Cliente/Grupo.zip", grupo,
+                    "Cliente/Entidad/contrato.pdf", "pdf");
+            String conGrupo = Zips.ver(interior);
+            ok(conGrupo.contains("entidad «Grupo»") && conGrupo.contains("demanda.pdf") && conGrupo.contains("foto.jpg")
+                            && conGrupo.contains("entidad «Entidad»") && conGrupo.contains("contrato.pdf")
+                            && !conGrupo.contains("Grupo.zip") && !conGrupo.contains("docx")
+                            && !conGrupo.contains("__MACOSX") && !conGrupo.contains("._") && !conGrupo.contains("No se abre"),
+                    "un ZIP interior cuenta como la entidad y no hace falta que el nombre diga USURA");
+
+            Path sueltoZip = guardarZip(Files.createTempDirectory("zips-suelto-zip"), "raiz.zip",
+                    "Suelto.zip", zipDe("nota.pdf", "n"));
+            String enRaiz = Zips.ver(sueltoZip);
+            ok(enRaiz.contains("cliente «(sin carpeta)»") && enRaiz.contains("entidad «Suelto»") && enRaiz.contains("nota.pdf"),
+                    "un ZIP suelto en la raíz es la entidad, y el cliente es «(sin carpeta)»");
+
+            String masHondo = Zips.ver(guardarZip(Files.createTempDirectory("zips-interior-hondo"), "hondo-interior.zip",
+                    "Cliente/Grupo.zip", zipDe("sub/a.pdf", "a")));
+            ok(masHondo.contains("No se abre") && masHondo.contains("3 niveles") && masHondo.contains("sub/a.pdf")
+                            && !masHondo.contains("cliente «"),
+                    "una carpeta dentro del ZIP interior pasa de 3 niveles y se rechaza");
+
+            String usura = Zips.ver(guardarZip(Files.createTempDirectory("zips-usura"), "usura.zip",
+                    "Cliente/Entidad/USURA_x.zip", zipDe("a.pdf", "a")));
+            ok(usura.contains("No se abre") && usura.contains("3 niveles") && usura.contains("USURA_x.zip")
+                            && !usura.contains("cliente «"),
+                    "un ZIP dentro de una entidad serían 4 niveles y se rechaza");
+
+            String anidado = Zips.ver(guardarZip(Files.createTempDirectory("zips-anidado"), "anidado.zip",
+                    "Cliente/Grupo.zip", zipDe("otro.zip", zipDe("a.pdf", "a")),
+                    "Otro/Entidad/ok.pdf", "ok"));
+            ok(anidado.contains("No se abre") && anidado.contains("ZIP dentro") && anidado.contains("otro.zip")
+                            && !anidado.contains("cliente «") && !anidado.contains("ok.pdf"),
+                    "un ZIP dentro del ZIP interior se rechaza, y el bloque entero");
+
+            Path varios = Files.createTempDirectory("zips-varios");
+            guardarZip(varios, "uno.zip", "Uno/Entidad/a.pdf", "a");
+            guardarZip(varios, "dos.zip", "Dos/Entidad/b.pdf", "b");
+            String dosInteriores = Zips.ver(guardarZip(Files.createTempDirectory("zips-dos-zip"), "dos.zip",
+                    "Cliente/A.zip", zipDe("a.pdf", "a"),
+                    "Cliente/B.zip", zipDe("b.pdf", "b")));
+            ok(dosInteriores.contains("No se abre") && dosInteriores.contains("solo se admite un ZIP")
+                            && !dosInteriores.contains("cliente «"),
+                    "solo se admite un ZIP dentro");
+            String soloLista = Zips.informe(varios, List.of());
+            ok(soloLista.contains("uno.zip") && soloLista.contains("dos.zip") && !soloLista.contains("Dentro de"),
+                    "con varios ZIP solo se listan: no se abre ninguno");
+            String visto = Zips.informe(varios, List.of("--ver", "dos.zip"));
+            ok(visto.contains("uno.zip") && visto.contains("dos.zip") && visto.contains("cliente «Dos»")
+                            && !visto.contains("cliente «Uno»"),
+                    "--ver enseña solo ese ZIP");
+            Path cfgVer = Files.createTempFile("entrada-ver", ".json");
+            Files.writeString(cfgVer, "{}");
+            List<String> argsVer = List.of("--carpeta", varios.toString(), "--ver", "dos.zip");
+            String compuesto = Zips.informe(Zips.carpeta(cfgVer, argsVer), argsVer);
+            ok(compuesto.contains("cliente «Dos»") && !compuesto.contains("cliente «Uno»"),
+                    "--carpeta y --ver se leen como en el comando");
+
+            String salida = Zips.ver(guardarZip(Files.createTempDirectory("zips-salida"), "salida.zip",
+                    "propuesta.json", "{}",
+                    "Cliente/Entidad/a.pdf", "a"));
+            ok(salida.contains("paquete de alta") && salida.contains("propuesta.json")
+                            && !salida.contains("cliente «") && !salida.contains("a.pdf"),
+                    "propuesta.json es el paquete de alta que sale, no un bloque de documentación");
+            String ficha = Zips.ver(guardarZip(Files.createTempDirectory("zips-ficha"), "ficha.zip",
+                    "00 Ficha cliente/datos.txt", "x"));
+            ok(ficha.contains("paquete de alta") && ficha.contains("00 Ficha cliente") && !ficha.contains("cliente «"),
+                    "«00 Ficha cliente» también es el paquete que sale");
+            String e1 = Zips.ver(guardarZip(Files.createTempDirectory("zips-e1"), "e1.zip",
+                    "E1 - Nota/texto.txt", "x"));
+            ok(e1.contains("paquete de alta") && e1.contains("E1 - Nota") && !e1.contains("cliente «"),
+                    "«E1 - …» también es el paquete que sale");
+
+            String slip = Zips.ver(guardarZip(Files.createTempDirectory("zips-slip"), "slip.zip",
+                    "Cliente/../../fuera.pdf", "no"));
+            ok(slip.contains("No se abre") && slip.contains("se sale") && !slip.contains("cliente «"),
+                    "una ruta que se sale de la carpeta se rechaza y no rompe");
+
+            Path cifrado = Files.createTempDirectory("zips-cifrado").resolve("cifrado.zip");
+            Files.write(cifrado, zipCifrado());
+            String cif = Zips.ver(cifrado);
+            ok(cif.contains("No se abre") && cif.contains("cifrado") && !cif.contains("cliente «"),
+                    "un ZIP cifrado se rechaza y no rompe");
+
+            Path roto = Files.createTempDirectory("zips-roto").resolve("roto.zip");
+            Files.write(roto, new byte[] {0x50, 0x4b, 3, 4, 9});
+            String mal = Zips.ver(roto);
+            ok(mal.contains("No se abre") && !mal.contains("cliente «"),
+                    "un ZIP roto se explica y no rompe");
+            ok(Zips.ver(doc.resolve("no-esta.zip")).startsWith("No está"),
+                    "un ZIP que no está se dice y no rompe");
+
+            String sinFicheros = Zips.ver(guardarZip(Files.createTempDirectory("zips-sin"), "vacio.zip",
+                    "Cliente/Entidad/no.docx", "x",
+                    "__MACOSX/Cliente/Entidad/._a.pdf", "m"));
+            ok(sinFicheros.contains("No hay ficheros") && !sinFicheros.contains("No se abre") && !sinFicheros.contains("docx"),
+                    "si no hay pdf, jpg, jpeg, png, webp, heic ni txt, se dice y no se rechaza el ZIP");
+            ok(Zips.informe(vacia, List.of()).equals(Zips.listar(vacia)),
+                    "una carpeta vacía sigue sin abrir nada");
+        } catch (java.io.IOException e) {
+            ok(false, "los ZIPs se listan sin romperse: " + e.getMessage());
+        }
+    }
+
+    /** Un ZIP mínimo en memoria. Los datos pueden ser texto o los bytes de otro ZIP. */
+    static byte[] zipDe(Object... partes) throws java.io.IOException {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        try (ZipOutputStream zos = new ZipOutputStream(bos, StandardCharsets.UTF_8)) {
+            for (int i = 0; i < partes.length; i += 2) {
+                zos.putNextEntry(new ZipEntry((String) partes[i]));
+                byte[] datos = partes[i + 1] instanceof byte[] b ? b : String.valueOf(partes[i + 1]).getBytes(StandardCharsets.UTF_8);
+                zos.write(datos);
+                zos.closeEntry();
+            }
+        }
+        return bos.toByteArray();
+    }
+
+    static Path guardarZip(Path dir, String nombre, Object... partes) throws java.io.IOException {
+        Path p = dir.resolve(nombre);
+        Files.write(p, zipDe(partes));
+        return p;
+    }
+
+    /** ZIP almacenado con el bit de cifrado: Java lo rechaza al abrirlo, sin contraseña de verdad. */
+    static byte[] zipCifrado() {
+        byte[] nombre = "Cliente/Entidad/a.pdf".getBytes(StandardCharsets.UTF_8);
+        byte[] datos = new byte[] {9, 9, 9, 9};
+        CRC32 crc = new CRC32();
+        crc.update(datos);
+        int crcV = (int) crc.getValue();
+        int n = nombre.length;
+        int tam = 30 + n + datos.length + 46 + n + 22;
+        ByteBuffer bb = ByteBuffer.allocate(tam).order(ByteOrder.LITTLE_ENDIAN);
+        bb.putInt(0x04034b50);
+        bb.putShort((short) 20);
+        bb.putShort((short) 1);
+        bb.putShort((short) 0);
+        bb.putShort((short) 0);
+        bb.putShort((short) 0);
+        bb.putInt(crcV);
+        bb.putInt(datos.length);
+        bb.putInt(datos.length);
+        bb.putShort((short) n);
+        bb.putShort((short) 0);
+        bb.put(nombre);
+        bb.put(datos);
+        int cd = bb.position();
+        bb.putInt(0x02014b50);
+        bb.putShort((short) 20);
+        bb.putShort((short) 20);
+        bb.putShort((short) 1);
+        bb.putShort((short) 0);
+        bb.putShort((short) 0);
+        bb.putShort((short) 0);
+        bb.putInt(crcV);
+        bb.putInt(datos.length);
+        bb.putInt(datos.length);
+        bb.putShort((short) n);
+        bb.putShort((short) 0);
+        bb.putShort((short) 0);
+        bb.putShort((short) 0);
+        bb.putShort((short) 0);
+        bb.putInt(0);
+        bb.putInt(0);
+        bb.put(nombre);
+        int cdTam = bb.position() - cd;
+        bb.putInt(0x06054b50);
+        bb.putShort((short) 0);
+        bb.putShort((short) 0);
+        bb.putShort((short) 1);
+        bb.putShort((short) 1);
+        bb.putInt(cdTam);
+        bb.putInt(cd);
+        bb.putShort((short) 0);
+        if (bb.position() != tam) {
+            throw new IllegalStateException("ZIP cifrado mal armado: " + bb.position() + " de " + tam);
+        }
+        return bb.array();
     }
 
     static Map<String, Object> texto(String t) {

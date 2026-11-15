@@ -10,6 +10,12 @@ import com.sun.jna.ptr.PointerByReference;
 import com.sun.jna.win32.StdCallLibrary;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * UI Automation: la forma en que Windows deja «leer por dentro» cualquier programa. Es lo que usan los lectores de
@@ -160,6 +166,51 @@ public final class Uia {
 
     public static String noDisponible() {
         return motivoNoDisponible == null ? "" : motivoNoDisponible;
+    }
+
+    /**
+     * Suelta UI Automation y la vuelve a crear. Hace falta cuando una pulsación por dentro ha abierto un diálogo
+     * modal: la llamada se queda dentro de Windows y, a partir de ahí, el árbol de controles sale vacío. Sin esto
+     * el asistente no ve la pantalla de empresa ni la de ejercicio justo cuando más las necesita.
+     */
+    public static synchronized void reiniciar() {
+        if (automation != null) {
+            soltar(automation);
+            automation = null;
+        }
+        motivoNoDisponible = null;
+    }
+
+    /**
+     * Ejecuta una llamada a COM en un hilo aparte y no espera más de lo dicho.
+     * Si Windows no devuelve el control, se abandona esa llamada: el hilo que pregunta sigue.
+     * El hilo de la llamada es demonio; si se queda dentro de UI Automation, no impide salir.
+     */
+    public static <T> T conTope(int segundos, Callable<T> tarea, T siTarda) {
+        ExecutorService hilo = Executors.newSingleThreadExecutor(r -> {
+            Thread t = new Thread(r, "uia-tope");
+            t.setDaemon(true);
+            return t;
+        });
+        try {
+            return hilo.submit(tarea).get(Math.max(1, segundos), TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            return siTarda;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return siTarda;
+        } catch (ExecutionException e) {
+            Throwable c = e.getCause();
+            if (c instanceof RuntimeException re) {
+                throw re;
+            }
+            if (c instanceof Error err) {
+                throw err;
+            }
+            throw new IllegalStateException(c == null ? e : c);
+        } finally {
+            hilo.shutdownNow();
+        }
     }
 
     /** El árbol de controles de una ventana, o null si no se puede. */

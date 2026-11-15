@@ -25,6 +25,10 @@ public final class VentanaDePrueba {
             formulario(nombre);
             return;
         }
+        if (args.length > 1 && args[1].equals("lista")) {
+            lista(nombre);
+            return;
+        }
         Frame f = new Frame(nombre);
         f.add(new Label("Ventana de prueba del Asistente Altas"));
         f.setSize(420, 160);
@@ -115,6 +119,44 @@ public final class VentanaDePrueba {
         });
         f.setSize(420, 250);
         f.setLocation(80, 80);
+        f.setVisible(true);
+        Thread.sleep(90_000);
+        f.dispose();
+        System.exit(0);
+    }
+
+    /**
+     * El diálogo de ejercicio de MN: una lista de años y un botón «Seleccionar» que NO hace nada si no hay fila
+     * elegida. Es exactamente el atasco: pulsar confirmar sin elegir año deja la pantalla quieta.
+     */
+    private static void lista(String nombre) throws Exception {
+        final Frame f = new Frame(nombre);
+        f.setLayout(new java.awt.BorderLayout(8, 8));
+        java.awt.List años = new java.awt.List(6);
+        años.add("2021");
+        años.add("2022");
+        años.add("2023");
+        años.add("2024");
+        años.add("2025");
+        años.add("2026");
+        java.awt.Button seleccionar = new java.awt.Button("Seleccionar");
+        seleccionar.addActionListener(e -> {
+            if (años.getSelectedIndex() >= 0) {
+                f.dispose();
+                System.exit(0);
+            }
+        });
+        f.add(años, java.awt.BorderLayout.CENTER);
+        f.add(seleccionar, java.awt.BorderLayout.SOUTH);
+        f.addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosing(java.awt.event.WindowEvent e) {
+                f.dispose();
+                System.exit(0);
+            }
+        });
+        f.setSize(360, 280);
+        f.setLocation(90, 90);
         f.setVisible(true);
         Thread.sleep(90_000);
         f.dispose();

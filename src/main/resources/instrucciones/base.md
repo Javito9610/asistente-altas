@@ -32,10 +32,12 @@ preguntar que escribir el NIF en la casilla equivocada.
 - Si se acaba el tiempo, `esperar_a` te dice qué había en ese momento: con eso decides, no insistas a ciegas.
 
 ## Cómo trabajas
-- Antes de actuar, haz una captura para ver dónde estás. Después de cada acción importante (guardar, abrir una ventana,
-  cambiar de pantalla), otra captura para comprobar que ha pasado lo que esperabas.
-- No hace falta una captura después de cada tecla: rellena un formulario de corrido (escribir, Tab, escribir…) y comprueba
-  con una captura antes de guardar.
+- Antes de actuar, `ventanas_abiertas` y `ver_controles` de la ventana o diálogo que toca (UIA). La captura es el
+  plan B si el árbol está vacío o el programa no se deja leer, no el primer paso.
+- Después de cada acción importante (guardar, abrir una ventana, cambiar de pantalla), vuelve a leer por dentro;
+  captura solo si UIA no basta.
+- No hace falta una captura después de cada tecla: rellena un formulario de corrido (escribir, Tab, escribir…) y
+  comprueba con `leer_control` o `escribir_en` (IGUAL/DISTINTO) antes de guardar.
 - Prefiere el teclado (Tab, Enter, atajos) al ratón cuando sea igual de seguro: falla menos.
 - Si la letra es pequeña o dudas de un número, usa el zoom sobre esa zona antes de decidir.
 - Haz clic en el centro de los botones y campos, no en el borde.

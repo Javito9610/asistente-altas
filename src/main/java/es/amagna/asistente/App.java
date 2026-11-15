@@ -21,6 +21,9 @@ import java.util.List;
 /**
  * Asistente Altas (fase de pruebas, M1–M2). Uso:
  *   asistente mirar                      captura de pantalla a captura.png y datos de escala (no toca nada)
+ *   asistente zips [--carpeta ruta] [--ver nombre.zip]
+ *                                        lista los .zip; --ver enseña el interior de uno
+ *                                        (si solo hay uno, se enseña también)
  *   asistente probar-manos               prueba de precisión del ratón y de tecleo en el Bloc de notas (sin IA)
  *   asistente guardar-clave              guarda la clave de la API (no se ve al escribir)
  *   asistente agente "tarea" [--vista] [--pasos N] [--modelo M] [--sin-expediente]
@@ -40,6 +43,7 @@ public final class App {
                 case "probar-manos" -> probarManos();
                 case "guardar-clave" -> guardarClave();
                 case "ventanas" -> System.out.println(new VentanasNativas(false).abiertas());
+                case "zips" -> zips(Arrays.asList(args).subList(1, args.length));
                 case "campo" -> campo();
                 case "controles" -> controles(Arrays.asList(args).subList(1, args.length));
                 case "probar-windows" -> PruebasWindows.main(new String[0]);
@@ -76,6 +80,9 @@ public final class App {
                           asistente probar-manos
                           asistente guardar-clave
                           asistente ventanas            (lista las ventanas abiertas, sin IA)
+                          asistente zips [--carpeta <ruta>] [--ver <nombre.zip>]
+                                                        (los .zip de la bandeja; --ver enseña uno por dentro.
+                                                         Si solo hay un .zip, también. La ruta está en entrada.json)
                           asistente campo               (lee el campo donde hagas clic, sin IA)
                           asistente controles "<ventana>" [--hondo N] [--a arbol.txt]
                                                         (los controles por dentro, sin IA)
@@ -127,6 +134,11 @@ public final class App {
         System.out.printf("Pantalla (lógica): %d × %d · escala de Windows: %.0f %%%n", e.anchoLogico(), e.altoLogico(), m.escalaWindows() * 100);
         System.out.printf("Lo que verá Claude: %d × %d (factor %.3f)%n", e.anchoImagen(), e.altoImagen(), e.factor());
         System.out.println("Guardada en captura.png. Ábrela: tiene que verse nítida y entera.");
+    }
+
+    /** Los .zip de la bandeja. --carpeta cambia la ruta solo esta vez. --ver enseña uno; si solo hay uno, también. */
+    private static void zips(List<String> a) {
+        System.out.println(Zips.informe(Zips.carpeta(a), a));
     }
 
     private static void probarManos() throws Exception {
@@ -287,21 +299,35 @@ public final class App {
         var esp = es.amagna.asistente.cerebro.Especialista.cargar("desatascador", MODELO_POR_DEFECTO, 60_000);
         return (vent, control, queSeQueria, porQue) -> {
             VentanasNativas v = new VentanasNativas(false);
+            boolean entrada = Controles.esDialogoDeEjercicio(vent) || Controles.esDialogoDeEmpresa(vent)
+                    || (vent != null && vent.toLowerCase(java.util.Locale.ROOT).contains("control de acceso"));
             Agente ag = new Agente(new ClaudeApi(Clave.leer()), new ManosRobot(false), v, esp.modelo(),
                     esp.instrucciones(), esp.pasos(), esp.topeTokens(), System.out::println)
                     .conControles(new Controles(v))
+                    .enEntrada(entrada)
                     .conExpediente(true);
+            String extra = entrada ? """
+
+                    ESTO ES LA ENTRADA DE MN. Normas estrictas:
+                    - PRIMERO ventanas_abiertas y ver_controles del diálogo que haya (el título real es
+                      «Selección de Ejercicio Contable», no un trozo «Ejercicio Contable»). NUNCA empieces
+                      por captura ni por el menú de MNprogram.
+                    - Si está «Selección de Ejercicio Contable»: última fila (2026) y boton:Seleccionar
+                      (o doble clic). Que se vea «MNprogram - Abogados» detrás NO es haberlo pasado.
+                      «Ya estaba pasada» no cuenta. Si el diálogo sigue ahí, púlsalo.
+                    - NUNCA abras Contabilidad, Fichaje, Mi Empresa, Empresa 3/4, Alta, Baja ni Modificar.
+                    - Avisos «Información»: Aceptar. No te quedes congelado.
+                    """ : "";
             return ag.ejecutar("""
                     Una tarea automática se ha atascado en la ventana «%s» y tienes que desatascarla, nada más.
 
                     Lo que había que hacer: %s
                     Lo que ha contestado el ordenador: %s
-
-                    Mira qué está pasando de verdad (un aviso encima, otra pantalla, un campo obligatorio sin
-                    rellenar, el programa aún cargando…) y déjalo de forma que ese paso se pueda hacer. NO hagas el
+                    %s
+                    Mira qué está pasando de verdad con UIA (ventanas_abiertas, ver_controles). NO hagas el
                     resto de la tarea: de eso se encarga el guion después. No inventes datos. Si lo que pasa no es
                     cosa tuya o hay que decidir algo que no te corresponde, termina con PARADO explicándolo.
-                    """.formatted(vent, queSeQueria, porQue)).mensaje();
+                    """.formatted(vent, queSeQueria, porQue, extra)).mensaje();
         };
     }
 
@@ -320,12 +346,31 @@ public final class App {
 
         // 1. Que el programa esté vivo y responda. Si está cerrado, lo abre.
         var sesion = new es.amagna.asistente.guion.Sesion(ctrl, ventanas, mapa, "", System.out::println).conEntradaDelMapa();
+        boolean ejercicioAbierto = ventanas.handleDe(Controles.DIALOGO_EJERCICIO) != null;
         // La IA de guardia: solo entra si el guion se atasca con algo que no estaba previsto.
-        if (!a.contains("--sin-ia") && Clave.hay()) {
+        // Con el diálogo de ejercicio abierto no: o se pulsa Seleccionar o se para. No se pasea por los menús.
+        if (!ejercicioAbierto && !a.contains("--sin-ia") && Clave.hay()) {
             sesion.conRescate(rescateConIa(mapa.ventana()));
             System.out.println("IA de guardia: solo entra si algo se atasca.");
+        } else if (ejercicioAbierto) {
+            System.out.println("Diálogo de ejercicio abierto: solo Seleccionar, sin IA.");
         }
         var estado = sesion.asegurar();
+        boolean dialogoSigue = ventanas.handleDe(Controles.DIALOGO_EJERCICIO) != null;
+        boolean falloEjercicio = !estado.lista() && estado.comoEsta() != null
+                && estado.comoEsta().contains("Ejercicio Contable");
+        if (dialogoSigue || falloEjercicio) {
+            String crudo = estado.comoEsta() == null ? "" : estado.comoEsta();
+            int nl = crudo.indexOf('\n');
+            String linea = nl < 0 ? crudo : crudo.substring(0, nl);
+            if (!linea.startsWith("PARADO")) {
+                linea = "PARADO: «Selección de Ejercicio Contable» sigue abierto. No se abre Clientes.";
+            }
+            System.out.println(linea);
+            es.amagna.asistente.manos.Aviso.avisar("Asistente Altas",
+                    linea.length() > 180 ? linea.substring(0, 180) : linea, true);
+            System.exit(2);
+        }
         if (!estado.lista()) {
             throw new IllegalStateException("No se ha podido dejar el programa listo: " + estado.comoEsta());
         }
@@ -338,18 +383,29 @@ public final class App {
         List<String> ruta = Arrays.asList(a.get(a.indexOf("--ruta") + 1).split("\\s*>\\s*"));
         System.out.println("Entrando en: " + String.join(" > ", ruta) + "…");
         var antes = es.amagna.asistente.guion.Explorador.ventanasAhora();
+        String destino = ruta.get(ruta.size() - 1);
+        String yaAbierta = ventanas.tituloDe(destino);
+        boolean yaSirve = yaAbierta != null && !yaAbierta.contains(mapa.ventana())
+                && !VentanasNativas.esRuidoDeBusqueda(yaAbierta);
         String r = ctrl.pulsarRuta(mapa.ventana(), ruta);
         if (!r.startsWith("Pulsado")) {
             throw new IllegalStateException("No se ha podido entrar: " + r);
         }
-        var salio = es.amagna.asistente.guion.Explorador.esperarPantalla(antes, espera);
-        if (salio.ventana() == null) {
+        // Si Clientes ya estaba abierto, no sale una ventana nueva: se usa esa.
+        double esperaMenu = yaSirve ? Math.min(espera, 8) : espera;
+        var salio = es.amagna.asistente.guion.Explorador.esperarPantalla(antes, esperaMenu);
+        String pantalla;
+        if (salio.ventana() != null) {
+            pantalla = es.amagna.asistente.guion.Explorador.tituloDe(salio.ventana());
+            System.out.println("Se ha abierto: «" + pantalla + "»");
+        } else if (yaSirve) {
+            pantalla = yaAbierta;
+            System.out.println("Ya estaba abierta: «" + pantalla + "»");
+        } else {
             throw new IllegalStateException(salio.menu() ? "Eso es un submenú, no una pantalla: pon la ruta entera."
                     : salio.cargando() != null ? "Se ha quedado en «" + salio.cargando() + "» y no ha llegado a abrirse en " + espera + " s."
                     : "No se ha abierto ninguna pantalla en " + espera + " s.");
         }
-        String pantalla = es.amagna.asistente.guion.Explorador.tituloDe(salio.ventana());
-        System.out.println("Se ha abierto: «" + pantalla + "»");
 
         // 3. Y si hay que dar un paso más dentro (el botón de crear del listado → la ficha en blanco).
         if (a.contains("--luego")) {

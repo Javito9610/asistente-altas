@@ -103,13 +103,21 @@ public final class Sesion {
         // ventanas seguidas, no se sabe de antemano en cuál se va a atascar, y pedir otra vuelta entera para ver la
         // siguiente es perder el tiempo de quien espera.
         try {
+            es.amagna.asistente.manos.Uia.reiniciar();
             StringBuilder b = new StringBuilder();
-            int cuantas = 0;
-            for (Map.Entry<Long, String> e : VentanasNativas.instantanea().entrySet()) {
+            List<Map.Entry<Long, String>> todas = new ArrayList<>(VentanasNativas.instantanea().entrySet());
+            todas.removeIf(e -> {
                 String t = e.getValue();
-                if (t.isBlank() || t.contains("asistente") || t.contains("Símbolo del sistema") || cuantas >= 8) {
-                    continue;
+                return t.isBlank() || t.toLowerCase(Locale.ROOT).contains("asistente")
+                        || t.contains("Símbolo del sistema");
+            });
+            todas.sort((a, b2) -> Integer.compare(prioridadDiagnostico(b2.getValue()), prioridadDiagnostico(a.getValue())));
+            int cuantas = 0;
+            for (Map.Entry<Long, String> e : todas) {
+                if (cuantas >= 16) {
+                    break;
                 }
+                String t = e.getValue();
                 b.append("\n========== ventana: «").append(t).append("» ==========\n")
                         .append(controles.arbol(t, 12, 1200)).append('\n');
                 cuantas++;
@@ -122,9 +130,31 @@ public final class Sesion {
         }
     }
 
-    /** ¿Está el programa pidiendo usuario y contraseña ahora mismo? */
+    /** Primero las de MN (ejercicio, empresa, acceso), no Chrome ni el explorador. */
+    private static int prioridadDiagnostico(String titulo) {
+        String n = titulo.toLowerCase(Locale.ROOT);
+        if (n.contains("ejercicio") || n.contains("selección de empresa") || n.contains("seleccion de empresa")) {
+            return 100;
+        }
+        if (n.contains("control de acceso") || n.contains("mnprogram")) {
+            return 90;
+        }
+        if (n.contains("cargando") || n.contains("onedrive") || n.contains("aviso")
+                || n.contains("información") || n.contains("informacion")) {
+            return 80;
+        }
+        return 0;
+    }
+
+    /** ¿Está el programa pidiendo usuario y contraseña ahora mismo, o a medias de elegir empresa/ejercicio? */
     public boolean pideEntrar() {
-        return mapaEntrada != null && ventanas.handleDe(mapaEntrada.ventana()) != null;
+        if (mapaEntrada == null) {
+            return false;
+        }
+        return ventanas.handleDe(mapaEntrada.ventana()) != null
+                || ventanas.handleDe(es.amagna.asistente.manos.Controles.DIALOGO_EMPRESA) != null
+                || ventanas.handleDe(es.amagna.asistente.manos.Controles.DIALOGO_EJERCICIO) != null
+                || ventanas.handleDe("Ejercicio Contable") != null;
     }
 
     /** Rellena la pantalla de entrada y espera a que aparezca la principal. */
@@ -139,18 +169,29 @@ public final class Sesion {
             }
             var parte = g.ejecutar(guionEntrada, false);
             if (!parte.bien()) {
+                String resumen = parte.resumen() == null ? "" : parte.resumen();
+                if (ejercicioAbierto() || resumen.toLowerCase(Locale.ROOT).contains("ejercicio")) {
+                    return lineaParado(resumen) + volcarEjercicio();
+                }
                 // Si no ha encontrado un campo, lo útil no es rendirse: es dejar escrito QUÉ hay en esa pantalla,
                 // para poder corregir el mapa en un minuto en vez de ir adivinando.
-                return "no se ha podido entrar: " + parte.resumen() + diagnostico();
+                return "no se ha podido entrar: " + resumen + diagnostico();
             }
         } catch (IOException e) {
             return "no se ha podido leer el guion de entrada: " + e.getMessage();
         }
+        if (ejercicioAbierto()) {
+            return "PARADO: «" + Controles.DIALOGO_EJERCICIO + "» sigue abierto. No se sigue." + volcarEjercicio();
+        }
         // Al entrar, los programas de gestión sueltan lo que tengan pendiente: avisos, configuraciones, novedades.
         // Nada de eso lo hemos pedido nosotros, así que se cancela y se sigue; queda apuntado por si interesa.
+        // El diálogo de ejercicio no se cancela: o ya se pulsó Seleccionar, o se para.
         long fin = System.currentTimeMillis() + 120_000;
         List<String> apartados = new ArrayList<>();
         while (System.currentTimeMillis() < fin) {
+            if (ejercicioAbierto()) {
+                return "PARADO: «" + Controles.DIALOGO_EJERCICIO + "» sigue abierto. No se sigue." + volcarEjercicio();
+            }
             if (ventanas.handleDe(mapa.ventana()) != null && !ventanas.abiertas().contains("BLOQUEADA")) {
                 if (!apartados.isEmpty()) {
                     registro.accept("     (se han apartado " + apartados.size() + " ventanas que salieron al entrar: "
@@ -173,6 +214,67 @@ public final class Sesion {
     public record Estado(boolean lista, String comoEsta, int escalon) {
     }
 
+    private boolean ejercicioAbierto() {
+        return ventanas.handleDe(Controles.DIALOGO_EJERCICIO) != null;
+    }
+
+    /** El diálogo de ejercicio ya está delante: solo Seleccionar. No se cancela, no se mata MN, no entra la IA. */
+    private Estado atenderEjercicio() {
+        rescate = null;
+        registro.accept("Está «" + Controles.DIALOGO_EJERCICIO + "». Se pulsa Seleccionar. No se cierra MN.");
+        String fallo = entrar();
+        if (fallo != null) {
+            return new Estado(false, fallo.contains("PARADO") ? fallo : "PARADO: " + fallo, 0);
+        }
+        if (ejercicioAbierto()) {
+            return new Estado(false,
+                    "PARADO: «" + Controles.DIALOGO_EJERCICIO + "» sigue abierto. No se sigue.", 0);
+        }
+        Estado e = mirar();
+        if (e.lista()) {
+            return new Estado(true, "listo (ejercicio seleccionado)", 0);
+        }
+        if (empresaEquivocada(e)) {
+            return paradoSinTocar(e);
+        }
+        return new Estado(false, "PARADO: el ejercicio se cerró pero no estamos en Empresa de prueba. " + e.comoEsta(), 0);
+    }
+
+    private static String lineaParado(String s) {
+        if (s == null || s.isBlank()) {
+            return "PARADO: «" + Controles.DIALOGO_EJERCICIO + "» sigue abierto.";
+        }
+        int nl = s.indexOf('\n');
+        String linea = nl < 0 ? s : s.substring(0, nl);
+        if (linea.length() > 220) {
+            linea = linea.substring(0, 220);
+        }
+        return linea.contains("PARADO") ? linea : "PARADO: " + linea;
+    }
+
+    /** Solo el árbol de «Selección de Ejercicio Contable», para ver por qué no se pudo pulsar. Con tope: UIA puede no volver. */
+    private String volcarEjercicio() {
+        if (!ejercicioAbierto()) {
+            return "";
+        }
+        try {
+            String extra = es.amagna.asistente.manos.Uia.conTope(2, () -> {
+                try {
+                    String t = Controles.DIALOGO_EJERCICIO;
+                    String arbol = controles.arbol(t, 6, 80);
+                    Path f = Path.of("diagnostico-entrada.txt");
+                    Files.writeString(f, "Diálogo «" + t + "» al parar:\n" + arbol, java.nio.charset.StandardCharsets.UTF_8);
+                    return "\n   Árbol de ese diálogo en " + f.toAbsolutePath() + ".";
+                } catch (Exception e) {
+                    return "";
+                }
+            }, "");
+            return extra == null ? "" : extra;
+        } catch (RuntimeException e) {
+            return "";
+        }
+    }
+
     /** ¿Está el programa vivo, respondiendo y donde tiene que estar? */
     public Estado mirar() {
         // Lo primero: ¿está pidiendo usuario y contraseña? Es lo que pasa cuando caduca la sesión, y no hay que
@@ -183,6 +285,10 @@ public final class Sesion {
         String titulo = ventanas.tituloDe(mapa.ventana());
         if (titulo == null) {
             return new Estado(false, "el programa no está abierto", 0);
+        }
+        if (es.amagna.asistente.manos.Controles.empresaProhibida(titulo)) {
+            return new Estado(false, "está abierto pero en el sitio equivocado: el título dice «" + titulo
+                    + "» y tiene que decir «" + (debeDecir.isBlank() ? "Empresa de prueba" : debeDecir) + "»", 0);
         }
         if (!debeDecir.isBlank() && !titulo.toLowerCase(Locale.ROOT).contains(debeDecir.toLowerCase(Locale.ROOT))) {
             return new Estado(false, "está abierto pero en el sitio equivocado: el título dice «" + titulo
@@ -199,9 +305,16 @@ public final class Sesion {
 
     /** Lo deja listo para trabajar, subiendo escalones solo si hace falta. */
     public Estado asegurar() {
+        if (ejercicioAbierto()) {
+            return atenderEjercicio();
+        }
         Estado e = mirar();
         if (e.lista()) {
             return e;
+        }
+        // Empresa real abierta (p. ej. la 4): se para. No se cierran diálogos, no se mata MN, no se sigue.
+        if (empresaEquivocada(e)) {
+            return paradoSinTocar(e);
         }
         registro.accept("La sesión no está lista: " + e.comoEsta() + ". Arreglándolo…");
 
@@ -216,6 +329,9 @@ public final class Sesion {
             if (e.lista()) {
                 return new Estado(true, "listo (ha vuelto a entrar)", 0);
             }
+            if (empresaEquivocada(e)) {
+                return paradoSinTocar(e);
+            }
         }
 
         // 1) Avisos y diálogos encima.
@@ -226,6 +342,9 @@ public final class Sesion {
             if (e.lista()) {
                 return new Estado(true, "listo (había avisos encima)", 1);
             }
+            if (empresaEquivocada(e)) {
+                return paradoSinTocar(e);
+            }
         }
 
         // 2) Un menú desplegado esperando a que alguien elija.
@@ -233,6 +352,9 @@ public final class Sesion {
         e = mirar();
         if (e.lista()) {
             return new Estado(true, "listo (había un menú abierto)", 2);
+        }
+        if (empresaEquivocada(e)) {
+            return paradoSinTocar(e);
         }
 
         // 3) Pantallas que se quedaron abiertas de antes.
@@ -243,9 +365,12 @@ public final class Sesion {
             if (e.lista()) {
                 return new Estado(true, "listo (quedaban " + cerradas + " pantallas abiertas)", 3);
             }
+            if (empresaEquivocada(e)) {
+                return paradoSinTocar(e);
+            }
         }
 
-        // 4) Cerrar a lo bruto y volver a abrir.
+        // 4) Cerrar a lo bruto y volver a abrir. Nunca si está en otra empresa: eso ya se ha parado arriba.
         if (mapa.ejecutable().isBlank()) {
             return new Estado(false, e.comoEsta() + ", y el mapa no dice con qué programa se abre: "
                     + "no se puede reiniciar solo. Hay que mirarlo.", 4);
@@ -276,10 +401,24 @@ public final class Sesion {
         if (e.lista()) {
             return new Estado(true, "listo (reiniciado" + (guionEntrada == null ? "" : " y vuelto a entrar") + ")", 5);
         }
+        if (empresaEquivocada(e)) {
+            return paradoSinTocar(e);
+        }
         return new Estado(false, pideEntrar()
                 ? "el programa pide usuario y contraseña y no hay nada configurado para entrar solo: "
                   + "pon el bloque «entrada» en el mapa y guarda la contraseña con «asistente secreto»"
                 : "se ha reiniciado pero sigue sin estar listo: " + e.comoEsta(), 5);
+    }
+
+    private boolean empresaEquivocada(Estado e) {
+        return e.comoEsta() != null && e.comoEsta().contains("sitio equivocado");
+    }
+
+    private Estado paradoSinTocar(Estado e) {
+        registro.accept("PARADO: está en el sitio equivocado. No se cierra ni se toca nada. " + e.comoEsta());
+        return new Estado(false,
+                e.comoEsta() + ". Cierra esa empresa a mano. El asistente no mata el programa ni sigue.",
+                0);
     }
 
     private int cerrarPantallasSueltas() {

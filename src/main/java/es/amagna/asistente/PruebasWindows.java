@@ -457,6 +457,14 @@ public final class PruebasWindows {
                 es.amagna.asistente.guion.Mapa.leer(mSesion), "Empresa de prueba", l -> { }).mirar();
         ok(!otroSitio.lista() && otroSitio.comoEsta().contains("sitio equivocado"),
                 "y si el título no dice lo que tiene que decir, NO da la sesión por buena");
+        var sesionMal = new es.amagna.asistente.guion.Sesion(ctrl, (VentanasNativas) v,
+                es.amagna.asistente.guion.Mapa.leer(mSesion), "Empresa de prueba", l -> { });
+        var parado = sesionMal.asegurar();
+        ok(!parado.lista() && parado.comoEsta().contains("sitio equivocado")
+                && parado.comoEsta().contains("no mata"),
+                "y si está en el sitio equivocado, PARA y dice que no mata el programa");
+        ok(((VentanasNativas) v).handleDe(vSesion) != null,
+                "el programa sigue abierto: no se ha hecho taskkill");
         ((VentanasNativas) v).cerrarSiEsNuestra(vSesion);
 
         System.out.println("14f) El usuario junto a la contraseña, y el arranque al encender el ordenador");
@@ -704,7 +712,7 @@ public final class PruebasWindows {
         }
 
         System.out.println("14o) Pasar de una pantalla de confirmar sin saber cómo se llama su botón");
-        // Es el caso de MN: «Selección de Empresa» y «Ejercicio Contable» solo confirman. Afinar a mano el nombre
+        // Es el caso de MN: «Selección de Empresa» y «Selección de Ejercicio Contable» solo confirman. Afinar a mano el nombre
         // exacto del botón de cada diálogo es frágil y es perder el tiempo: que lo resuelva él.
         String vAv = "prueba-avanzar";
         Process pAv = new ProcessBuilder(exeJava, "-cp", cp, "es.amagna.asistente.VentanaDePrueba", vAv, "formulario").inheritIO().start();
@@ -735,6 +743,41 @@ public final class PruebasWindows {
             ((VentanasNativas) v).cerrarSiEsNuestra(vNoAv);
         } finally {
             pNoAv.destroy();
+        }
+
+        System.out.println("14p) El diálogo del ejercicio: hay que ELEGIR el año; pulsar Seleccionar sin fila no basta");
+        String vEj = "prueba-ejercicio-lista";
+        Process pEj = new ProcessBuilder(exeJava, "-cp", cp, "es.amagna.asistente.VentanaDePrueba", vEj, "lista").inheritIO().start();
+        try {
+            ok(ctrl.esperar(vEj, null, es.amagna.asistente.manos.Controles.Que.APAREZCA, null, 25).startsWith("Ya está"),
+                    "se abre la lista de años");
+            ok(ctrl.existe(vEj, "fila[-1]"),
+                    "una lista de años se ve como filas aunque Windows las llame opciones");
+            long tEj = System.currentTimeMillis();
+            String rEj = ctrl.avanzar(vEj, () -> ((VentanasNativas) v).handleDe(vEj) == null, 40, true);
+            long tardoEj = System.currentTimeMillis() - tEj;
+            System.out.println("   " + rEj + " (" + tardoEj + " ms)");
+            ok(rEj.startsWith("Pasada"), "elige la última fila y confirma");
+            ok(((VentanasNativas) v).handleDe(vEj) == null, "la pantalla del ejercicio se ha cerrado de verdad");
+        } finally {
+            pEj.destroy();
+        }
+
+        System.out.println("14q) Confirmar SIN «ultima» no elige la última fila (eso es lo que abrió la empresa 4)");
+        String vNoUlt = "prueba-no-ultima";
+        Process pNoUlt = new ProcessBuilder(exeJava, "-cp", cp, "es.amagna.asistente.VentanaDePrueba", vNoUlt, "lista").inheritIO().start();
+        try {
+            ok(ctrl.esperar(vNoUlt, null, es.amagna.asistente.manos.Controles.Que.APAREZCA, null, 25).startsWith("Ya está"),
+                    "se abre otra lista");
+            String rNoUlt = ctrl.avanzar(vNoUlt, () -> ((VentanasNativas) v).handleDe(vNoUlt) == null, 12);
+            System.out.println("   " + rNoUlt.lines().findFirst().orElse(""));
+            ok(((VentanasNativas) v).handleDe(vNoUlt) != null,
+                    "la lista sigue abierta: no se ha elegido la última fila a ciegas");
+            ok(rNoUlt.startsWith("No se ha podido pasar"),
+                    "y lo dice, en vez de confirmar lo que haya al final de la lista");
+            ((VentanasNativas) v).cerrarSiEsNuestra(vNoUlt);
+        } finally {
+            pNoUlt.destroy();
         }
 
         System.out.println("15) No se lía con su propia consola, y despierta la ventana si está minimizada");

@@ -190,15 +190,32 @@ public final class ManosRobot implements Manos {
      * coordenadas de la captura. Hace falta cuando un botón no se deja pulsar por dentro y hay que ir al ratón.
      */
     public void clicEnPantalla(int px, int py) {
+        clicEnPantalla(px, py, 1);
+    }
+
+    /**
+     * Clics en un punto REAL de la pantalla. «veces = 2» es el doble clic con el que MN confirma una fila de
+     * empresa o de ejercicio cuando el botón de Seleccionar no reacciona.
+     */
+    public void clicEnPantalla(int px, int py, int veces) {
         freno();
-        if (vista("clic real en " + px + "," + py)) {
+        int n = Math.max(1, veces);
+        if (vista("clic real ×" + n + " en " + px + "," + py)) {
             return;
         }
-        robot.mouseMove(px, py);
+        // UI Automation da píxeles reales; el Robot de Java, si Windows no está al 100 %, trabaja en lógicos.
+        double s = escalaWindows();
+        if (s < 0.5) {
+            s = 1;
+        }
+        robot.mouseMove(pantalla.x + (int) Math.round(px / s), pantalla.y + (int) Math.round(py / s));
         robot.delay(80);
-        robot.mousePress(java.awt.event.InputEvent.BUTTON1_DOWN_MASK);
-        robot.delay(60);
-        robot.mouseRelease(java.awt.event.InputEvent.BUTTON1_DOWN_MASK);
+        for (int i = 0; i < n; i++) {
+            robot.mousePress(java.awt.event.InputEvent.BUTTON1_DOWN_MASK);
+            robot.delay(40);
+            robot.mouseRelease(java.awt.event.InputEvent.BUTTON1_DOWN_MASK);
+            robot.delay(n > 1 ? 50 : 60);
+        }
         pausa();
     }
 

@@ -37,6 +37,10 @@ public final class Win32 {
 
         boolean EnumWindows(EnumProc proc, Pointer datos);
 
+        boolean EnumChildWindows(Pointer padre, EnumProc proc, Pointer datos);
+
+        boolean IsWindow(Pointer hwnd);
+
         int GetWindowThreadProcessId(Pointer hwnd, IntByReference pid);
 
         Pointer GetAncestor(Pointer hwnd, int tipo);
@@ -64,6 +68,10 @@ public final class Win32 {
         Kernel32 I = Native.load("kernel32", Kernel32.class);
 
         int GetCurrentThreadId();
+
+        void SetLastError(int error);
+
+        int GetLastError();
 
         /** La consola desde la que nos han lanzado (para no confundirla nunca con la ventana del programa). */
         Pointer GetConsoleWindow();
@@ -105,7 +113,10 @@ public final class Win32 {
     static final int IDCANCEL = 2;
     static final int WM_GETTEXT = 0x000D;
     static final int WM_GETTEXTLENGTH = 0x000E;
+    /** El clic de un botón de toda la vida. El resultado del mensaje suele ser 0 aunque el clic haya entrado. */
+    public static final int BM_CLICK = 0x00F5;
     static final int SMTO_ABORTIFHUNG = 0x0002;
+    static final int ERROR_TIMEOUT = 1460;
     /** Tope de espera de cada pregunta a un programa: si no contesta en este tiempo, está colgado o bloqueado. */
     static final int MS_TOPE = 2000;
 
@@ -119,6 +130,63 @@ public final class Win32 {
     static boolean mandar(Pointer hwnd, int msg, long wParam, long lParam) {
         PointerByReference r = new PointerByReference();
         return User32.I.SendMessageTimeoutW(hwnd, msg, new Pointer(wParam), new Pointer(lParam), SMTO_ABORTIFHUNG, MS_TOPE, r) != null;
+    }
+
+    /** ¿Sigue siendo una ventana visible? No pregunta a UI Automation. */
+    public static boolean visible(Pointer hwnd) {
+        try {
+            return hwnd != null && User32.I.IsWindow(hwnd) && User32.I.IsWindowVisible(hwnd);
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Pulsa el botón hijo de ESE diálogo cuyo texto es el pedido (Seleccionar).
+     * SendMessageTimeout: si el programa no contesta, se deja a los pocos segundos.
+     * No es un clic a ciegas en la pantalla: solo ese hijo.
+     *
+     * @return true si el mensaje no ha caducado (el botón lo ha recibido). El diálogo hay que mirarlo después.
+     */
+    public static boolean pulsarBoton(Pointer dialogo, String texto, int ms) {
+        if (dialogo == null || texto == null || texto.isBlank()) {
+            return false;
+        }
+        String buscado = plano(texto);
+        Pointer[] mejor = {null};
+        int[] puntos = {0};
+        User32.EnumProc cb = new User32.EnumProc() {
+            @Override
+            public boolean invoke(Pointer hwnd, Pointer datos) {
+                if (hwnd == null || !User32.I.IsWindowVisible(hwnd)) {
+                    return true;
+                }
+                String t = titulo(hwnd);
+                if (t == null || t.isBlank() || !plano(t).equals(buscado)) {
+                    return true;
+                }
+                int p = clase(hwnd).toLowerCase(java.util.Locale.ROOT).contains("button") ? 2 : 1;
+                if (p > puntos[0]) {
+                    puntos[0] = p;
+                    mejor[0] = hwnd;
+                }
+                return true;
+            }
+        };
+        User32.I.EnumChildWindows(dialogo, cb, null);
+        if (mejor[0] == null) {
+            return false;
+        }
+        Kernel32.I.SetLastError(0);
+        PointerByReference r = new PointerByReference();
+        User32.I.SendMessageTimeoutW(mejor[0], BM_CLICK, null, null, SMTO_ABORTIFHUNG, Math.max(500, ms), r);
+        // BM_CLICK devuelve 0 aunque haya entrado. El caducado se distingue por ERROR_TIMEOUT.
+        return Kernel32.I.GetLastError() != ERROR_TIMEOUT;
+    }
+
+    private static String plano(String s) {
+        String n = java.text.Normalizer.normalize(s == null ? "" : s, java.text.Normalizer.Form.NFD).replaceAll("\\p{M}", "");
+        return n.replace("&", "").trim().toLowerCase(java.util.Locale.ROOT);
     }
 
     public static String titulo(Pointer hwnd) {

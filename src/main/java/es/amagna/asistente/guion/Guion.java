@@ -162,12 +162,43 @@ public final class Guion {
             boolean toca = Boolean.TRUE.equals(m.get("toca"));
             double segundos = m.get("segundos") instanceof Number n ? n.doubleValue() : 20;
 
+            // Si ya estamos más adelante (la empresa ya está en pantalla), no se vuelve a escribir la contraseña
+            // en la ventana de acceso que sigue detrás.
+            if (hayQueSaltar(m)) {
+                lineas.add("ok     " + hacer + ": ya estamos más adelante, se salta");
+                hechos++;
+                continue;
+            }
+
             // Hay pasos que no van contra ningún control (pulsar una tecla, esperar un rato): no hay nada que buscar.
             if ((control.isBlank() && apodoSuelto == null) || hacer.equals("avanzar")) {
                 String soloTecla = hacerPaso(hacer, control, "", valor, segundos, m, ensayo, lineas, escrito, ventanaPaso);
+                // Si falta la empresa de prueba, no entra la IA: la última vez pulsó Modificar y «Mi Empresa».
+                if (soloTecla != null && soloTecla != SALTADO && rescate != null && !ensayo
+                        && !noLlamarIa(soloTecla, m)) {
+                    lineas.add("ATASCO " + hacer + " [" + ventanaPaso + "]: " + primeraLinea(soloTecla));
+                    registro.accept("   … atascado en «" + hacer + "»: entra la inteligencia artificial");
+                    rescates++;
+                    String hizo;
+                    try {
+                        hizo = rescate.intentar(ventanaPaso, hacer,
+                                hacer + " en la ventana «" + ventanaPaso + "»"
+                                + (valor == null ? "" : " con el valor exacto «" + valor + "»"), soloTecla);
+                    } catch (RuntimeException e) {
+                        hizo = "no ha podido: " + e.getMessage();
+                    }
+                    lineas.add("IA     " + hizo);
+                    soloTecla = hacerPaso(hacer, control, "", valor, segundos, m, ensayo, lineas, escrito, ventanaPaso);
+                    if (soloTecla == SALTADO) {
+                        soloTecla = null;
+                    }
+                    if (soloTecla == null) {
+                        lineas.add("ok     RESCATADO por la IA: " + hacer);
+                    }
+                }
                 if (soloTecla != null && soloTecla != SALTADO) {
-                    lineas.add("FALLA  " + hacer + ": " + soloTecla);
-                    return parte(false, "PARADO en «" + hacer + "»: " + soloTecla, lineas, hechos, avisos, rescates, clave, ensayo);
+                    lineas.add("FALLA  " + hacer + ": " + primeraLinea(soloTecla));
+                    return parte(false, "PARADO en «" + hacer + "»: " + primeraLinea(soloTecla), lineas, hechos, avisos, rescates, clave, ensayo);
                 }
                 if (soloTecla == null) {
                     lineas.add("ok     " + hacer + (valor == null ? "" : " " + valor));
@@ -213,7 +244,7 @@ public final class Guion {
                 hechos++;
                 continue;
             }
-            if (error != null && rescate != null && !ensayo) {
+            if (error != null && rescate != null && !ensayo && !noLlamarIa(error, m)) {
                 String nombrePaso = control.isBlank() ? apodoSuelto : control;
                 lineas.add("ATASCO " + hacer + " " + nombrePaso + " [" + ventanaPaso + "]: " + error);
                 registro.accept("   … atascado en «" + hacer + " " + nombrePaso + "»: entra la inteligencia artificial");
@@ -398,8 +429,10 @@ public final class Guion {
                     String a2 = l.get("apodo") == null ? null : String.valueOf(l.get("apodo"));
                     String q2 = String.valueOf(l.getOrDefault("que", "aparezca"));
                     String esperado = l.get("valor") == null ? null : String.valueOf(l.get("valor"));
-                    java.util.function.BooleanSupplier logrado = () -> cumple(v2, a2, q2, esperado);
-                    String pi = controles.pulsarInsistiendo(ventana, apodo, logrado, 6);
+                    String otra = l.get("o_ventana") == null ? null : String.valueOf(l.get("o_ventana"));
+                    java.util.function.BooleanSupplier logrado = () -> cumple(v2, a2, q2, esperado)
+                            || (otra != null && !otra.isBlank() && cumple(otra, null, "aparezca", null));
+                    String pi = controles.pulsarInsistiendo(ventana, apodo, logrado, Math.max(6, segundos));
                     return pi.startsWith("Pulsado") ? null : pi;
                 }
                 String p = controles.pulsar(ventana, apodo);
@@ -431,7 +464,32 @@ public final class Guion {
                 String a3 = h.get("apodo") == null ? null : String.valueOf(h.get("apodo"));
                 String q3 = String.valueOf(h.getOrDefault("que", "aparezca"));
                 String val3 = h.get("valor") == null ? null : String.valueOf(h.get("valor"));
-                String r3 = controles.avanzar(ventana, () -> cumple(v3, a3, q3, val3), segundos);
+                String fila = m.get("fila") == null ? null : String.valueOf(m.get("fila")).trim();
+                if (fila != null && fila.isBlank()) {
+                    fila = null;
+                } else if (fila != null && !fila.contains(":")) {
+                    fila = "fila:" + fila;
+                }
+                boolean ultima = esSi(m.get("ultima"));
+                String r3 = controles.avanzar(ventana, () -> cumple(v3, a3, q3, val3), segundos, fila, ultima);
+                if (Controles.esDialogoDeEjercicio(ventana)) {
+                    // El handle de Win32 manda. «Ya estaba pasada» o un texto que solo menciona
+                    // Seleccionar no es éxito mientras ese diálogo siga abierto.
+                    boolean sigue = ventanas != null && ventanas.ejercicioVisible();
+                    if (Controles.exitoDeEjercicio(r3, sigue)) {
+                        lineas.add("ok     " + r3);
+                        return null;
+                    }
+                    if (r3 != null && r3.startsWith("PARADO")) {
+                        return r3;
+                    }
+                    if (sigue) {
+                        return "PARADO: «" + Controles.DIALOGO_EJERCICIO + "» sigue abierto. No se sigue.";
+                    }
+                    return r3 == null
+                            ? "PARADO: no se ha confirmado «" + ventana + "»."
+                            : r3;
+                }
                 if (r3.startsWith("Pasada") || r3.startsWith("Ya estaba")) {
                     lineas.add("ok     " + r3);
                     return null;
@@ -642,6 +700,104 @@ public final class Guion {
 
     private static String limpio(String s) {
         return s.replaceAll("[^A-Za-z0-9._-]", "_");
+    }
+
+    /**
+     * La IA no elige empresa. Si falta «Empresa de prueba», pulsar «cualquier botón» acabó en Modificar
+     * y en «Mi Empresa». Se para y lo mira una persona.
+     */
+    public static boolean noLlamarIa(String error, Map<String, Object> m) {
+        if (m != null && Controles.esDialogoDeEjercicio(String.valueOf(m.get("ventana")))) {
+            return true;
+        }
+        if (error == null) {
+            return false;
+        }
+        String e = error.toLowerCase(java.util.Locale.ROOT);
+        if (e.contains("ejercicio contable") || e.contains("parado:")) {
+            return true;
+        }
+        if (e.contains("no se confirma nada") || e.contains("parado")
+                || e.contains("empresa real") || e.contains("empresa equivocada")
+                || e.contains("empresa de prueba")) {
+            return true;
+        }
+        if (m != null && m.get("fila") != null && !String.valueOf(m.get("fila")).isBlank()) {
+            return true;
+        }
+        return Controles.empresaProhibida(error);
+    }
+
+    /**
+     * «ultima: true» del JSON llega como Boolean, no como texto. parseBoolean(String.valueOf)
+     * vale, pero un 1 o un «sí» no: aquí se aceptan las formas reales y no se pierde el flag.
+     */
+    public static boolean esSi(Object v) {
+        if (v == null) {
+            return false;
+        }
+        if (v instanceof Boolean b) {
+            return b;
+        }
+        String s = String.valueOf(v).trim().toLowerCase(java.util.Locale.ROOT);
+        return s.equals("true") || s.equals("1") || s.equals("si") || s.equals("sí") || s.equals("yes");
+    }
+
+    /**
+     * Si el paso dice «saltar_si» y esa ventana ya está abierta, no se hace: ya hemos pasado de él.
+     * Así, si MN se quedó en «Selección de Empresa», no se vuelve a escribir la contraseña detrás.
+     *
+     * Un «avanzar» del ejercicio NUNCA se salta porque se vea «MNprogram - Abogados»: esa principal
+     * existe detrás del modal. Saltar por ella dejaba el año sin confirmar, o apuntaba
+     * «Ya estaba pasada» cuando pulsó una persona.
+     */
+    private boolean hayQueSaltar(Map<String, Object> m) {
+        if (ventanas == null || m.get("saltar_si") == null) {
+            return false;
+        }
+        List<String> titulos = new ArrayList<>();
+        Object s = m.get("saltar_si");
+        if (s instanceof List<?> l) {
+            for (Object o : l) {
+                titulos.add(String.valueOf(o));
+            }
+        } else {
+            titulos.add(String.valueOf(s));
+        }
+        String hacer = String.valueOf(m.getOrDefault("hacer", "")).trim();
+        String ventanaPaso = m.get("ventana") == null ? mapa.ventana() : String.valueOf(m.get("ventana"));
+        return saltarPorqueYaEstamos(hacer, ventanaPaso, titulos, t -> ventanas.handleDe(t) != null);
+    }
+
+    public static boolean saltarPorqueYaEstamos(String hacer, String ventanaPaso, List<String> saltarSi,
+            java.util.function.Predicate<String> abierta) {
+        if (saltarSi == null || saltarSi.isEmpty()) {
+            return false;
+        }
+        if ("avanzar".equals(hacer) && ventanaPaso != null && !ventanaPaso.isBlank()) {
+            if (Controles.esDialogoDeEjercicio(ventanaPaso)) {
+                return false;
+            }
+            if (abierta.test(ventanaPaso)) {
+                return false;
+            }
+        }
+        for (String t : saltarSi) {
+            if (t != null && !t.isBlank() && abierta.test(t)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** La primera línea, para el parte: el árbol de controles de un «avanzar» fallido no cabe en un resumen. */
+    private static String primeraLinea(String s) {
+        if (s == null) {
+            return "";
+        }
+        int nl = s.indexOf('\n');
+        String linea = nl < 0 ? s : s.substring(0, nl);
+        return linea.length() > 240 ? linea.substring(0, 240) + "…" : linea;
     }
 
     /** Lo que pasa cuando el programa no está donde el mapa dice. */

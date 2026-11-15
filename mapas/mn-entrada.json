@@ -1,7 +1,7 @@
 {
   "nombre": "MN: arranque (entrar, empresa y ejercicio)",
   "ventana": "Control de acceso",
-  "_nota": "Identificadores leídos de la pantalla real. El botón de entrar es un «panel», no un botón, por eso se busca por su identificador.",
+  "_nota": "Identificadores leídos de la pantalla real. El botón de entrar es un «panel», no un botón, por eso se busca por su identificador. La empresa se elige por nombre (Empresa de prueba), nunca la última fila. El ejercicio sí es el último, en el diálogo «Selección de Ejercicio Contable».",
   "controles": {
     "usuario": [
       "#txtNombre",
