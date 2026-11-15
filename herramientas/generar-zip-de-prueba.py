@@ -98,7 +98,7 @@ notas = ("Notas del asesor (documento de prueba, datos inventados)\r\n"
          "Correo: angela.garcia.prueba@ejemplo-invalido.test\r\n"
          "Entidad: Kviku. Tarjeta revolving contratada en junio de 2024.\r\n"
          "Dice que lleva pagados unos 2.650 EUR y que sigue debiendo casi todo.\r\n"
-         "Pendiente: confirmar si tiene mas contratos con la misma entidad.\r\n").encode("utf-8")
+         "Documentacion completa y revisada. Nada pendiente.\r\n").encode("utf-8")
 
 # El expediente va como ZIP dentro, igual que en el bloque real.
 inner = io.BytesIO()
@@ -117,5 +117,60 @@ with zipfile.ZipFile(DESTINO, "w", zipfile.ZIP_DEFLATED) as z:
 
 print("escrito", DESTINO, os.path.getsize(DESTINO), "bytes")
 with zipfile.ZipFile(DESTINO) as z:
+    for i in z.infolist():
+        print("  %8d  %s" % (i.file_size, i.filename))
+
+# ---------------------------------------------------------------------------
+# Y el bloque que TIENE que parar: todo lo que puede salir torcido en un alta.
+# Sirve para comprobar que el asistente no se lo traga y llama a una persona.
+# ---------------------------------------------------------------------------
+dni_malo = pdf([
+    "## DATOS DEL TITULAR",
+    "Apellidos: LOPEZ PRUEBA",
+    "Nombre: MANUEL",
+    "Fecha de nacimiento: 02 11 1979",
+    "DNI / NIF: 11111111K",          # la letra buena de 11111111 es la H: esta esta mal a proposito
+    "## DOMICILIO",
+    "Avenida Inventada 3",
+    "15002 A Coruna (A Coruna)",
+], "DOCUMENTO NACIONAL DE IDENTIDAD (simulado)")
+
+contrato_otro = pdf([
+    "## PARTES",
+    "Prestamista: CETELEM, S.A.U.",   # la carpeta dice WIZINK: no cuadra
+    "Prestatario: MANUEL LOPEZ PRUEBA",
+    "Con la intervencion de Dona CARMEN PRUEBA SOTO como avalista.",
+    "## CONDICIONES DEL CREDITO",
+    "Numero de contrato: CT-2021-0001234",
+    "Fecha de firma: 4 de marzo de 2021",
+    "Limite de credito concedido: 3.000,00 EUR",
+    "TAE: 26,80 %",
+], "CONTRATO DE CREDITO AL CONSUMO")
+
+hoja_sin_firmar = pdf([
+    "## CLIENTE",
+    "Don MANUEL LOPEZ PRUEBA, con DNI 11111111K.",
+    "Nombre que consta en el expediente: MANUEL LOPEZ PRIETO.",  # no coincide con el DNI
+    "## OBJETO DEL ENCARGO",
+    "Reclamacion frente a WIZINK BANK, S.A.",
+    "## FIRMA",
+    "BORRADOR SIN FIRMAR - PENDIENTE DE FIRMA DEL CLIENTE",
+], "HOJA DE ENCARGO PROFESIONAL")
+
+notas_raras = ("Notas del asesor (documento de prueba, datos inventados)\r\n"
+               "Cliente: Manuel Lopez. No ha dado telefono ni correo todavia.\r\n"
+               "Pendiente: confirmar con el cliente de que entidad es el contrato.\r\n"
+               "Pendiente: preguntar si la avalista tambien reclama.\r\n").encode("utf-8")
+
+RARO = os.path.join(os.path.dirname(DESTINO), "raro-prueba.zip")
+with zipfile.ZipFile(RARO, "w", zipfile.ZIP_DEFLATED) as z:
+    base = "López Prueba/"
+    z.writestr(base + "notas.txt", notas_raras)
+    z.writestr(base + "dni.pdf", dni_malo)
+    z.writestr(base + "hoja.pdf", hoja_sin_firmar)
+    z.writestr(base + "WIZINK/contrato.pdf", contrato_otro)
+
+print("escrito", RARO, os.path.getsize(RARO), "bytes")
+with zipfile.ZipFile(RARO) as z:
     for i in z.infolist():
         print("  %8d  %s" % (i.file_size, i.filename))

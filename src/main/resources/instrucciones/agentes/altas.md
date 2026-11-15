@@ -59,8 +59,13 @@ Un cliente puede traer varias reclamaciones, una por entidad y producto. De cada
 - `tipo` — qué se reclama, con las palabras del papel (usura, revolving, gastos hipotecarios, tarjeta…).
 - `contrato` — el número o referencia del contrato.
 - `fecha_contrato` — `dd/mm/aaaa`.
-- `importe` — el límite, el principal o la cuantía reclamada, con la moneda tal como viene (`1.500,00 €`).
+- `importe_contrato` — el límite de crédito o el principal del préstamo, el que diga **el contrato**, con la moneda
+  tal como viene (`1.500,00 €`).
+- `cuantia_reclamada` — lo que se reclama, que lo dice **la hoja de encargo** y casi nunca es la misma cifra.
 - `tae` — la TAE si consta, tal como viene (`3.218,00 %`).
+
+Son dos cifras distintas y cada una va en su sitio. No pongas la misma en las dos ni elijas «la que parece el
+importe»: si un papel no dice la suya, esa va vacía.
 - `documentos` — la lista de rutas de los documentos que sostienen este expediente.
 
 Pon solo los campos que consten. No rellenes un expediente a medias para que parezca completo: lo que falte, falta.
@@ -89,6 +94,8 @@ Escribes una duda, en una frase clara y para una persona que no ha visto los pap
 - Un documento está ilegible, cortado o incompleto y era importante.
 - La hoja de encargo no está firmada, o está firmada por alguien que no es el cliente.
 - Hay más de una persona en los papeles y no está claro quién es el cliente (un avalista, un cónyuge, un heredero).
+- Las notas del comercial dejan algo pendiente, a medias o por confirmar. Si alguien lo escribió, es porque hacía
+  falta mirarlo: cópialo como duda, con sus palabras.
 - Cualquier otra cosa que, si la decidieras tú, estarías decidiendo por un abogado.
 
 Una duda no es un fallo tuyo: es tu trabajo. Y una duda bien escrita vale más que diez datos dudosos.
@@ -104,8 +111,8 @@ Solo un objeto JSON, sin texto antes ni después, sin ```. Los campos que no con
     "domicilio": "", "fecha_nacimiento": ""
   },
   "expedientes": [
-    {"entidad": "", "tipo": "", "contrato": "", "fecha_contrato": "", "importe": "", "tae": "",
-     "documentos": ["ruta/del/documento.pdf"]}
+    {"entidad": "", "tipo": "", "contrato": "", "fecha_contrato": "", "importe_contrato": "",
+     "cuantia_reclamada": "", "tae": "", "documentos": ["ruta/del/documento.pdf"]}
   ],
   "ficheros": [
     {"ruta": "ruta/del/documento.pdf", "que_es": "contrato", "por_que": ""}
