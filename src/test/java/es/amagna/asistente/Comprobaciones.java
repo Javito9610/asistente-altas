@@ -779,11 +779,20 @@ public final class Comprobaciones {
                 "Ejercicio Contable", "MNprogram - Abogados", false, false);
         int pExacto = es.amagna.asistente.manos.VentanasNativas.puntosDeVentana(
                 "Selección de Ejercicio Contable", "Selección de Ejercicio Contable", true, false);
-        ok(pDialogo > 80 && pDialogo > pPrincipal && pExacto > pDialogo
-                && es.amagna.asistente.manos.VentanasNativas.esRuidoDeBusqueda("Cursor Agents")
-                && es.amagna.asistente.manos.VentanasNativas.puntosDeVentana(
-                        "Ejercicio Contable", "Cursor Agents", false, false) == 0,
-                "se prefiere el diálogo visible «Selección de Ejercicio Contable», no Cursor ni la principal");
+        ok(pDialogo > 80 && pDialogo > pPrincipal && pExacto > pDialogo,
+                "se prefiere el diálogo visible «Selección de Ejercicio Contable» a la ventana principal");
+
+        // Esto se descartaba por el título, y descartaba de paso la ventana de las pruebas y a cualquier cliente
+        // que se llamara «Asistencia». Una consola se reconoce por lo que es, no por cómo se llama.
+        ok(es.amagna.asistente.manos.VentanasNativas.esRuidoDeBusqueda("")
+                        && es.amagna.asistente.manos.VentanasNativas.esRuidoDeBusqueda("   ")
+                        && es.amagna.asistente.manos.VentanasNativas.esRuidoDeBusqueda(null)
+                        && !es.amagna.asistente.manos.VentanasNativas.esRuidoDeBusqueda("prueba-asistente-123.txt - Notepad")
+                        && !es.amagna.asistente.manos.VentanasNativas.esRuidoDeBusqueda("Asistencia Tecnica S.L. - Ficha"),
+                "una ventana no se descarta porque su título tenga una palabra en la lista negra");
+        ok(es.amagna.asistente.manos.VentanasNativas.puntosDeVentana(
+                        "asistente", "prueba-asistente-123.txt - Notepad", false, false) > 0,
+                "y se puede buscar una ventana cuyo título lleve esa palabra");
 
         ok(Agente.rechazoEnEntrada(true, false, "screenshot", null) != null
                 && Agente.rechazoEnEntrada(true, true, "screenshot", null) == null

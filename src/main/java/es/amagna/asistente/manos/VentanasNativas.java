@@ -352,7 +352,7 @@ public final class VentanasNativas implements Ventanas {
                 continue;
             }
             String t = Win32.titulo(h);
-            if (esRuidoDeBusqueda(t)) {
+            if (esRuidoDeBusqueda(t) || esConsola(h)) {
                 continue;
             }
             boolean dialogo = esDialogo(h);
@@ -367,12 +367,29 @@ public final class VentanasNativas implements Ventanas {
 
     /** Consola, el propio asistente, Cursor: no son el diálogo de MN. */
     public static boolean esRuidoDeBusqueda(String titulo) {
-        if (titulo == null || titulo.isBlank()) {
+        return titulo == null || titulo.isBlank();
+    }
+
+    /**
+     * Una ventana que nunca es la que buscamos: una consola.
+     *
+     * Antes esto se decidía por el título («asistente», «símbolo del sistema»…) y era un error de bulto: el título
+     * de una consola lleva el comando entero, así que al buscar «MNprogram» se encontraba a sí misma; pero una
+     * ventana de un cliente que se llame «Asistencia» o un fichero llamado «asistente» tampoco son la consola. Se
+     * decide por lo que la ventana ES, no por cómo se llama: su clase de Windows y de quién es.
+     *
+     * La clase no cambia de idioma ni de usuario, así que esto vale igual en un Windows en inglés que en el de Javi.
+     */
+    public static boolean esConsola(Pointer h) {
+        if (h == null) {
             return true;
         }
-        String n = titulo.toLowerCase(Locale.ROOT);
-        return n.contains("asistente") || n.contains("símbolo del sistema") || n.contains("simbolo del sistema")
-                || n.contains("cursor agents") || n.contains("qa osd");
+        if (Win32.pid(h) == ProcessHandle.current().pid()) {
+            return true;
+        }
+        String clase = Win32.clase(h);
+        return clase.equals("ConsoleWindowClass") || clase.equals("CASCADIA_HOSTING_WINDOW_CLASS")
+                || clase.equals("PseudoConsoleWindow") || clase.equals("VirtualConsoleClass");
     }
 
     public static boolean esDialogoPorClase(String clase, boolean tieneDuenioDistinto) {

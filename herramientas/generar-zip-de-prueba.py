@@ -65,6 +65,10 @@ hoja = pdf([
     "Cuantia reclamada estimada: 1.150,00 EUR",
     "## HONORARIOS",
     "Segun hoja de encargo tipo del despacho. Documento de prueba.",
+    "## FIRMA",
+    "En A Coruna, a 20 de septiembre de 2026.",
+    "Firmado: ANGELA GARCIA PRUEBA (firmado electronicamente)",
+    "Firmado: AMAGNA LEGAL, S.L.P.",
 ], "HOJA DE ENCARGO PROFESIONAL")
 
 # Un justificante como FOTO: no tiene texto dentro, hay que mirarlo.
@@ -101,8 +105,9 @@ inner = io.BytesIO()
 with zipfile.ZipFile(inner, "w", zipfile.ZIP_DEFLATED) as z:
     z.writestr("hoja.pdf", hoja)
 
-os.makedirs("out", exist_ok=True)
-with zipfile.ZipFile("out/garcia-prueba.zip", "w", zipfile.ZIP_DEFLATED) as z:
+DESTINO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pruebas", "zips", "garcia-prueba.zip")
+os.makedirs(os.path.dirname(DESTINO), exist_ok=True)
+with zipfile.ZipFile(DESTINO, "w", zipfile.ZIP_DEFLATED) as z:
     base = "García Prueba/"
     z.writestr(base + "notas.txt", notas)
     z.writestr(base + "justificante.jpg", justificante)
@@ -110,7 +115,7 @@ with zipfile.ZipFile("out/garcia-prueba.zip", "w", zipfile.ZIP_DEFLATED) as z:
     z.writestr(base + "USURA_150.zip", inner.getvalue())
     z.writestr(base + "KVIKU/contrato.pdf", contrato)
 
-print("escrito out/garcia-prueba.zip", os.path.getsize("out/garcia-prueba.zip"), "bytes")
-with zipfile.ZipFile("out/garcia-prueba.zip") as z:
+print("escrito", DESTINO, os.path.getsize(DESTINO), "bytes")
+with zipfile.ZipFile(DESTINO) as z:
     for i in z.infolist():
         print("  %8d  %s" % (i.file_size, i.filename))
