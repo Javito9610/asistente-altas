@@ -7,6 +7,8 @@ import com.sun.jna.Structure;
 import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.ptr.PointerByReference;
 import com.sun.jna.win32.StdCallLibrary;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Las funciones de Windows que usa el asistente, llamadas directamente desde Java con JNA (sin PowerShell ni otros
@@ -38,6 +40,10 @@ public final class Win32 {
         boolean EnumWindows(EnumProc proc, Pointer datos);
 
         boolean EnumChildWindows(Pointer padre, EnumProc proc, Pointer datos);
+
+        Pointer GetParent(Pointer hwnd);
+
+        boolean GetWindowRect(Pointer hwnd, RECT rect);
 
         boolean IsWindow(Pointer hwnd);
 
@@ -86,6 +92,15 @@ public final class Win32 {
         }
     }
 
+    /** RECT de Win32. Lo rellena GetWindowRect (coordenadas de pantalla). */
+    @Structure.FieldOrder({"left", "top", "right", "bottom"})
+    public static class RECT extends Structure {
+        public int left;
+        public int top;
+        public int right;
+        public int bottom;
+    }
+
     /** GUITHREADINFO: qué control tiene el foco del teclado en el hilo de la ventana de delante. */
     @Structure.FieldOrder({"cbSize", "flags", "hwndActive", "hwndFocus", "hwndCapture", "hwndMenuOwner", "hwndMoveSize", "hwndCaret",
             "left", "top", "right", "bottom"})
@@ -111,8 +126,12 @@ public final class Win32 {
     static final int WM_CLOSE = 0x0010;
     static final int WM_COMMAND = 0x0111;
     static final int IDCANCEL = 2;
+    static final int WM_SETTEXT = 0x000C;
     static final int WM_GETTEXT = 0x000D;
     static final int WM_GETTEXTLENGTH = 0x000E;
+    static final int WM_LBUTTONDOWN = 0x0201;
+    static final int WM_LBUTTONUP = 0x0202;
+    static final int MK_LBUTTON = 0x0001;
     /** El clic de un botón de toda la vida. El resultado del mensaje suele ser 0 aunque el clic haya entrado. */
     public static final int BM_CLICK = 0x00F5;
     static final int SMTO_ABORTIFHUNG = 0x0002;
@@ -184,6 +203,25 @@ public final class Win32 {
         return Kernel32.I.GetLastError() != ERROR_TIMEOUT;
     }
 
+    /**
+     * BM_CLICK una sola vez sobre ESE botón, con tope.
+     * Si abre un diálogo modal, la llamada caduca y el clic aun así ha entrado: se devuelve true.
+     * El diálogo hay que mirarlo después. No manda un segundo clic.
+     */
+    public static boolean bmClick(Pointer hwnd, int ms) {
+        if (!visible(hwnd)) {
+            return false;
+        }
+        try {
+            Kernel32.I.SetLastError(0);
+            PointerByReference r = new PointerByReference();
+            Pointer ret = User32.I.SendMessageTimeoutW(hwnd, BM_CLICK, null, null, SMTO_ABORTIFHUNG, Math.max(400, ms), r);
+            return ret != null || Kernel32.I.GetLastError() == ERROR_TIMEOUT;
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
     private static String plano(String s) {
         String n = java.text.Normalizer.normalize(s == null ? "" : s, java.text.Normalizer.Form.NFD).replaceAll("\\p{M}", "");
         return n.replace("&", "").trim().toLowerCase(java.util.Locale.ROOT);
@@ -223,5 +261,133 @@ public final class Win32 {
         long copiados = Pointer.nativeValue(r2.getValue());
         char[] cs = buf.getCharArray(0, (int) Math.min(copiados, largo));
         return new String(cs);
+    }
+
+    /** Texto de un control (WM_GETTEXT). Null si el programa no contesta a tiempo. */
+    public static String leerTexto(Pointer hwnd) {
+        if (hwnd == null) {
+            return null;
+        }
+        try {
+            return textoDe(hwnd);
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Escribe el texto de un control con WM_SETTEXT y no espera más de lo dicho.
+     * No pulsa nada: el control tiene que ser el cuadro de esa ficha.
+     *
+     * @return true si el mensaje no ha caducado. Hay que releer el control para saber si ha quedado.
+     */
+    public static boolean ponerTexto(Pointer hwnd, String texto, int ms) {
+        if (hwnd == null || texto == null) {
+            return false;
+        }
+        Memory buf = new Memory(((long) texto.length() + 1) * 2);
+        buf.setWideString(0, texto);
+        return mensaje(hwnd, WM_SETTEXT, null, buf, ms);
+    }
+
+    /** Todos los hijos de esa ventana, nietos incluidos. Cada identificador es una copia: el callback no lo reutiliza. */
+    public static List<Pointer> hijos(Pointer padre) {
+        List<Pointer> lista = new ArrayList<>();
+        if (padre == null) {
+            return lista;
+        }
+        User32.EnumProc cb = new User32.EnumProc() {
+            @Override
+            public boolean invoke(Pointer hwnd, Pointer datos) {
+                if (hwnd != null) {
+                    lista.add(new Pointer(Pointer.nativeValue(hwnd)));
+                }
+                return true;
+            }
+        };
+        try {
+            User32.I.EnumChildWindows(padre, cb, null);
+        } catch (RuntimeException e) {
+            return lista;
+        }
+        return lista;
+    }
+
+    /** {x, y, ancho, alto} en píxeles de pantalla, o null. */
+    public static int[] rectangulo(Pointer hwnd) {
+        if (!visible(hwnd)) {
+            return null;
+        }
+        RECT rc = new RECT();
+        try {
+            if (!User32.I.GetWindowRect(hwnd, rc)) {
+                return null;
+            }
+            rc.read();
+        } catch (RuntimeException e) {
+            return null;
+        }
+        int ancho = rc.right - rc.left;
+        int alto = rc.bottom - rc.top;
+        if (ancho <= 0 || alto <= 0) {
+            return null;
+        }
+        return new int[] {rc.left, rc.top, ancho, alto};
+    }
+
+    /** La ventana padre, o null. */
+    public static Pointer padre(Pointer hwnd) {
+        if (hwnd == null) {
+            return null;
+        }
+        try {
+            Pointer p = User32.I.GetParent(hwnd);
+            return p == null ? null : new Pointer(Pointer.nativeValue(p));
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Un clic en ESE control: el botón de ratón, no un clic en la pantalla.
+     * SendMessageTimeout: si el programa no contesta, se deja a los pocos segundos.
+     */
+    public static boolean clicEn(Pointer hwnd, int ms) {
+        if (!visible(hwnd)) {
+            return false;
+        }
+        int x = 8;
+        int y = 8;
+        RECT rc = new RECT();
+        try {
+            if (User32.I.GetWindowRect(hwnd, rc)) {
+                rc.read();
+                int ancho = rc.right - rc.left;
+                int alto = rc.bottom - rc.top;
+                if (ancho > 2 && alto > 2) {
+                    x = ancho / 2;
+                    y = alto / 2;
+                }
+            }
+        } catch (RuntimeException e) {
+            // Se manda igual, al centro aproximado del control.
+        }
+        long lp = ((long) (y & 0xFFFF) << 16) | (x & 0xFFFF);
+        Pointer punto = new Pointer(lp);
+        boolean abajo = mensaje(hwnd, WM_LBUTTONDOWN, new Pointer(MK_LBUTTON), punto, ms);
+        boolean arriba = mensaje(hwnd, WM_LBUTTONUP, new Pointer(0), punto, ms);
+        return abajo && arriba;
+    }
+
+    /** Manda un mensaje y distingue el caducado. El búfer de lParam tiene que seguir vivo durante la llamada. */
+    private static boolean mensaje(Pointer hwnd, int msg, Pointer wParam, Pointer lParam, int ms) {
+        try {
+            Kernel32.I.SetLastError(0);
+            PointerByReference r = new PointerByReference();
+            Pointer ret = User32.I.SendMessageTimeoutW(hwnd, msg, wParam, lParam, SMTO_ABORTIFHUNG, Math.max(200, ms), r);
+            return ret != null && Kernel32.I.GetLastError() != ERROR_TIMEOUT;
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 }

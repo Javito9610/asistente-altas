@@ -1,0 +1,14 @@
+{
+  "cliente": {
+    "nombre": "MARTA",
+    "apellidos": "LOPEZ PRUEBA",
+    "nif": "48291736Q",
+    "telefono": "622 33 44 55",
+    "correo": "marta.lopez.prueba@ejemplo-invalido.test",
+    "domicilio": "Rua de Proba 8, 2 C, 15001 A Coruna, A Coruna",
+    "fecha_nacimiento": "02/11/1990"
+  },
+  "expedientes": [],
+  "ficheros": [],
+  "dudas": []
+}

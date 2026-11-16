@@ -1,5 +1,6 @@
 package es.amagna.asistente;
 
+import es.amagna.asistente.altas.Alta;
 import es.amagna.asistente.altas.Lectura;
 import es.amagna.asistente.cerebro.Agente;
 import es.amagna.asistente.cerebro.Cerebro;
@@ -35,6 +36,7 @@ public final class Comprobaciones {
         filas();
         zips();
         lectura();
+        alta();
         System.out.println("\nTODO BIEN: " + bien + " comprobaciones.");
     }
 
@@ -1116,6 +1118,315 @@ public final class Comprobaciones {
         } catch (java.io.IOException e) {
             ok(false, "leer los papeles no se rompe: " + e.getMessage());
         }
+    }
+
+    /**
+     * El alta no abre MN si la lectura está parada o le falta un dato. El encaje de la ficha se prueba con un árbol
+     * de mentira: aquí no hay programa.
+     */
+    static void alta() {
+        String listo = """
+                {"cliente": {"nombre": "Angela", "apellidos": "Garcia Prueba", "nif": "00000000T",
+                             "telefono": "600112233", "correo": "", "domicilio": "", "fecha_nacimiento": ""},
+                 "expedientes": [], "ficheros": [], "dudas": []}
+                """;
+        Alta.Decision sigue = Alta.deTexto(listo);
+        ok(sigue.seguir() && sigue.lectura().cliente().get("nif").equals("00000000T"),
+                "con nombre, apellidos y NIF, y sin dudas, el alta puede seguir");
+
+        Alta.Decision duda = Alta.deTexto("""
+                {"cliente": {"nombre": "Angela", "apellidos": "Garcia", "nif": "00000000T"},
+                 "expedientes": [], "ficheros": [], "dudas": ["La letra del DNI no cuadra"]}
+                """);
+        ok(!duda.seguir() && duda.mensaje().startsWith("PARADO") && duda.mensaje().contains("no cuadra"),
+                "una duda para el alta: no se abre MN");
+
+        Alta.Decision sinNif = Alta.deTexto("""
+                {"cliente": {"nombre": "Angela", "apellidos": "Garcia", "nif": ""},
+                 "expedientes": [], "ficheros": [], "dudas": []}
+                """);
+        ok(!sinNif.seguir() && sinNif.mensaje().contains("nif"), "sin NIF no se sigue");
+        ok(!Alta.deTexto("""
+                {"cliente": {"nombre": "", "apellidos": "Garcia", "nif": "00000000T"}, "dudas": []}
+                """).seguir(), "sin nombre no se sigue");
+        ok(!Alta.deTexto("""
+                {"cliente": {"nombre": "Angela", "apellidos": " ", "nif": "00000000T"}, "dudas": []}
+                """).seguir(), "sin apellidos no se sigue");
+        ok(!Alta.deTexto("PARADO: lo tiene que mirar una persona\n"
+                + "{\"cliente\":{\"nombre\":\"Angela\",\"apellidos\":\"Garcia\",\"nif\":\"00000000T\"},\"dudas\":[]}").seguir(),
+                "si la lectura dice PARADO, no se sigue aunque el JSON traiga datos");
+        ok(!Alta.deTexto("""
+                CLIENTE
+                  nombre: Angela
+                  apellidos: Garcia
+                  nif: 00000000T
+
+                NO SE SIGUE. Esto lo tiene que mirar una persona:
+                  · falta una firma
+                """).seguir(), "un informe que dice NO SE SIGUE no se sigue");
+        Alta.Decision informe = Alta.deTexto("""
+                Bloque «garcia-prueba.zip» · 4 documentos
+
+                CLIENTE
+                  nombre: Angela
+                  apellidos: Garcia Prueba
+                  nif: 00000000T
+
+                EXPEDIENTES (0)
+
+                LISTO: están los datos imprescindibles y no hay dudas.
+                """);
+        ok(informe.seguir() && informe.lectura().cliente().get("apellidos").equals("Garcia Prueba"),
+                "el informe LISTO, con los tres datos, también vale");
+        ok(!Alta.deTexto("""
+                CLIENTE
+                  nombre: Angela
+                  apellidos: Garcia
+                  nif: (no consta)
+
+                LISTO: están los datos imprescindibles y no hay dudas.
+                """).seguir(), "si el informe dice LISTO pero el NIF no consta, no se sigue");
+        ok(!Alta.deTexto("").seguir() && !Alta.deTexto("no es una lectura").seguir(),
+                "una lectura vacía o ilegible no se sigue");
+
+        ok(Alta.rutaClientes("Bases de Datos > Clientes").equals(List.of("Bases de Datos", "Clientes")),
+                "Clientes se abre por la ruta del mapa");
+        ok(Alta.rutaClientes("Contabilidad > Cuentas").isEmpty() && Alta.rutaClientes("").isEmpty(),
+                "una ruta de Contabilidad, o una vacía, no se abre");
+
+        String ficha = """
+                Controles de «Cliente»:
+                - campo «NIF» (#txtNif) [etiqueta: NIF] = «»
+                - campo «Nombre» (#txtNombre) [etiqueta: Nombre] = «»
+                - campo «Apellidos» (#txtApellidos) [etiqueta: Apellidos] = «»
+                - campo «Teléfono» (#txtTelefono) [etiqueta: Teléfono] = «»
+                - boton «Guardar» (#btnGuardar)
+                - boton «Alta» (#btnAlta)
+                - boton «Baja» (#btnBaja)
+                """;
+        List<Alta.ControlFicha> controles = Alta.leerControles(ficha);
+        Alta.Plano plano = Alta.encajar(sigue.lectura(), controles);
+        ok(plano.listoParaRellenar()
+                        && plano.de("nif").control().apodo().equals("#txtNif")
+                        && plano.de("nombre").control().apodo().equals("#txtNombre")
+                        && plano.de("apellidos").control().apodo().equals("#txtApellidos")
+                        && plano.de("telefono").control().apodo().equals("#txtTelefono"),
+                "cada dato encaja con un solo campo, por su etiqueta");
+        ok(Alta.botonDeCrear(controles, "Clientes") != null
+                        && Alta.botonDeCrear(controles, "Clientes").apodo().equals("#btnAlta")
+                        && Alta.botonDeCrear(controles, "Selección de Empresa") == null
+                        && Alta.botonDeCrear(controles, "Selección de Ejercicio Contable") == null,
+                "el botón de alta es el de Clientes; en el diálogo de empresa no se pulsa");
+        Alta.ControlFicha guardar = Alta.botonDeGuardar(controles, "Cliente");
+        ok(guardar != null && guardar.apodo().equals("#btnGuardar")
+                        && Alta.botonDeGuardar(controles, "Selección de Empresa") == null,
+                "Guardar se ve en la ficha y no en el diálogo de empresa");
+        ok(Alta.motivoParaNoGuardar("MNprogram - Empresa de prueba", "Cliente", "00000000T", "00000000T", guardar) == null,
+                "se puede guardar si el título sigue en Empresa de prueba y el NIF coincide");
+        ok(Alta.motivoParaNoGuardar("MNprogram - Empresa de prueba", "Cliente", "11111111H", "00000000T", guardar) != null,
+                "si el NIF de la pantalla no es el de la lectura, no se guarda");
+        ok(Alta.motivoParaNoGuardar("MNprogram", "Cliente", "00000000T", "00000000T", guardar) != null,
+                "si el título ya no dice Empresa de prueba, no se guarda");
+        ok(Alta.motivoParaNoGuardar("MNprogram - Mi Empresa", "Cliente", "00000000T", "00000000T", guardar) != null,
+                "en una empresa real no se guarda");
+
+        String principal = Alta.elegirPrincipal(List.of(
+                new Alta.VentanaVista("Clientes", true, true),
+                new Alta.VentanaVista("Alta Cliente", true, true),
+                new Alta.VentanaVista("Teléfono Móvil", true, true),
+                new Alta.VentanaVista("MNprogram - Abogados - Empresa de prueba [\\Usu1] Año 2026", true, false)));
+        ok(principal != null && principal.contains("Empresa de prueba") && Alta.motivoCandado(principal, "Clientes") == null,
+                "un hijo «Clientes» no tumba el candado si la principal dice Empresa de prueba");
+        ok(Alta.empresaSigueBien(null, "Clientes", principal)
+                        && !Alta.empresaSigueBien("MNprogram - Mi Empresa", "Clientes", principal),
+                "si solo se ve el hijo se mantiene la principal; si pasa a otra empresa, se para");
+        ok(!Alta.debePulsarAlta("00000000T", "328 ANGELA GARCIA PRUEBA 00000000T 600 11 22 33", false)
+                        && Alta.debePulsarAlta("12345678Z", "328 ANGELA GARCIA PRUEBA 00000000T", false)
+                        && !Alta.debePulsarAlta("12345678Z", "328 ANGELA GARCIA PRUEBA 00000000T", true),
+                "si el NIF ya está en el listado, o la ficha ya está abierta, no se pulsa Alta");
+        ok("Salir".equals(Alta.botonDeCierre("Direcciones de Correo Electrónico",
+                        List.of("Alta", "Baja", "Modificar", "Salir"), true, true))
+                        && "Guardar".equals(Alta.botonDeCierre("Dirección Correo Electrónico",
+                        List.of("Guardar", "Cancelar"), true, false))
+                        && "Aceptar".equals(Alta.botonDeCierre("Teléfono Móvil",
+                        List.of("Aceptar", "Cancelar"), true, false))
+                        && "Cancelar".equals(Alta.botonDeCierre("Teléfono Móvil",
+                        List.of("Cancelar"), true, true))
+                        && Alta.botonDeCierre("Teléfono Móvil", List.of("Cancelar"), true, false) == null
+                        && "Cancelar".equals(Alta.botonDeCierre("Dirección Correo Electrónico",
+                        List.of("Guardar", "Cancelar"), false, true)),
+                "el teléfono y el correo se quedan con Aceptar o Guardar; la lista sale con Salir, nunca con Baja");
+        Alta.PasoDialogo listaCorreo = Alta.decidirDialogo("Direcciones de Correo Electrónico", "No hay datos",
+                List.of("Alta", "Baja", "Modificar", "Salir"));
+        ok("confirmar".equals(listaCorreo.accion()) && "Salir".equals(listaCorreo.boton()),
+                "la lista de correos, aunque tenga Baja, se cierra con Salir");
+        java.util.List<Alta.PasoCierre> pila = Alta.secuenciaDeCierre(java.util.List.of(
+                "Alta Cliente", "Teléfono Móvil", "Direcciones de Correo Electrónico", "Dirección Correo Electrónico"),
+                false);
+        ok(pila.size() == 4
+                        && "Dirección Correo Electrónico".equals(pila.get(0).dialogo()) && "Guardar".equals(pila.get(0).boton())
+                        && "Direcciones de Correo Electrónico".equals(pila.get(1).dialogo()) && "Salir".equals(pila.get(1).boton())
+                        && "Teléfono Móvil".equals(pila.get(2).dialogo()) && "Guardar".equals(pila.get(2).boton())
+                        && "Alta Cliente".equals(pila.get(3).dialogo()) && "Guardar".equals(pila.get(3).boton())
+                        && pila.stream().noneMatch(p -> "Baja".equals(p.boton()) || "Modificar".equals(p.boton()))
+                        && pila.stream().filter(p -> "Alta Cliente".equals(p.dialogo())).count() == 1,
+                "el cierre es correo-Guardar, lista-Salir (no Baja), teléfono y un solo Guardar de la ficha");
+        ok(Alta.ordenDeCierre("Dirección Correo Electrónico") < Alta.ordenDeCierre("Direcciones de Correo Electrónico")
+                        && Alta.ordenDeCierre("Direcciones de Correo Electrónico") < Alta.ordenDeCierre("Teléfono Móvil")
+                        && Alta.ordenDeCierre("Teléfono Móvil") < Alta.ordenDeCierre("Alta Cliente"),
+                "el diálogo de delante es el correo suelto, luego la lista, luego el teléfono, luego la ficha");
+        java.util.List<Alta.PasoCierre> telYa = Alta.secuenciaDeCierre(java.util.List.of("Teléfono Móvil", "Alta Cliente"), true);
+        ok(telYa.size() == 2 && "Cancelar".equals(telYa.get(0).boton()) && "Guardar".equals(telYa.get(1).boton()),
+                "si el móvil ya está en la ficha, ese diálogo se cierra con Cancelar");
+        ok("Salir".equals(Alta.botonConocido("Direcciones de Correo Electrónico", true, true))
+                        && "Guardar".equals(Alta.botonConocido("Dirección Correo Electrónico", true, true))
+                        && !"Baja".equals(Alta.botonConocido("Direcciones de Correo Electrónico", true, false)),
+                "el botón se decide por el diálogo, sin leer el texto Win32 del botón");
+        ok(!Alta.sePuedeGuardarLaFicha(java.util.List.of("Dirección Correo Electrónico", "Alta Cliente"))
+                        && !Alta.sePuedeGuardarLaFicha(java.util.List.of("Teléfono Móvil"))
+                        && Alta.sePuedeGuardarLaFicha(java.util.List.of("Alta Cliente")),
+                "no se pulsa el Guardar de la ficha mientras el correo o el teléfono siguen delante");
+        int[] guardarCorreo = Alta.zonaBoton("Dirección Correo Electrónico", "Guardar", 0, 0, 400, 280);
+        int[] cancelarCorreo = Alta.zonaBoton("Dirección Correo Electrónico", "Cancelar", 0, 0, 400, 280);
+        int[] salirLista = Alta.zonaBoton("Direcciones de Correo Electrónico", "Salir", 0, 0, 520, 320);
+        int[] guardarFicha = Alta.zonaBoton("Alta Cliente", "Guardar", 0, 0, 900, 640);
+        int[] guardarMovil = Alta.zonaBoton("Teléfono Móvil", "Guardar", 0, 0, 360, 220);
+        ok(guardarCorreo[0] < cancelarCorreo[0] && guardarCorreo[0] < 200
+                        && salirLista[0] > 390
+                        && guardarFicha[0] < 120 && guardarFicha[1] > 560
+                        && guardarMovil[0] < 180,
+                "si UIA no contesta, Guardar es el botón de la izquierda y Salir el de la derecha");
+        ok(!Alta.altaQuedoGuardada(true, true) && !Alta.altaQuedoGuardada(true, false)
+                        && !Alta.altaQuedoGuardada(false, false) && Alta.altaQuedoGuardada(false, true),
+                "una ficha que sigue abierta no es un alta guardada; hace falta que se haya ido y el NIF esté en la rejilla");
+        ok(Alta.zonaAlMomento("Teléfono Móvil", "Guardar")
+                        && Alta.zonaAlMomento("Dirección Correo Electrónico", "Guardar")
+                        && Alta.zonaAlMomento("Direcciones de Correo Electrónico", "Salir")
+                        && Alta.zonaAlMomento("Alta Cliente", "Guardar")
+                        && !Alta.zonaAlMomento("Direcciones de Correo Electrónico", "Baja")
+                        && !Alta.zonaAlMomento("Teléfono Móvil", "Cancelar")
+                        && !Alta.zonaAlMomento("Alta Cliente", "Cancelar"),
+                "la pila conocida se pulsa por zona al momento, sin esperar 4 s a que UIA conteste");
+        String filaLucia = "otro «Fila 330» = «330;LUCIA FERNANDEZ PRUEBA;73918462-G;611 22 33 44»";
+        ok(Alta.nifYaListado("73918462G", filaLucia)
+                        && Alta.nifYaListado("73918462G", "7391 8462 G")
+                        && Alta.nifYaListado("73918462G", "73.918.462 G")
+                        && "presente".equals(Alta.veredictoNif("73918462G", "Controles de «Clientes»:\n- " + filaLucia))
+                        && "ausente".equals(Alta.veredictoNif("73918462G",
+                                "Controles de «Clientes»:\n- otro «Fila 328» = «328;ANGELA GARCIA PRUEBA;00000000T»"))
+                        && "sin-leer".equals(Alta.veredictoNif("73918462G", null))
+                        && "sin-leer".equals(Alta.veredictoNif("73918462G", "No se pueden leer los controles"))
+                        && "sin-leer".equals(Alta.veredictoNif("73918462G",
+                                "Controles de «Clientes»:\n… (hay más; busca uno concreto por su nombre)")),
+                "73918462G está en la rejilla aunque el volcado lleve espacios o guiones; una lectura cortada no es ausencia");
+        ok("guardado".equals(Alta.cierreTrasRejilla(false, java.util.List.of("sin-leer", "presente")))
+                        && "parada".equals(Alta.cierreTrasRejilla(true, java.util.List.of("presente")))
+                        && "sin-leer".equals(Alta.cierreTrasRejilla(false, java.util.List.of("sin-leer", "sin-leer")))
+                        && "ausente".equals(Alta.cierreTrasRejilla(false, java.util.List.of("sin-leer", "ausente")))
+                        && Alta.fraseDeGuardado("MNprogram - Empresa de prueba").equals(
+                                "Guardado. La ficha «Alta Cliente» se ha cerrado. Sesión: «MNprogram - Empresa de prueba»."),
+                "si la ficha se cierra y el NIF aparece en la rejilla, la línea es de guardado; si sigue abierta, parada");
+
+        String ambiguo = """
+                Controles de «Cliente»:
+                - campo «NIF» (#txtNif) = «»
+                - campo «DNI» (#txtDni) = «»
+                - campo «Nombre» (#txtNombre) = «»
+                - campo «Apellidos» (#txtApellidos) = «»
+                - boton «Alta» (#btnAlta)
+                - boton «Crear» (#btnCrear)
+                - boton «Guardar» (#btnGuardar)
+                - boton «Aceptar» (#btnAceptar)
+                """;
+        List<Alta.ControlFicha> dos = Alta.leerControles(ambiguo);
+        Alta.Plano dudoso = Alta.encajar(sigue.lectura(), dos);
+        ok(!dudoso.listoParaRellenar() && dudoso.inciertos().stream().anyMatch(s -> s.startsWith("nif")),
+                "si el NIF encaja con dos campos, no se rellena");
+        ok(Alta.botonDeCrear(dos, "Clientes") == null, "si hay Alta y Crear, no se pulsa ninguno");
+        ok(Alta.botonDeGuardar(dos, "Cliente") == null, "si hay Guardar y Aceptar, no se pulsa ninguno");
+
+        String partidos = """
+                Controles de «Cliente»:
+                - campo «NIF» (#txtNif) = «»
+                - campo «Nombre» (#txtNombre) = «»
+                - campo «Primer apellido» (#txtApellido1) = «»
+                - campo «Segundo apellido» (#txtApellido2) = «»
+                """;
+        ok(!Alta.encajar(sigue.lectura(), Alta.leerControles(partidos)).listoParaRellenar(),
+                "si los apellidos van en dos campos, no se parte la lectura a ojo");
+
+        String apagado = """
+                Controles de «Cliente»:
+                - campo «NIF» (#txtNif) = «» [desactivado]
+                - campo «Nombre» (#txtNombre) = «»
+                - campo «Apellidos» (#txtApellidos) = «»
+                """;
+        ok(!Alta.encajar(sigue.lectura(), Alta.leerControles(apagado)).listoParaRellenar(),
+                "un NIF desactivado no se rellena");
+
+        Alta.Decision garcia = Alta.deTexto("""
+                {"cliente": {"nombre": "ANGELA", "apellidos": "GARCIA PRUEBA", "nif": "00000000T",
+                             "telefono": "600 11 22 33",
+                             "correo": "angela.garcia.prueba@ejemplo-invalido.test",
+                             "domicilio": "Calle Inventada 15, 3 B, 15001 A Coruna, A Coruna"},
+                 "expedientes": [], "ficheros": [], "dudas": []}
+                """);
+        String fichaUna = """
+                Controles de «Alta Cliente»:
+                - campo «» [etiqueta: Nombre] = «»
+                - campo «» [etiqueta: NIF/CIF] = «»
+                - campo «» [etiqueta: Teléfono] = «»
+                - campo «» [etiqueta: Móvil] = «»
+                - campo «» [etiqueta: Correo Electrónico] = «»
+                - campo «» [etiqueta: Dirección] = «»
+                - campo «» [etiqueta: Código Postal] = «»
+                - campo «» [etiqueta: Población] = «»
+                - campo «» [etiqueta: Número] = «328»
+                - desplegable «» [etiqueta: Tipo Cliente] = «General»
+                - desplegable «» [etiqueta: Provincia] = «»
+                - boton «Guardar»
+                """;
+        Alta.Plano una = Alta.encajar(garcia.lectura(), Alta.leerControles(fichaUna));
+        ok(una.listoParaRellenar() && una.de("apellidos") == null
+                        && "ANGELA GARCIA PRUEBA".equals(Alta.textoPara(garcia.lectura(), "nombre", una))
+                        && "Móvil".equals(una.de("telefono").control().etiqueta())
+                        && "00000000T".equals(Alta.textoPara(garcia.lectura(), "nif", una))
+                        && "Calle Inventada 15, 3 B".equals(Alta.textoPara(garcia.lectura(), "domicilio", una))
+                        && "15001".equals(Alta.textoPara(garcia.lectura(), "codigo_postal", una))
+                        && "A Coruna".equals(Alta.textoPara(garcia.lectura(), "poblacion", una))
+                        && una.encajes().stream().noneMatch(e -> "Número".equals(e.control().etiqueta())),
+                "en Alta Cliente el nombre va junto, el móvil gana al teléfono y la dirección se parte");
+        ok("Angela".equals(Alta.textoPara(sigue.lectura(), "nombre", plano)),
+                "si hay campo de apellidos, el nombre no se junta");
+
+        Alta.PasoDialogo confirmar = Alta.decidirDialogo("Confirmación",
+                "¿Desea guardar los datos del cliente?", List.of("Sí", "No"));
+        ok("confirmar".equals(confirmar.accion()) && "Sí".equals(confirmar.boton()) && !confirmar.yaGuardado(),
+                "una pregunta de guardar se contesta con Sí");
+        Alta.PasoDialogo hecho = Alta.decidirDialogo("Información",
+                "El cliente se ha guardado correctamente.", List.of("Aceptar"));
+        ok("confirmar".equals(hecho.accion()) && hecho.yaGuardado() && "Aceptar".equals(hecho.boton()),
+                "«se ha guardado» es la confirmación, y se cierra con Aceptar");
+        Alta.PasoDialogo provincia = Alta.decidirDialogo("Aviso",
+                "El campo Provincia es obligatorio.", List.of("Aceptar"));
+        ok("error".equals(provincia.accion()) && provincia.campo().isEmpty(),
+                "si falta la Provincia no se inventa");
+        Alta.PasoDialogo nif = Alta.decidirDialogo("Aviso",
+                "Debe introducir el NIF/CIF.", List.of("Aceptar"));
+        ok("error".equals(nif.accion()) && "nif".equals(nif.campo()) && "Aceptar".equals(nif.boton()),
+                "si falta el NIF, que ya sabemos, se señala ese campo");
+        Alta.PasoDialogo baja = Alta.decidirDialogo("Clientes",
+                "¿Dar de baja al cliente?", List.of("Sí", "No"));
+        ok("peligro".equals(baja.accion()) && baja.boton().isEmpty(),
+                "dar de baja no se pulsa, aunque haya un Sí");
+        Alta.PasoDialogo modificar = Alta.decidirDialogo("Empresa",
+                "Modificar empresa", List.of("Aceptar", "Cancelar"));
+        ok("peligro".equals(modificar.accion()) && modificar.boton().isEmpty(),
+                "Modificar empresa no se pulsa");
+        Alta.PasoDialogo raro = Alta.decidirDialogo("Atención",
+                "No se ha podido completar la operación.", List.of("Aceptar"));
+        ok("no-claro".equals(raro.accion()) && raro.boton().isEmpty(),
+                "un aviso que no se entiende no se pulsa");
     }
 
     /** Un ZIP mínimo en memoria. Los datos pueden ser texto o los bytes de otro ZIP. */

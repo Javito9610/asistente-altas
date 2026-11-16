@@ -1,0 +1,17 @@
+{
+  "cliente": {
+    "nombre": "LUCIA",
+    "apellidos": "FERNANDEZ PRUEBA",
+    "nif": "73918462G",
+    "telefono": "611 22 33 44",
+    "correo": "lucia.fernandez.prueba@ejemplo-invalido.test",
+    "domicilio": "Calle de Proba 4, 1 A, 15002 A Coruña",
+    "fecha_nacimiento": ""
+  },
+  "expedientes": [],
+  "ficheros": [
+    {"ruta": "Lucia Fernandez Prueba/identidad.txt", "que_es": "identidad", "por_que": "Documento de identidad con nombre, apellidos y NIF. La letra G cuadra con el número 73918462."},
+    {"ruta": "Lucia Fernandez Prueba/justificante.txt", "que_es": "justificante", "por_que": "Justificante de pago de 1,00 EUR, concepto «pago de prueba». Los datos del titular coinciden con los del documento de identidad."}
+  ],
+  "dudas": []
+}

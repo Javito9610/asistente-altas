@@ -597,4 +597,49 @@ public final class VentanasNativas implements Ventanas {
             Thread.currentThread().interrupt();
         }
     }
+
+    /**
+     * Ventanas de MN, visibles o no. La principal a veces queda tapada por «Clientes» o por un aviso
+     * y deja de salir en el listado de las que se ven: el título con «Empresa de prueba» sigue ahí.
+     */
+    public static List<Pointer> topesMn() {
+        List<Pointer> r = new ArrayList<>();
+        Win32.User32.I.EnumWindows(new Win32.User32.EnumProc() {
+            @Override
+            public boolean invoke(Pointer hwnd, Pointer datos) {
+                if (hwnd == null || esConsola(hwnd)) {
+                    return true;
+                }
+                String t = Win32.titulo(hwnd);
+                if (t == null || t.isBlank()) {
+                    return true;
+                }
+                String prog = programa(hwnd).toLowerCase(Locale.ROOT);
+                if (prog.contains("mnprogram") || sinAcentos(t).contains("mnprogram")) {
+                    r.add(new Pointer(Pointer.nativeValue(hwnd)));
+                }
+                return true;
+            }
+        }, null);
+        return r;
+    }
+
+    /** True si esa ventana es un diálogo (propiedad de otra, o clase #32770). */
+    public static boolean esVentanaDialogo(long hwnd) {
+        return esDialogo(new Pointer(hwnd));
+    }
+
+    /**
+     * Título de la ventana dueña, si es otra. La de «Clientes» suele colgar de la principal de MN.
+     * Null si esta ventana es la dueña de sí misma.
+     */
+    public static String tituloDueno(long hwnd) {
+        Pointer h = new Pointer(hwnd);
+        Pointer d = Win32.User32.I.GetAncestor(h, Win32.GA_ROOTOWNER);
+        if (d == null || d.equals(h)) {
+            return null;
+        }
+        String t = Win32.titulo(d);
+        return t == null || t.isBlank() ? null : t;
+    }
 }

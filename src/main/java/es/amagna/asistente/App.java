@@ -1,5 +1,6 @@
 package es.amagna.asistente;
 
+import es.amagna.asistente.altas.Alta;
 import es.amagna.asistente.altas.Lectura;
 import es.amagna.asistente.cerebro.Agente;
 import es.amagna.asistente.cerebro.ClaudeApi;
@@ -46,6 +47,7 @@ public final class App {
                 case "ventanas" -> System.out.println(new VentanasNativas(false).abiertas());
                 case "zips" -> zips(Arrays.asList(args).subList(1, args.length));
                 case "leer" -> leer(Arrays.asList(args).subList(1, args.length));
+                case "alta" -> alta(Arrays.asList(args).subList(1, args.length));
                 case "campo" -> campo();
                 case "controles" -> controles(Arrays.asList(args).subList(1, args.length));
                 case "probar-windows" -> PruebasWindows.main(new String[0]);
@@ -89,6 +91,10 @@ public final class App {
                                                         (la IA abre los papeles de un bloque y saca los datos del
                                                          alta: cliente, expedientes y qué es cada fichero. Si falta
                                                          algo o hay dudas, no sigue: lo dice)
+                          asistente alta <lectura.json> [--mapa mapas\\mn.json] [--a ficha-cliente.txt]
+                                                        (da de alta en Clientes solo si la lectura está LISTO,
+                                                         con nombre, apellidos y NIF. Si está PARADO o falta un
+                                                         dato, no abre MN. No guarda si la ficha no cuadra)
                           asistente campo               (lee el campo donde hagas clic, sin IA)
                           asistente controles "<ventana>" [--hondo N] [--a arbol.txt]
                                                         (los controles por dentro, sin IA)
@@ -170,6 +176,37 @@ public final class App {
             System.out.println("Guardado en " + destino.toAbsolutePath());
         }
         System.exit(r.completo() ? 0 : 1);
+    }
+
+    /**
+     * Da de alta al cliente de una lectura ya hecha. Si la lectura no está LISTO, sale antes de tocar MN.
+     */
+    private static void alta(List<String> a) throws IOException {
+        if (a.isEmpty() || a.get(0).startsWith("--")) {
+            throw new IllegalArgumentException("Uso: asistente alta <lectura.json> [--mapa mapas\\mn.json] [--a ficha-cliente.txt]");
+        }
+        Path fichero = Path.of(a.get(0));
+        if (!Files.isRegularFile(fichero)) {
+            System.out.println("PARADO: no está el fichero «" + a.get(0) + "». Ejemplo: pruebas\\lectura-garcia.json");
+            System.exit(1);
+        }
+        final String texto;
+        try {
+            texto = Files.readString(fichero, StandardCharsets.UTF_8);
+        } catch (java.nio.file.NoSuchFileException e) {
+            System.out.println("PARADO: no está el fichero «" + a.get(0) + "». Ejemplo: pruebas\\lectura-garcia.json");
+            System.exit(1);
+            return;
+        }
+        Alta.Decision d = Alta.deTexto(texto);
+        System.out.println(d.mensaje());
+        if (!d.seguir()) {
+            System.exit(1);
+        }
+        Path mapa = Path.of(a.contains("--mapa") ? a.get(a.indexOf("--mapa") + 1) : "mapas\\mn.json");
+        Path informe = Path.of(a.contains("--a") ? a.get(a.indexOf("--a") + 1) : "ficha-cliente.txt");
+        int codigo = Alta.crearEnMn(d.lectura(), mapa, informe, System.out::println);
+        System.exit(codigo);
     }
 
     /** El .zip que toca: el que te digan, o el único que haya. */

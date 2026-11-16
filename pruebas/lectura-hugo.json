@@ -1,0 +1,17 @@
+{
+  "cliente": {
+    "nombre": "HUGO",
+    "apellidos": "RIVAS PRUEBA",
+    "nif": "29061847J",
+    "telefono": "655 66 77 88",
+    "correo": "hugo.rivas.prueba@ejemplo-invalido.test",
+    "domicilio": "Travesia da Proba 7, 3 A, 15005 A Coruña",
+    "fecha_nacimiento": ""
+  },
+  "expedientes": [],
+  "ficheros": [
+    {"ruta": "Hugo Rivas Prueba/identidad.txt", "que_es": "identidad", "por_que": "Documento de identidad del titular, con la letra de control del NIF correcta."},
+    {"ruta": "Hugo Rivas Prueba/justificante.txt", "que_es": "justificante", "por_que": "Justificante de pago de 1,00 EUR, concepto «pago de prueba». Los datos del titular coinciden con los de la identidad."}
+  ],
+  "dudas": []
+}

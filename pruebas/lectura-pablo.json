@@ -1,0 +1,17 @@
+{
+  "cliente": {
+    "nombre": "PABLO",
+    "apellidos": "SOTO PRUEBA",
+    "nif": "61827345X",
+    "telefono": "633 44 55 66",
+    "correo": "pablo.soto.prueba@ejemplo-invalido.test",
+    "domicilio": "Rua Nova 12, 4 B, 15003 A Coruña",
+    "fecha_nacimiento": ""
+  },
+  "expedientes": [],
+  "ficheros": [
+    {"ruta": "Pablo Soto Prueba/identidad.txt", "que_es": "identidad", "por_que": "Documento de identidad del titular, con nombre, apellidos, NIF y domicilio. La letra del NIF (X) cuadra con el número."},
+    {"ruta": "Pablo Soto Prueba/justificante.txt", "que_es": "justificante", "por_que": "Justificante de pago de 1,00 EUR, concepto «pago de prueba». El pagador coincide con el titular de la identidad."}
+  ],
+  "dudas": []
+}

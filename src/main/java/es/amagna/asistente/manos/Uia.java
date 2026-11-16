@@ -300,6 +300,14 @@ public final class Uia {
         }
 
         public List<Elemento> hijos() {
+            return hijosHasta(400, null);
+        }
+
+        /**
+         * Los primeros {@code max} hijos. Si hay más y {@code hayMas} no es null, {@code hayMas[0]} pasa a true:
+         * quien busca un dato no puede darlo por ausente.
+         */
+        public List<Elemento> hijosHasta(int max, boolean[] hayMas) {
             List<Elemento> l = new ArrayList<>();
             Pointer cond = condicionTodo();
             if (cond == null) {
@@ -314,7 +322,10 @@ public final class Uia {
                 try {
                     IntByReference n = new IntByReference();
                     if (llamar(lista, 3, n) == 0) { // get_Length
-                        for (int i = 0; i < Math.min(n.getValue(), 400); i++) {
+                        if (hayMas != null && n.getValue() > max) {
+                            hayMas[0] = true;
+                        }
+                        for (int i = 0; i < Math.min(n.getValue(), max); i++) {
                             PointerByReference h = new PointerByReference();
                             if (llamar(lista, 4, i, h) == 0 && h.getValue() != null) { // GetElement
                                 l.add(new Elemento(h.getValue()));
@@ -433,6 +444,23 @@ public final class Uia {
             }
             try {
                 return llamar(pat, 3) == 0; // Expand
+            } finally {
+                soltar(pat);
+            }
+        }
+
+        /**
+         * Filas que anuncia una rejilla (patrón Grid). -1 si este control no es una rejilla.
+         * Sirve para no dar por ausente un dato que está en una fila que no se ha llegado a leer.
+         */
+        public int filasDeRejilla() {
+            Pointer pat = patron(10006); // Grid
+            if (pat == null) {
+                return -1;
+            }
+            try {
+                IntByReference n = new IntByReference();
+                return llamar(pat, 4, n) == 0 ? n.getValue() : -1; // get_RowCount
             } finally {
                 soltar(pat);
             }

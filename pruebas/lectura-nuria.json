@@ -1,0 +1,22 @@
+{
+  "cliente": {
+    "nombre": "NURI",
+    "apellidos": "VEGA PRUEBA",
+    "nif": "57392018H",
+    "telefono": "644 55 66 79",
+    "correo": "nuria.veiga.prueba@ejemplo-invalid.test",
+    "domicilio": "Praza da Proba 2, 1 C, 15004 A Coruña",
+    "fecha_nacimiento": ""
+  },
+  "expedientes": [],
+  "ficheros": [
+    {"ruta": "Nuri Vega Prueba/identidad.txt", "que_es": "identidad", "por_que": "Es un texto con los datos del documento de identidad, no una imagen del DNI. No consta fecha de nacimiento."},
+    {"ruta": "Nuri Vega Prueba/justificante.txt", "que_es": "justificante", "por_que": "Justificante de un pago de 1,00 EUR con concepto «pago de prueba». No se ve a qué entidad ni a qué contrato corresponde."}
+  ],
+  "dudas": [
+    "La letra del NIF no cuadra con el número: 57392018 correspondería a la letra A y en los papeles consta 57392018H. Lo he dejado tal como viene, sin corregirlo. Hay que comprobarlo contra el DNI original.",
+    "El nombre de pila es «Nuri» y los apellidos «Vega Prueba», pero el correo es «nuria.veiga.prueba@…» y el zip se llama «nuria-prueba». No sé si el nombre es Nuri o Nuria, ni si el apellido es Vega o Veiga. He puesto lo que dice el documento de identidad, pero conviene confirmarlo.",
+    "No hay hoja de encargo, ni contrato con ninguna entidad, ni notas. Por eso no puedo crear ningún expediente (entidad, tipo, contrato, importes). Tampoco se puede comprobar el teléfono y el correo, que salen solo del documento de identidad y no de la hoja de encargo.",
+    "No consta fecha de nacimiento en los papeles."
+  ]
+}

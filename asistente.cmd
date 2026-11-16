@@ -28,7 +28,7 @@ if "%~1"=="compilar" goto fin
 
 :ejecutar
 "%JBIN%java" -Dstdout.encoding=UTF-8 -cp "%CP%" es.amagna.asistente.App %*
-goto fin
+exit /b %ERRORLEVEL%
 
 :jna
 echo Descargando JNA %JNA_VER% de Maven Central...
