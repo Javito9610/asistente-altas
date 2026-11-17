@@ -103,6 +103,7 @@ public final class Ejecutor {
             }
         }
         String ultimoFallo = null;
+        int limpiezasMapa = 0;
         while (true) {
             try {
                 for (Mapa.Orden o : ordenes) {
@@ -128,15 +129,22 @@ public final class Ejecutor {
                     return new Resultado(false, "PARADO: " + f.getMessage() + " OJO: ya se había guardado; NO se repite. "
                             + "Comprueba a mano si el expediente " + (numero.isBlank() ? "" : numero + " ") + "quedó bien.", numero, rescates);
                 }
-                if (rescate == null || rescates >= MAX_RESCATES) {
-                    return new Resultado(false, "PARADO: " + f.getMessage(), numero, rescates);
-                }
                 if (f.getMessage().equals(ultimoFallo)) {
-                    // Falló igual después de que la IA dejara la pantalla limpia: no es un atasco puntual, es el dato o el mapa.
+                    // Falló igual después de dejar la pantalla limpia: no es un atasco puntual, es el dato o el mapa.
                     return new Resultado(false, "PARADO: " + f.getMessage() + " Falla igual tras limpiar la pantalla: revisa los datos "
                             + "(parámetros) o el mapa; repetir no lo arregla.", numero, rescates);
                 }
                 ultimoFallo = f.getMessage();
+                // Primero el mapa: si sabe salir de donde ha quedado (cerrar el aviso, el selector, cancelar el formulario),
+                // lo limpia él y se reintenta una vez. La IA solo entra si el mapa no sabe cómo salir de ahí.
+                if (limpiezasMapa < 2 && limpiarConMapa()) {
+                    limpiezasMapa++;
+                    registro.accept("  Pantalla limpia con el mapa (sin IA); se reintenta la tarea desde ahí.");
+                    continue;
+                }
+                if (rescate == null || rescates >= MAX_RESCATES) {
+                    return new Resultado(false, "PARADO: " + f.getMessage(), numero, rescates);
+                }
                 rescates++;
                 registro.accept("  La IA da el empujón (" + rescates + " de " + MAX_RESCATES + ")…");
                 rescate.intentar(tarea, f.getMessage() + " Estado actual: " + estado() + ". Ventanas:\n" + observa.ventanas());
@@ -153,6 +161,17 @@ public final class Ejecutor {
             return "Pantalla limpia: «" + mapa.reposo() + "».";
         } catch (RuntimeException e) {
             return "OJO: no he podido dejar la pantalla limpia (" + e.getMessage() + "): míralo a mano.";
+        }
+    }
+
+    /** ¿Sabe el mapa salir de donde está hasta el estado de reposo? (Sin IA.) */
+    private boolean limpiarConMapa() {
+        try {
+            alcanzar(mapa.reposo(), java.util.Map.of());
+            return true;
+        } catch (RuntimeException e) {
+            registro.accept("  El mapa no sabe limpiar la pantalla: " + e.getMessage());
+            return false;
         }
     }
 

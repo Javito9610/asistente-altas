@@ -1178,6 +1178,7 @@ public final class Comprobaciones {
         boolean fallaGuardar;
         boolean auditaMal;
         String fallaSiempre;
+        boolean atascaAlFallar;
         java.util.List<String> espia;
         java.util.Map<String, String> extra = java.util.Map.of();
         String cliente = "1";
@@ -1201,12 +1202,18 @@ public final class Comprobaciones {
         es.amagna.asistente.estados.Ejecutor.Hace hace = (p, ps) -> {
             if (w.falla != null && w.falla.equals(p.accion())) {
                 w.falla = null;
+                if (w.atascaAlFallar) {
+                    w.estado = "atencion-otra";
+                }
                 return "no ha reaccionado";
             }
             if (w.espia != null && p.accion().equals("type")) {
                 w.espia.add(es.amagna.asistente.cerebro.Receta.sustituir(String.valueOf(p.in().get("text")), ps));
             }
             if (w.fallaSiempre != null && w.fallaSiempre.equals(p.accion())) {
+                if (w.atascaAlFallar) {
+                    w.estado = "atencion-otra";
+                }
                 return "no ha reaccionado nunca";
             }
             if (w.auditaMal && p.accion().equals("auditar")) {
@@ -1318,7 +1325,7 @@ public final class Comprobaciones {
         wk.espia = vistos;
         wk.extra = java.util.Map.of("contrario", "33857008-L", "adjunto", "C:\\x.txt");
         var rk = correrFalso(mapa, wk, false);
-        ok(rk.bien() && wk.guardados == 1 && vistos.contains("33857008-L") && vistos.contains("C:\\x.txt"),
+        ok(rk.bien() && wk.guardados == 1 && vistos.stream().anyMatch(x -> x.startsWith("33857008-L")) && vistos.contains("C:\\x.txt"),
                 "estados: con contrario y adjunto se teclean sus datos; sin ellos esos pasos se saltan");
         var sinExtras = new MundoFalso("lista");
         var vistos2 = new java.util.ArrayList<String>();
@@ -1333,8 +1340,14 @@ public final class Comprobaciones {
         var wf = new MundoFalso("lista");
         wf.fallaSiempre = "double_click";
         var rf = correrFalso(mapa, wf, true);
-        ok(!rf.bien() && wf.rescates == 1 && wf.guardados == 0,
-                "estados: si falla igual después de que la IA limpie, no se la llama otra vez (es el dato o el mapa)");
+        ok(!rf.bien() && wf.rescates == 0 && wf.guardados == 0 && rf.mensaje().contains("Falla igual"),
+                "estados: si falla igual después de limpiar con el mapa, se para sin gastar IA (es el dato o el mapa)");
+        var wg = new MundoFalso("lista");
+        wg.fallaSiempre = "double_click";
+        wg.atascaAlFallar = true;
+        var rg = correrFalso(mapa, wg, true);
+        ok(!rg.bien() && wg.rescates == 1 && wg.guardados == 0,
+                "estados: si falla igual después de que la IA limpie, no se la llama otra vez");
         String conDialogo = "- «Expediente 37/2026» (GestorConsultas) — diálogos abiertos dentro: «Atención»  [BLOQUEADA: tiene un diálogo encima]\n"
                 + "- «Expedientes» (GestorConsultas) [BLOQUEADA: tiene un diálogo encima]\n"
                 + "- «MNprogram - Abogados - Empresa de prueba» (MNprogram)\n";
@@ -1347,14 +1360,20 @@ public final class Comprobaciones {
                         && wv.estado.equals("lista"),
                 "estados: si la auditoría no cuadra NO se guarda, NO se llama a la IA (no es un atasco) y la pantalla queda limpia");
         var w1 = new MundoFalso("inicio");
-        w1.falla = "ruta";
+        w1.fallaSiempre = "ruta";
         var r1 = correrFalso(mapa, w1, false);
         ok(!r1.bien() && w1.guardados == 0 && r1.mensaje().contains("PARADO"), "estados: si un paso falla y no hay IA, se para y no guarda nada");
         var w2 = new MundoFalso("inicio");
         w2.falla = "pulsar_hasta";
         var r2 = correrFalso(mapa, w2, true);
-        ok(r2.bien() && w2.guardados == 1 && w2.rescates == 1 && r2.rescates() == 1,
-                "estados: si un paso falla, la IA da el empujón, se vuelve a empezar y se guarda una vez");
+        ok(r2.bien() && w2.guardados == 1 && w2.rescates == 0 && r2.rescates() == 0,
+                "estados: si un paso falla y el mapa sabe limpiar la pantalla, la limpia él, reintenta y NO llama a la IA");
+        var w2b = new MundoFalso("inicio");
+        w2b.falla = "pulsar_hasta";
+        w2b.atascaAlFallar = true;
+        var r2b = correrFalso(mapa, w2b, true);
+        ok(r2b.bien() && w2b.guardados == 1 && w2b.rescates == 1 && r2b.rescates() == 1,
+                "estados: si el mapa no sabe salir de donde ha quedado, entonces sí da el empujón la IA, se reintenta y se guarda una vez");
         var w3 = new MundoFalso("form");
         w3.fallaGuardar = true;
         var r3 = correrFalso(mapa, w3, true);
