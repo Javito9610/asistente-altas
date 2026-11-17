@@ -491,6 +491,15 @@ public final class App {
         // Si Clientes ya estaba abierto, no sale una ventana nueva: se usa esa.
         double esperaMenu = yaSirve ? Math.min(espera, 8) : espera;
         var salio = es.amagna.asistente.guion.Explorador.esperarPantalla(antes, esperaMenu);
+        // Si el menú se pulsó pero no salió nada (MN recién reiniciado, menú sin desplegar), se vuelve a pulsar la ruta.
+        for (int intento = 2; intento <= 4 && salio.ventana() == null && ventanas.tituloDe(destino) == null; intento++) {
+            System.out.println("  La pantalla no ha salido: vuelvo a pulsar la ruta (intento " + intento + " de 4)…");
+            var antes2 = es.amagna.asistente.guion.Explorador.ventanasAhora();
+            String rr = ctrl.pulsarRuta(mapa.ventana(), ruta);
+            System.out.println("  " + rr);
+            salio = es.amagna.asistente.guion.Explorador.esperarPantalla(antes2, Math.min(espera, 20));
+        }
+        yaSirve = yaSirve && ventanas.tituloDe(destino) != null;
         String pantalla;
         if (salio.ventana() != null) {
             pantalla = es.amagna.asistente.guion.Explorador.tituloDe(salio.ventana());
