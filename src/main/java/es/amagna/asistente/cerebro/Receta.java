@@ -267,6 +267,41 @@ public final class Receta {
         }
     }
 
+    /** Un solo paso con sus parámetros y su tiempo máximo. null = bien; si no, por qué no. «_opcional» no es un fallo. */
+    public static String paso(Agente ag, Paso p, Map<String, String> params, int segundos) {
+        Map<String, Object> in = new LinkedHashMap<>(p.in());
+        for (String campo : List.of("text", "texto", "esperado")) {
+            if (in.get(campo) instanceof String s) {
+                String r = sustituir(s, params);
+                if (r.matches("(?s).*\\{[a-z_]+}.*")) {
+                    return "falta un parámetro: " + r;
+                }
+                in.put(campo, r);
+            }
+        }
+        boolean opcional = Boolean.TRUE.equals(in.remove("_opcional"));
+        in.remove("_si");
+        ExecutorService pool = Executors.newSingleThreadExecutor(r -> {
+            Thread t = new Thread(r, "paso");
+            t.setDaemon(true);
+            return t;
+        });
+        try {
+            Future<String> f = pool.submit(() -> new Receta("x", List.of()).hacer(ag, p, in));
+            String fallo = f.get(segundos, TimeUnit.SECONDS);
+            return opcional ? null : fallo;
+        } catch (java.util.concurrent.TimeoutException e) {
+            return opcional ? null : "tardó más de " + segundos + " s";
+        } catch (java.util.concurrent.ExecutionException e) {
+            return opcional ? null : String.valueOf(e.getCause().getMessage());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return "interrumpido";
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
     /** Devuelve null si ha ido bien, o por qué no. */
     private String hacer(Agente ag, Paso p, Map<String, Object> in) {
         Ventanas v = ag.ventanas();
@@ -299,9 +334,8 @@ public final class Receta {
             if (Agente.ES_DE_ORDENADOR.contains(p.accion())) {
                 ag.ejecutarAccion(p.accion(), in);
             } else {
-                String texto = String.valueOf(ag.ejecutarPropia(p.accion(), in).get(0));
-                if (texto.toLowerCase(java.util.Locale.ROOT).contains("no se ha podido") || texto.startsWith("ERROR")
-                        || texto.toLowerCase(java.util.Locale.ROOT).contains("no está")) {
+                String texto = Agente.texto(ag.ejecutarPropia(p.accion(), in));
+                if (Agente.pareceFallo(texto)) {
                     return texto;
                 }
             }

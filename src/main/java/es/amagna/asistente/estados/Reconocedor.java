@@ -1,0 +1,81 @@
+package es.amagna.asistente.estados;
+
+import es.amagna.asistente.cerebro.Receta;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/** Dónde estoy: mira las ventanas abiertas y dice en qué estado del mapa está el programa. */
+public final class Reconocedor {
+    private static final Pattern LINEA = Pattern.compile("^- «([^»]*)»(.*)$");
+
+    private Reconocedor() {
+    }
+
+    /** Una ventana de la lista que da {@code ventanas_abiertas}. */
+    public record Ventana(String titulo, boolean bloqueada) {
+    }
+
+    public static List<Ventana> leer(String abiertas) {
+        List<Ventana> v = new ArrayList<>();
+        if (abiertas == null) {
+            return v;
+        }
+        for (String l : abiertas.split("\\R")) {
+            Matcher m = LINEA.matcher(l.strip());
+            if (m.find()) {
+                v.add(new Ventana(m.group(1), m.group(2).contains("BLOQUEADA") || m.group(2).contains("minimizada")));
+            }
+        }
+        return v;
+    }
+
+    /**
+     * El estado. Se mira de delante hacia atrás y gana la primera ventana conocida que no esté tapada por un diálogo.
+     * Si no hay ninguna conocida pero sí la principal del programa: «inicio». Si no hay ni eso: «fuera».
+     */
+    public static String estado(Mapa mapa, String abiertas) {
+        List<Ventana> ventanas = leer(abiertas);
+        for (Ventana w : ventanas) {
+            if (w.bloqueada()) {
+                continue;
+            }
+            String n = Receta.norm(w.titulo());
+            for (Mapa.Estado e : mapa.estados()) {
+                if (coincide(n, e.ventana())) {
+                    return e.nombre();
+                }
+            }
+        }
+        for (Ventana w : ventanas) {
+            if (!mapa.principal().isBlank() && w.titulo().contains(mapa.principal()) && !w.titulo().contains("Explorador")) {
+                return "inicio";
+            }
+        }
+        return "fuera";
+    }
+
+    /** Igual, o «Cargando...» vale para «Cargando…» y «Cargando datos...»: un título que acaba en puntos suspensivos es un prefijo. */
+    static boolean coincide(String titulo, String patron) {
+        if (titulo.equals(patron)) {
+            return true;
+        }
+        String base = patron.replaceAll("(\\.\\.\\.|…)$", "").strip();
+        return !base.equals(patron) && !base.isEmpty() && titulo.startsWith(base);
+    }
+
+    /** El título real de la ventana (con su número) que está en ese estado, o null. */
+    public static String tituloDe(Mapa mapa, String abiertas, String estado) {
+        for (Mapa.Estado e : mapa.estados()) {
+            if (e.nombre().equals(estado)) {
+                for (Ventana w : leer(abiertas)) {
+                    if (!w.bloqueada() && coincide(Receta.norm(w.titulo()), e.ventana())) {
+                        return w.titulo();
+                    }
+                }
+            }
+        }
+        return null;
+    }
+}

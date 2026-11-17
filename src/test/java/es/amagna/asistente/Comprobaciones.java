@@ -39,6 +39,7 @@ public final class Comprobaciones {
         percepcion();
         plan();
         receta();
+        estados();
         alta();
         System.out.println("\nTODO BIEN: " + bien + " comprobaciones.");
     }
@@ -1150,6 +1151,139 @@ public final class Comprobaciones {
      * Leer los papeles: que se le enseñen los documentos como lo que son, que se entienda lo que contesta y, sobre
      * todo, que un alta con dudas o sin NIF NO siga.
      */
+
+    // ---- mapa de estados ----
+    static String ventanasDe(String estado) {
+        String mn = "- «MNprogram - Abogados - Empresa de prueba [\\Usu1] Año 2026» (MNprogram)\n- «C:\\Windows\\system32\\cmd.exe» (WindowsTerminal)";
+        return switch (estado) {
+            case "fuera" -> "- «Claude» (claude)\n- «Explorador» (explorer)";
+            case "inicio" -> mn;
+            case "lista" -> "- «Expedientes» (GestorConsultas) [delante, con el foco]\n" + mn;
+            case "form" -> "- «Expediente 36/2026» (GestorConsultas) [delante, con el foco]\n- «Expedientes» (GestorConsultas)\n" + mn;
+            case "selector" -> "- «Clientes» (GestorConsultas) [delante, con el foco]\n- «Expediente 36/2026» (GestorConsultas) [BLOQUEADA: tiene un diálogo encima]\n- «Expedientes» (GestorConsultas) [BLOQUEADA]\n" + mn;
+            default -> throw new IllegalArgumentException(estado);
+        };
+    }
+
+    /** Un MN de mentira: el estado cambia con lo que se «pulsa». */
+    static final class MundoFalso {
+        String estado;
+        int guardados;
+        int rescates;
+        String falla; // acción que falla una vez
+        boolean fallaGuardar;
+
+        MundoFalso(String e) {
+            estado = e;
+        }
+    }
+
+    static es.amagna.asistente.estados.Ejecutor.Resultado correrFalso(es.amagna.asistente.estados.Mapa mapa, MundoFalso w, boolean conIa) {
+        long[] t = {0};
+        es.amagna.asistente.estados.Ejecutor.Reloj reloj = new es.amagna.asistente.estados.Ejecutor.Reloj() {
+            public long ahora() {
+                return t[0];
+            }
+
+            public void dormir(long ms) {
+                t[0] += ms;
+            }
+        };
+        es.amagna.asistente.estados.Ejecutor.Hace hace = (p, ps) -> {
+            if (w.falla != null && w.falla.equals(p.accion())) {
+                w.falla = null;
+                return "no ha reaccionado";
+            }
+            switch (p.accion()) {
+                case "abrir_mn" -> w.estado = "inicio";
+                case "ruta" -> w.estado = "lista";
+                case "pulsar_hasta" -> w.estado = "form";
+                case "pulsar_control" -> {
+                    if (String.valueOf(p.in().get("control")).contains("Cancelar")) {
+                        w.estado = "lista";
+                    }
+                }
+                case "key" -> w.estado = w.estado.equals("selector") ? "form" : w.estado;
+                case "double_click" -> {
+                    if (p.rel() != null && p.rel()[0] == 597) {
+                        w.estado = "selector";
+                    }
+                }
+                case "left_click" -> {
+                    if (p.rel() != null && p.rel()[0] == 69) {
+                        w.estado = "form";
+                    }
+                    if (p.rel() != null && p.rel()[0] == 317) {
+                        if (w.fallaGuardar) {
+                            return "se colgó";
+                        }
+                        w.guardados++;
+                        w.estado = "lista";
+                    }
+                }
+                default -> { }
+            }
+            return null;
+        };
+        es.amagna.asistente.estados.Ejecutor.Rescate rescate = conIa ? (n, sit) -> {
+            w.rescates++;
+            w.estado = "lista"; // la IA deja la pantalla limpia
+        } : null;
+        return new es.amagna.asistente.estados.Ejecutor(mapa, () -> ventanasDe(w.estado), hace, rescate, reloj, x -> { })
+                .ejecutar("crear-expediente", java.util.Map.of("descripcion", "MICRO", "cliente", "1"));
+    }
+
+    static void estados() {
+        try {
+            estados2();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    static void estados2() throws Exception {
+        var mapa = es.amagna.asistente.estados.Mapa.leer(java.nio.file.Path.of("estados", "mn.json"));
+        ok(mapa.tareas().containsKey("crear-expediente") && mapa.accion("guardar").toca() && !mapa.accion("alta").toca(),
+                "estados: el mapa de MN se lee y se valida; Guardar está marcado como irreversible");
+        var R = es.amagna.asistente.estados.Reconocedor.class;
+        ok(es.amagna.asistente.estados.Reconocedor.estado(mapa, ventanasDe("fuera")).equals("fuera")
+                        && es.amagna.asistente.estados.Reconocedor.estado(mapa, ventanasDe("inicio")).equals("inicio")
+                        && es.amagna.asistente.estados.Reconocedor.estado(mapa, ventanasDe("lista")).equals("lista-expedientes")
+                        && es.amagna.asistente.estados.Reconocedor.estado(mapa, ventanasDe("form")).equals("formulario-expediente"),
+                "estados: reconoce fuera, inicio, lista y formulario (el número del expediente no importa)");
+        ok(es.amagna.asistente.estados.Reconocedor.estado(mapa, ventanasDe("selector")).equals("selector-cliente"),
+                "estados: con el selector delante, las ventanas de debajo están bloqueadas y no cuentan");
+        ok(es.amagna.asistente.estados.Reconocedor.estado(mapa, "- «Cargando...» (MNprogram) [delante]\n" + ventanasDe("inicio")).equals("cargando"),
+                "estados: «Cargando...» se reconoce");
+        var c1 = es.amagna.asistente.estados.Planificador.camino(mapa, "fuera", "formulario-expediente");
+        ok(c1 != null && c1.size() == 3 && c1.get(0).nombre().equals("abrir-mn") && c1.get(2).nombre().equals("alta"),
+                "estados: de «fuera» al formulario hay tres pasos: abrir MN, abrir la lista, Alta");
+        ok(es.amagna.asistente.estados.Planificador.camino(mapa, "selector-cliente", "lista-expedientes").size() == 2
+                        && es.amagna.asistente.estados.Planificador.camino(mapa, "lista-expedientes", "lista-expedientes").isEmpty(),
+                "estados: desde el selector se vuelve a la lista cerrándolo y cancelando; ya estar donde toca = nada que hacer");
+        ok(es.amagna.asistente.estados.Planificador.camino(mapa, "lista-expedientes", "inicio") == null,
+                "estados: sin camino, null (no se inventa uno)");
+        for (String ini : List.of("fuera", "inicio", "lista", "form", "selector")) {
+            var w = new MundoFalso(ini);
+            var r = correrFalso(mapa, w, false);
+            ok(r.bien() && w.guardados == 1 && r.numero().equals("36/2026") || (ini.equals("lista") || ini.equals("inicio") || ini.equals("fuera")) && r.bien() && w.guardados == 1,
+                    "estados: crear-expediente sale bien y guarda UNA vez empezando en «" + ini + "»");
+        }
+        var w1 = new MundoFalso("inicio");
+        w1.falla = "ruta";
+        var r1 = correrFalso(mapa, w1, false);
+        ok(!r1.bien() && w1.guardados == 0 && r1.mensaje().contains("PARADO"), "estados: si un paso falla y no hay IA, se para y no guarda nada");
+        var w2 = new MundoFalso("inicio");
+        w2.falla = "pulsar_hasta";
+        var r2 = correrFalso(mapa, w2, true);
+        ok(r2.bien() && w2.guardados == 1 && w2.rescates == 1 && r2.rescates() == 1,
+                "estados: si un paso falla, la IA da el empujón, se vuelve a empezar y se guarda una vez");
+        var w3 = new MundoFalso("form");
+        w3.fallaGuardar = true;
+        var r3 = correrFalso(mapa, w3, true);
+        ok(!r3.bien() && w3.rescates == 0 && w3.guardados == 0 && r3.mensaje().contains("NO se repite"),
+                "estados: si falla el Guardar no se repite la tarea (podría duplicar), se para y avisa");
+    }
 
     static void receta() {
         try {

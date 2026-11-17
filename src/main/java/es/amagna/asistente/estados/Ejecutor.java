@@ -1,0 +1,181 @@
+package es.amagna.asistente.estados;
+
+import es.amagna.asistente.cerebro.Receta;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Hace una tarea del mapa: mira dónde está, calcula el camino, ejecuta cada transición y COMPRUEBA que ha llegado
+ * donde tocaba. Si algo falla (pantalla desconocida, paso que no responde, estado inesperado) llama al rescate (la IA)
+ * con lo que ha pasado y vuelve a mirar dónde está. Funciona desde cualquier punto de partida.
+ */
+public final class Ejecutor {
+    public interface Observa {
+        String ventanas();
+    }
+
+    /** null = hecho; si no, el motivo. */
+    public interface Hace {
+        String paso(Receta.Paso paso, Map<String, String> params);
+    }
+
+    public interface Rescate {
+        void intentar(String tarea, String situacion);
+    }
+
+    public interface Reloj {
+        long ahora();
+
+        void dormir(long ms);
+    }
+
+    public record Resultado(boolean bien, String mensaje, String numero, int rescates) {
+    }
+
+    private static final Reloj REAL = new Reloj() {
+        public long ahora() {
+            return System.currentTimeMillis();
+        }
+
+        public void dormir(long ms) {
+            try {
+                Thread.sleep(ms);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    };
+    private static final Pattern NUMERO = Pattern.compile("(\\d+/\\d{4})");
+    static final int MAX_RESCATES = 2;
+
+    private final Mapa mapa;
+    private final Observa observa;
+    private final Hace hace;
+    private final Rescate rescate;
+    private final Reloj reloj;
+    private final java.util.function.Consumer<String> registro;
+    private String numero = "";
+    private int rescates;
+    private boolean comprometido;
+
+    public Ejecutor(Mapa mapa, Observa observa, Hace hace, Rescate rescate, Reloj reloj, java.util.function.Consumer<String> registro) {
+        this.mapa = mapa;
+        this.observa = observa;
+        this.hace = hace;
+        this.rescate = rescate;
+        this.reloj = reloj == null ? REAL : reloj;
+        this.registro = registro;
+    }
+
+    private static final class Fallo extends RuntimeException {
+        Fallo(String m) {
+            super(m);
+        }
+    }
+
+    public Resultado ejecutar(String tarea, Map<String, String> params) {
+        List<Mapa.Orden> ordenes = mapa.tareas().get(tarea);
+        if (ordenes == null) {
+            return new Resultado(false, "No hay ninguna tarea «" + tarea + "». Las que hay: " + String.join(", ", mapa.tareas().keySet()), "", 0);
+        }
+        while (true) {
+            try {
+                for (Mapa.Orden o : ordenes) {
+                    if (o.ir() != null) {
+                        alcanzar(o.ir(), params);
+                    } else {
+                        Mapa.Transicion t = mapa.accion(o.hacer());
+                        alcanzar(t.de(), params);
+                        recorrer(t, params);
+                    }
+                }
+                break;
+            } catch (Fallo f) {
+                registro.accept("  FALLO: " + f.getMessage());
+                if (comprometido) {
+                    // Ya se hizo lo irreversible (Guardar). Repetir la tarea crearía un duplicado: se para y se dice.
+                    return new Resultado(false, "PARADO: " + f.getMessage() + " OJO: ya se había guardado; NO se repite. "
+                            + "Comprueba a mano si el expediente " + (numero.isBlank() ? "" : numero + " ") + "quedó bien.", numero, rescates);
+                }
+                if (rescate == null || rescates >= MAX_RESCATES) {
+                    return new Resultado(false, "PARADO: " + f.getMessage(), numero, rescates);
+                }
+                rescates++;
+                registro.accept("  La IA da el empujón (" + rescates + " de " + MAX_RESCATES + ")…");
+                rescate.intentar(tarea, f.getMessage() + " Estado actual: " + estado() + ". Ventanas:\n" + observa.ventanas());
+                // Después del empujón se vuelve a empezar la tarea desde donde esté la pantalla: el mapa vale desde cualquier punto.
+            }
+        }
+        return new Resultado(true, "HECHO: «" + tarea + "»" + (numero.isBlank() ? "" : " (expediente " + numero + ")"), numero, rescates);
+    }
+
+    /** El estado, esperando a que un «Cargando…» se quite. */
+    String estado() {
+        String e = Reconocedor.estado(mapa, observa.ventanas());
+        long fin = reloj.ahora() + 25_000;
+        while ("cargando".equals(e) && reloj.ahora() < fin) {
+            reloj.dormir(500);
+            e = Reconocedor.estado(mapa, observa.ventanas());
+        }
+        anotarNumero(e);
+        return e;
+    }
+
+    private void anotarNumero(String estado) {
+        String t = Reconocedor.tituloDe(mapa, observa.ventanas(), estado);
+        if (t != null && estado.startsWith("formulario")) {
+            Matcher m = NUMERO.matcher(t);
+            if (m.find()) {
+                numero = m.group(1);
+            }
+        }
+    }
+
+    private void alcanzar(String destino, Map<String, String> params) {
+        for (int vuelta = 0; vuelta < 8; vuelta++) {
+            String aqui = estado();
+            if (aqui.equals(destino)) {
+                return;
+            }
+            List<Mapa.Transicion> camino = Planificador.camino(mapa, aqui, destino);
+            if (camino == null || camino.isEmpty()) {
+                throw new Fallo("no sé llegar de «" + aqui + "» a «" + destino + "» (pantalla desconocida o sin camino en el mapa).");
+            }
+            recorrer(camino.get(0), params);
+        }
+        throw new Fallo("no he conseguido llegar a «" + destino + "» tras 8 intentos.");
+    }
+
+    private void recorrer(Mapa.Transicion t, Map<String, String> params) {
+        registro.accept("  " + t.de() + " → " + t.a() + (t.nombre().isBlank() ? "" : " (" + t.nombre() + ")"));
+        if (t.toca()) {
+            comprometido = true; // desde el primer paso: un clic en Guardar puede haber guardado aunque lo demás falle
+        }
+        for (Receta.Paso p : t.pasos()) {
+            Object si = p.in().get("_si");
+            if (si != null && (params.get(String.valueOf(si)) == null || params.get(String.valueOf(si)).isBlank())) {
+                continue;
+            }
+            String err = hace.paso(p, params);
+            if (err != null) {
+                throw new Fallo("«" + t.de() + " → " + t.a() + "», paso «" + p.accion() + "»: " + err);
+            }
+        }
+        if (t.toca()) {
+            comprometido = true;
+        }
+        long fin = reloj.ahora() + t.segundos() * 1000L;
+        String ahora;
+        do {
+            ahora = estado();
+            if (ahora.equals(t.a())) {
+                return;
+            }
+            reloj.dormir(400);
+        } while (reloj.ahora() < fin);
+        throw new Fallo("tras «" + t.nombre() + "» esperaba estar en «" + t.a() + "» y estoy en «" + ahora + "».");
+    }
+}

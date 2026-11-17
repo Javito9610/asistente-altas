@@ -52,7 +52,8 @@ public final class Agente {
     public static boolean pareceFallo(String t) {
         String m = t == null ? "" : t.toLowerCase(java.util.Locale.ROOT);
         return m.startsWith("error") || m.contains("no se ha podido") || m.contains("no se ha encontrado")
-                || m.contains("no está") || m.contains("no permitido") || m.contains("no se deja");
+                || m.contains("no está") || m.contains("no permitido") || m.contains("no se deja")
+                || m.startsWith("se han pasado") || m.startsWith("interrumpido");
     }
 
     Manos manos() {
@@ -528,6 +529,41 @@ public final class Agente {
                 };
                 return List.of(textoBloque(controles.esperar((String) in.get("ventana"), (String) in.get("control"), q,
                         (String) in.get("valor"), segundos)));
+            }
+            case "ruta": {
+                @SuppressWarnings("unchecked")
+                List<String> ruta = (List<String>) in.get("ruta");
+                String r = controles.pulsarRuta((String) in.get("ventana"), ruta);
+                if (!r.startsWith("Pulsado")) {
+                    throw new IllegalStateException(r);
+                }
+                return List.of(textoBloque(r));
+            }
+            case "pulsar_hasta": {
+                java.util.regex.Pattern quiero = java.util.regex.Pattern.compile((String) in.get("hasta"));
+                String r = controles.pulsarInsistiendo((String) in.get("ventana"), (String) in.get("control"),
+                        () -> quiero.matcher(ventanas.abiertas()).find(), (int) num(in.getOrDefault("segundos", 20L)));
+                if (!r.startsWith("Pulsado")) {
+                    throw new IllegalStateException(r);
+                }
+                return List.of(textoBloque(r));
+            }
+            case "comprobar": {
+                String leido = controles.leer((String) in.get("ventana"), (String) in.get("control"));
+                int a = leido.indexOf('«');
+                int b = leido.lastIndexOf('»');
+                String valor = a >= 0 && b > a && leido.contains("vale") ? leido.substring(leido.indexOf("vale «") + 6, b) : null;
+                String esperado = String.valueOf(in.get("esperado"));
+                boolean contiene = !"igual".equals(in.get("modo"));
+                if (valor == null) {
+                    throw new IllegalStateException("no se ha podido leer " + in.get("control") + ": " + leido);
+                }
+                boolean ok = contiene ? valor.toLowerCase(java.util.Locale.ROOT).contains(esperado.toLowerCase(java.util.Locale.ROOT))
+                        : valor.equals(esperado);
+                if (!ok) {
+                    throw new IllegalStateException("Comprobación: esperaba «" + esperado + "» y hay «" + valor + "» en " + in.get("control"));
+                }
+                return List.of(textoBloque("Comprobado: " + in.get("control") + " vale «" + valor + "»."));
             }
             case "cancelar_bloqueos": {
                 List<String> l = ventanas.cancelarBloqueos();

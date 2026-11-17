@@ -48,6 +48,7 @@ public final class App {
             case "guion", "sesion", "explorar", "aprender" -> 420;
             case "agente", "expediente-prueba" -> 900;
             case "receta" -> 600;
+            case "tarea" -> 900;
             case "alta" -> 1200;
             case "probar-windows", "arranque", "secretos", "secreto", "guardar-clave", "ayuda" -> 0;
             default -> 300;
@@ -103,6 +104,7 @@ public final class App {
                 case "controles" -> controles(Arrays.asList(args).subList(1, args.length));
                 case "probar-windows" -> PruebasWindows.main(new String[0]);
                 case "expediente-prueba" -> expedientePrueba(Arrays.asList(args).subList(1, args.length));
+                case "tarea" -> tarea(Arrays.asList(args).subList(1, args.length));
                 case "receta" -> receta(Arrays.asList(args).subList(1, args.length));
                 case "agente" -> agente(Arrays.asList(args).subList(1, args.length));
                 case "guion" -> guion(Arrays.asList(args).subList(1, args.length));
@@ -545,6 +547,59 @@ public final class App {
             }
         }
         agente(b);
+    }
+
+    /**
+     * Hace una tarea del mapa de estados (estados/mn.json): reconoce dónde está MN, va hasta donde toca, comprueba cada
+     * paso y, si algo se pierde, la IA da el empujón.
+     *   asistente tarea crear-expediente --param descripcion=MICRO --param cliente=NIF [--param cliente_nombre=…] [--sin-ia]
+     */
+    private static void tarea(List<String> a) throws IOException {
+        if (a.isEmpty()) {
+            throw new IllegalArgumentException("Uso: asistente tarea <nombre> [--param k=v ...] [--mapa estados/mn.json] [--sin-ia]");
+        }
+        var mapa = es.amagna.asistente.estados.Mapa.leer(Path.of(a.contains("--mapa") ? a.get(a.indexOf("--mapa") + 1) : "estados/mn.json"));
+        var mapaMn = es.amagna.asistente.guion.Mapa.leer(Path.of("mapas", "mn.json"));
+        var ventanas = new VentanasNativas(false);
+        var ctrl = new Controles(ventanas);
+        var motor = new Agente(new ClaudeApi("sin-uso"), new ManosRobot(false), ventanas, MODELO_POR_DEFECTO, "", 1, 1, System.out::println)
+                .conControles(ctrl);
+        var params = parametros(a);
+        es.amagna.asistente.estados.Ejecutor.Hace hace = (paso, ps) -> {
+            if ("abrir_mn".equals(paso.accion())) {
+                try {
+                    dejarMnListo(mapaMn, ventanas, ctrl, a);
+                    return null;
+                } catch (Exception e) {
+                    return "no se ha podido abrir MN: " + e.getMessage();
+                }
+            }
+            // El cerrojo: nada se toca si MN no está en la empresa de prueba.
+            if (!ventanas.abiertas().contains("Empresa de prueba")) {
+                return "PARADO: MN no está en «Empresa de prueba»; no se toca nada.";
+            }
+            return es.amagna.asistente.cerebro.Receta.paso(motor, paso, ps, 25);
+        };
+        es.amagna.asistente.estados.Ejecutor.Rescate rescate = null;
+        if (!a.contains("--sin-ia") && Clave.hay()) {
+            var esp = es.amagna.asistente.cerebro.Especialista.cargar("expedientes", MODELO_POR_DEFECTO, 400_000);
+            rescate = (nombre, situacion) -> {
+                Agente ag = new Agente(new ClaudeApi(Clave.leer()), new ManosRobot(false), ventanas, esp.modelo(), esp.instrucciones(),
+                        25, 300_000, System.out::println).conControles(ctrl).conExpediente(true);
+                var r = ag.ejecutar("El asistente está haciendo la tarea «" + nombre + "» en la Empresa de prueba y se ha atascado:\n"
+                        + situacion + "\n\nTU TRABAJO NO ES TERMINAR LA TAREA. Es dejar MN en un punto limpio para que el asistente "
+                        + "vuelva a empezar él solo: sin diálogos «Atención» o de aviso abiertos, sin formularios de expediente "
+                        + "abiertos (Cancelar y «Sí» para salir sin guardar) y sin selectores abiertos. Si el formulario ya estaba "
+                        + "GUARDADO, no lo toques y dilo. Termina con TERMINADO: y cómo ha quedado la pantalla.");
+                System.out.println("  IA: " + r.mensaje());
+            };
+            System.out.println("IA de guardia: solo entra si algo se atasca (máximo 2 empujones).");
+        }
+        var ej = new es.amagna.asistente.estados.Ejecutor(mapa, ventanas::abiertas, hace, rescate, null, System.out::println);
+        long t0 = System.currentTimeMillis();
+        var r = ej.ejecutar(a.get(0), params);
+        System.out.println(r.mensaje() + String.format(" · %.0f s · %d empujones de la IA", (System.currentTimeMillis() - t0) / 1000.0, r.rescates()));
+        System.exit(r.bien() ? 0 : 1);
     }
 
     /** Los «--param nombre=valor» de la línea de órdenes. */

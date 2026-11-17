@@ -1,0 +1,98 @@
+{
+  "_nota": "Mapa de estados de MN para expedientes. Construido a partir de lo que el agente hizo bien en la Empresa de prueba. Cada transición tiene su estado de llegada: si no se llega, se para y entra la IA.",
+  "principal": "MNprogram - Abogados",
+  "estados": [
+    {"nombre": "cargando", "ventana": "Cargando..."},
+    {"nombre": "lista-expedientes", "ventana": "Expedientes"},
+    {"nombre": "formulario-expediente", "ventana": "Expediente 1/2026"},
+    {"nombre": "selector-tipo", "ventana": "Tipo de Expediente"},
+    {"nombre": "selector-cliente", "ventana": "Clientes"}
+  ],
+  "transiciones": [
+    {"nombre": "abrir-mn", "de": "fuera", "a": "inicio", "segundos": 240,
+     "pasos": [{"accion": "abrir_mn"}]},
+
+    {"nombre": "abrir-lista-expedientes", "de": "inicio", "a": "lista-expedientes", "segundos": 60,
+     "pasos": [
+       {"accion": "ruta", "ventana": "MNprogram - Abogados",
+        "in": {"ventana": "MNprogram - Abogados", "ruta": ["Bases de Datos", "Expedientes", "Expedientes"]}}
+     ]},
+
+    {"nombre": "alta", "de": "lista-expedientes", "a": "formulario-expediente", "segundos": 40,
+     "pasos": [
+       {"accion": "pulsar_hasta", "ventana": "Expedientes",
+        "in": {"ventana": "Expedientes", "control": "boton:Alta", "hasta": "«Expediente \\d+/\\d+»", "segundos": 20}}
+     ]},
+
+    {"nombre": "cancelar-formulario", "de": "formulario-expediente", "a": "lista-expedientes", "segundos": 20,
+     "pasos": [
+       {"accion": "pulsar_control", "ventana": "Expediente 1/2026", "in": {"ventana": "Expediente 1/2026", "control": "boton:Cancelar"}},
+       {"accion": "pulsar_control", "ventana": "Atención", "in": {"ventana": "Atención", "control": "boton:Sí", "_opcional": true}}
+     ]},
+
+    {"nombre": "cerrar-selector-cliente", "de": "selector-cliente", "a": "formulario-expediente", "segundos": 10,
+     "pasos": [{"accion": "key", "in": {"text": "Escape"}}]},
+
+    {"nombre": "cerrar-selector-tipo", "de": "selector-tipo", "a": "formulario-expediente", "segundos": 10,
+     "pasos": [{"accion": "key", "in": {"text": "Escape"}}]},
+
+    {"nombre": "rellenar-datos", "de": "formulario-expediente", "a": "formulario-expediente", "segundos": 15,
+     "pasos": [
+       {"accion": "escribir_en", "ventana": "Expediente 1/2026",
+        "in": {"ventana": "Expediente 1/2026", "control": "campo junto a Descripción Expediente", "texto": "{descripcion}"}},
+       {"accion": "left_click", "ventana": "Expediente 1/2026", "rel": [357, 132], "in": {}},
+       {"accion": "wait", "in": {"duration": 1}},
+       {"accion": "double_click", "ventana": "Expediente 1/2026", "rel": [357, 132], "in": {}},
+       {"accion": "wait", "in": {"duration": 1}},
+       {"accion": "left_click", "ventana": "Tipo de Expediente", "rel": [81, 89], "in": {}},
+       {"accion": "left_click", "ventana": "Tipo de Expediente", "rel": [199, 308], "in": {}},
+       {"accion": "wait", "in": {"duration": 2}},
+       {"accion": "left_click", "ventana": "Expediente 1/2026", "rel": [421, 176], "in": {}},
+       {"accion": "wait", "in": {"duration": 1}},
+       {"accion": "type", "in": {"text": "PEND. ENV"}},
+       {"accion": "wait", "in": {"duration": 1}},
+       {"accion": "left_click", "ventana": "Expediente 1/2026", "rel": [328, 194], "in": {}},
+       {"accion": "wait", "in": {"duration": 1}}
+     ]},
+
+    {"nombre": "elegir-cliente", "de": "formulario-expediente", "a": "formulario-expediente", "segundos": 25,
+     "pasos": [
+       {"accion": "double_click", "ventana": "Expediente 1/2026", "rel": [597, 88], "in": {}},
+       {"accion": "wait", "in": {"duration": 2}},
+       {"accion": "left_click", "ventana": "Clientes", "rel": [80, 30], "in": {}},
+       {"accion": "type", "in": {"text": "{cliente}"}},
+       {"accion": "key", "in": {"text": "Return"}},
+       {"accion": "wait", "in": {"duration": 2}},
+       {"accion": "left_click", "ventana": "Clientes", "rel": [156, 80], "in": {}},
+       {"accion": "left_click", "ventana": "Clientes", "rel": [69, 444], "in": {}},
+       {"accion": "wait", "in": {"duration": 2}}
+     ]},
+
+    {"nombre": "comprobar-antes-de-guardar", "de": "formulario-expediente", "a": "formulario-expediente", "segundos": 20,
+     "pasos": [
+       {"accion": "comprobar", "ventana": "Expediente 1/2026",
+        "in": {"ventana": "Expediente 1/2026", "control": "campo junto a Estado Expediente", "esperado": "Abierto"}},
+       {"accion": "comprobar", "ventana": "Expediente 1/2026",
+        "in": {"ventana": "Expediente 1/2026", "control": "campo junto a Descripción Expediente", "esperado": "{descripcion}"}},
+       {"accion": "comprobar", "ventana": "Expediente 1/2026",
+        "in": {"ventana": "Expediente 1/2026", "control": "campo junto a Cliente", "esperado": "{cliente_nombre}", "_si": "cliente_nombre"}}
+     ]},
+
+    {"nombre": "guardar", "de": "formulario-expediente", "a": "lista-expedientes", "segundos": 45, "toca": true,
+     "pasos": [
+       {"accion": "left_click", "ventana": "Expediente 1/2026", "rel": [317, 519], "in": {}},
+       {"accion": "wait", "in": {"duration": 2}},
+       {"accion": "esperar_a", "ventana": "Cargando", "in": {"que": "desaparezca", "ventana": "Cargando", "segundos": 20, "_opcional": true}}
+     ]}
+  ],
+  "tareas": {
+    "crear-expediente": [
+      {"ir": "lista-expedientes"},
+      {"hacer": "alta"},
+      {"hacer": "rellenar-datos"},
+      {"hacer": "elegir-cliente"},
+      {"hacer": "comprobar-antes-de-guardar"},
+      {"hacer": "guardar"}
+    ]
+  }
+}
