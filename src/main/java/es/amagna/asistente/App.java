@@ -509,7 +509,17 @@ public final class App {
             String boton = a.get(a.indexOf("--luego") + 1);
             System.out.println("Pulsando «" + boton + "» dentro…");
             var antes2 = es.amagna.asistente.guion.Explorador.ventanasAhora();
-            String r2 = ctrl.pulsar(pantalla, boton);
+            // Pulsar insistiendo: por dentro, con el ratón y con Intro, hasta que salga la ventana nueva. Hay botones
+            // (Alta de Expedientes) que por dentro no se dejan, y quedarse esperando sin hacer nada no vale.
+            final String desde = pantalla;
+            java.util.regex.Pattern quiero = java.util.regex.Pattern.compile(
+                    a.contains("--hasta") ? a.get(a.indexOf("--hasta") + 1) : "«Expediente \\d+/\\d+");
+            String r2 = ctrl.pulsarInsistiendo(pantalla, boton,
+                    () -> quiero.matcher(ventanas.abiertas()).find()
+                            || es.amagna.asistente.guion.Explorador.ventanasAhora().stream().anyMatch(h -> !antes2.contains(h)
+                                    && !String.valueOf(es.amagna.asistente.guion.Explorador.tituloDe(h)).contains("Recortes")
+                                    && !String.valueOf(es.amagna.asistente.guion.Explorador.tituloDe(h)).equals(desde)),
+                    8);
             System.out.println("  " + r2);
             var salio2 = es.amagna.asistente.guion.Explorador.esperarPantalla(antes2, espera);
             if (salio2.ventana() != null) {
@@ -524,7 +534,13 @@ public final class App {
         // pantalla a la que se ha llegado. El guion decide sus ventanas por su cuenta.
         if (a.contains("--guion")) {
             var g = new es.amagna.asistente.guion.Guion(ctrl, ventanas, mapa, System.out::println);
-            var parte = g.ejecutar(Path.of(a.get(a.indexOf("--guion") + 1)), false);
+            // «{ventana}» en el guion = el título real de la pantalla a la que se ha llegado (cambia: «Expediente 31/2026»).
+            String texto = Files.readString(Path.of(a.get(a.indexOf("--guion") + 1)), java.nio.charset.StandardCharsets.UTF_8)
+                    .replace("{ventana}", pantalla.replace("\\", "\\\\").replace("\"", "\\\""));
+            Path tmp = Files.createTempFile("guion-", ".json");
+            Files.writeString(tmp, texto, java.nio.charset.StandardCharsets.UTF_8);
+            var parte = g.ejecutar(tmp, false);
+            Files.deleteIfExists(tmp);
             System.out.println(parte.resumen());
         }
 

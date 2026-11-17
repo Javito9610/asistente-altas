@@ -3,13 +3,13 @@
  "pasos": [
   {
    "hacer": "volcar",
-   "ventana": "Expediente ",
+   "ventana": "{ventana}",
    "valor": "exp-exploracion.txt",
    "nota": "formulario base"
   },
   {
    "hacer": "pulsar",
-   "ventana": "Expediente ",
+   "ventana": "{ventana}",
    "apodo": "pestana:Clientes",
    "opcional": true
   },
@@ -19,13 +19,13 @@
   },
   {
    "hacer": "volcar",
-   "ventana": "Expediente ",
+   "ventana": "{ventana}",
    "valor": "exp-exploracion.txt",
    "nota": "pestaña Clientes"
   },
   {
    "hacer": "pulsar",
-   "ventana": "Expediente ",
+   "ventana": "{ventana}",
    "apodo": "pestana:Contrarios",
    "opcional": true
   },
@@ -35,13 +35,13 @@
   },
   {
    "hacer": "volcar",
-   "ventana": "Expediente ",
+   "ventana": "{ventana}",
    "valor": "exp-exploracion.txt",
    "nota": "pestaña Contrarios"
   },
   {
    "hacer": "pulsar",
-   "ventana": "Expediente ",
+   "ventana": "{ventana}",
    "apodo": "pestana:Adjuntos",
    "opcional": true
   },
@@ -51,13 +51,13 @@
   },
   {
    "hacer": "volcar",
-   "ventana": "Expediente ",
+   "ventana": "{ventana}",
    "valor": "exp-exploracion.txt",
    "nota": "pestaña Adjuntos"
   },
   {
    "hacer": "pulsar",
-   "ventana": "Expediente ",
+   "ventana": "{ventana}",
    "apodo": "campo:Tipo de Expediente",
    "opcional": true
   },
@@ -72,13 +72,13 @@
   },
   {
    "hacer": "volcar",
-   "ventana": "Expediente ",
+   "ventana": "{ventana}",
    "valor": "exp-exploracion.txt",
    "nota": "tras pulsar Tipo de Expediente"
   },
   {
    "hacer": "pulsar",
-   "ventana": "Expediente ",
+   "ventana": "{ventana}",
    "apodo": "campo:Cliente",
    "opcional": true
   },
@@ -93,13 +93,13 @@
   },
   {
    "hacer": "volcar",
-   "ventana": "Expediente ",
+   "ventana": "{ventana}",
    "valor": "exp-exploracion.txt",
    "nota": "tras pulsar Cliente"
   },
   {
    "hacer": "pulsar",
-   "ventana": "Expediente ",
+   "ventana": "{ventana}",
    "apodo": "campo:Contrario",
    "opcional": true
   },
@@ -114,7 +114,7 @@
   },
   {
    "hacer": "volcar",
-   "ventana": "Expediente ",
+   "ventana": "{ventana}",
    "valor": "exp-exploracion.txt",
    "nota": "tras pulsar Contrario"
   },
@@ -129,7 +129,7 @@
   },
   {
    "hacer": "pulsar",
-   "ventana": "Expediente ",
+   "ventana": "{ventana}",
    "apodo": "boton:Cancelar",
    "opcional": true
   },
