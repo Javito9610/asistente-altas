@@ -526,6 +526,9 @@ public final class Guion {
                     return "«volcar» necesita el fichero en «valor»";
                 }
                 try {
+                    if ("{delante}".equals(ventana) && ventanas != null) {
+                        ventana = ventanas.activa(); // la que tenga el foco: un selector nuevo cuyo título no se sabe
+                    }
                     String t = controles.arbol(ventana, 14, 4000);
                     java.nio.file.Files.writeString(java.nio.file.Path.of(valor),
                             "\n===== " + ventana + " · " + (m.get("nota") == null ? "" : m.get("nota")) + " =====\n" + t + "\n",

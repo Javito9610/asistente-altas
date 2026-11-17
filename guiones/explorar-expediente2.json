@@ -1,0 +1,215 @@
+{
+ "_nota": "Segunda exploración del formulario de expediente: selectores de tipo, cliente, contrario y adjunto. No guarda nada; cancela y sale sin guardar.",
+ "pasos": [
+  {
+   "hacer": "pulsar",
+   "ventana": "{ventana}",
+   "apodo": "campo junto a Tipo de Expediente",
+   "opcional": true
+  },
+  {
+   "hacer": "dormir",
+   "segundos": 2
+  },
+  {
+   "hacer": "ventanas",
+   "valor": "exp-exploracion2.txt",
+   "nota": "tras pulsar el campo Tipo de Expediente"
+  },
+  {
+   "hacer": "volcar",
+   "ventana": "{delante}",
+   "valor": "exp-exploracion2.txt",
+   "nota": "delante tras pulsar Tipo"
+  },
+  {
+   "hacer": "tecla",
+   "valor": "Escape",
+   "opcional": true
+  },
+  {
+   "hacer": "pulsar",
+   "ventana": "Atención",
+   "apodo": "boton:No",
+   "opcional": true
+  },
+  {
+   "hacer": "dormir",
+   "segundos": 1
+  },
+  {
+   "hacer": "pulsar",
+   "ventana": "{ventana}",
+   "apodo": "pestana:Clientes",
+   "opcional": true
+  },
+  {
+   "hacer": "dormir",
+   "segundos": 1
+  },
+  {
+   "hacer": "pulsar",
+   "ventana": "{ventana}",
+   "apodo": "boton:Añadir Cliente",
+   "opcional": true
+  },
+  {
+   "hacer": "dormir",
+   "segundos": 3
+  },
+  {
+   "hacer": "ventanas",
+   "valor": "exp-exploracion2.txt",
+   "nota": "tras Añadir Cliente"
+  },
+  {
+   "hacer": "volcar",
+   "ventana": "{delante}",
+   "valor": "exp-exploracion2.txt",
+   "nota": "selector de cliente"
+  },
+  {
+   "hacer": "tecla",
+   "valor": "Escape",
+   "opcional": true
+  },
+  {
+   "hacer": "pulsar",
+   "ventana": "Atención",
+   "apodo": "boton:No",
+   "opcional": true
+  },
+  {
+   "hacer": "dormir",
+   "segundos": 1
+  },
+  {
+   "hacer": "pulsar",
+   "ventana": "{ventana}",
+   "apodo": "pestana:Contrarios",
+   "opcional": true
+  },
+  {
+   "hacer": "dormir",
+   "segundos": 1
+  },
+  {
+   "hacer": "pulsar",
+   "ventana": "{ventana}",
+   "apodo": "boton:Añadir Contrario",
+   "opcional": true
+  },
+  {
+   "hacer": "dormir",
+   "segundos": 3
+  },
+  {
+   "hacer": "ventanas",
+   "valor": "exp-exploracion2.txt",
+   "nota": "tras Añadir Contrario"
+  },
+  {
+   "hacer": "volcar",
+   "ventana": "{delante}",
+   "valor": "exp-exploracion2.txt",
+   "nota": "selector de contrario"
+  },
+  {
+   "hacer": "tecla",
+   "valor": "Escape",
+   "opcional": true
+  },
+  {
+   "hacer": "pulsar",
+   "ventana": "Atención",
+   "apodo": "boton:No",
+   "opcional": true
+  },
+  {
+   "hacer": "dormir",
+   "segundos": 1
+  },
+  {
+   "hacer": "pulsar",
+   "ventana": "{ventana}",
+   "apodo": "pestana:Adjuntos",
+   "opcional": true
+  },
+  {
+   "hacer": "dormir",
+   "segundos": 1
+  },
+  {
+   "hacer": "pulsar",
+   "ventana": "{ventana}",
+   "apodo": "boton:Añadir Adjunto",
+   "opcional": true
+  },
+  {
+   "hacer": "dormir",
+   "segundos": 3
+  },
+  {
+   "hacer": "ventanas",
+   "valor": "exp-exploracion2.txt",
+   "nota": "tras Añadir Adjunto"
+  },
+  {
+   "hacer": "volcar",
+   "ventana": "{delante}",
+   "valor": "exp-exploracion2.txt",
+   "nota": "selector de adjunto"
+  },
+  {
+   "hacer": "tecla",
+   "valor": "Escape",
+   "opcional": true
+  },
+  {
+   "hacer": "pulsar",
+   "ventana": "Atención",
+   "apodo": "boton:No",
+   "opcional": true
+  },
+  {
+   "hacer": "dormir",
+   "segundos": 1
+  },
+  {
+   "hacer": "pulsar",
+   "ventana": "{ventana}",
+   "apodo": "boton:Cancelar",
+   "opcional": true
+  },
+  {
+   "hacer": "dormir",
+   "segundos": 2
+  },
+  {
+   "hacer": "ventanas",
+   "valor": "exp-exploracion2.txt",
+   "nota": "tras Cancelar"
+  },
+  {
+   "hacer": "volcar",
+   "ventana": "{delante}",
+   "valor": "exp-exploracion2.txt",
+   "nota": "aviso de salir"
+  },
+  {
+   "hacer": "pulsar",
+   "ventana": "Atención",
+   "apodo": "boton:Sí",
+   "opcional": true
+  },
+  {
+   "hacer": "dormir",
+   "segundos": 2
+  },
+  {
+   "hacer": "ventanas",
+   "valor": "exp-exploracion2.txt",
+   "nota": "final"
+  }
+ ]
+}
