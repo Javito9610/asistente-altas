@@ -27,10 +27,17 @@ import java.util.Map;
  * ventana principal) no hace falta declararlos, pero sí sus transiciones.
  */
 public final class Mapa {
-    public record Estado(String nombre, String ventana) {
+    public record Estado(String nombre, String ventana, String contiene) {
+        public Estado(String nombre, String ventana) {
+            this(nombre, ventana, "");
+        }
     }
 
     public record Transicion(String nombre, String de, String a, int segundos, boolean toca, List<Receta.Paso> pasos) {
+        /** «a» puede ser varios estados separados por «|»: Cancelar, por ejemplo, pregunta «¿salir?» o cierra directamente. */
+        public List<String> destinos() {
+            return List.of(a.split("\\|"));
+        }
     }
 
     public record Orden(String ir, String hacer) {
@@ -91,7 +98,7 @@ public final class Mapa {
         List<Estado> es = new ArrayList<>();
         for (Object o : (List<Object>) raiz.getOrDefault("estados", List.of())) {
             Map<String, Object> m = (Map<String, Object>) o;
-            es.add(new Estado((String) m.get("nombre"), Receta.norm((String) m.get("ventana"))));
+            es.add(new Estado((String) m.get("nombre"), Receta.norm((String) m.get("ventana")), String.valueOf(m.getOrDefault("contiene", ""))));
         }
         List<Transicion> ts = new ArrayList<>();
         for (Object o : (List<Object>) raiz.getOrDefault("transiciones", List.of())) {
@@ -128,7 +135,7 @@ public final class Mapa {
     /** Un mapa mal escrito se rechaza al leerlo, no a mitad de un alta. */
     void validar() {
         for (Transicion t : transiciones) {
-            if (!existe(t.de()) || !existe(t.a())) {
+            if (!existe(t.de()) || !t.destinos().stream().allMatch(this::existe)) {
                 throw new IllegalArgumentException("Transición «" + t.nombre() + "»: estado desconocido (" + t.de() + " → " + t.a() + ")");
             }
         }

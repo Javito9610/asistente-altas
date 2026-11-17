@@ -595,7 +595,20 @@ public final class App {
             };
             System.out.println("IA de guardia: solo entra si algo se atasca (máximo 2 empujones).");
         }
-        var ej = new es.amagna.asistente.estados.Ejecutor(mapa, ventanas::abiertas, hace, rescate, null, System.out::println);
+        es.amagna.asistente.estados.Ejecutor.Observa observa = new es.amagna.asistente.estados.Ejecutor.Observa() {
+            public String ventanas() {
+                return ventanas.abiertas();
+            }
+
+            public String texto(String ventana) {
+                try {
+                    return ctrl.arbol(ventana, 6, 600);
+                } catch (RuntimeException e) {
+                    return "";
+                }
+            }
+        };
+        var ej = new es.amagna.asistente.estados.Ejecutor(mapa, observa, hace, rescate, null, System.out::println);
         long t0 = System.currentTimeMillis();
         var r = ej.ejecutar(a.get(0), params);
         System.out.println(r.mensaje() + String.format(" · %.0f s · %d empujones de la IA", (System.currentTimeMillis() - t0) / 1000.0, r.rescates()));

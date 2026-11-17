@@ -36,6 +36,11 @@ public final class Reconocedor {
      * Si no hay ninguna conocida pero sí la principal del programa: «inicio». Si no hay ni eso: «fuera».
      */
     public static String estado(Mapa mapa, String abiertas) {
+        return estado(mapa, abiertas, t -> "");
+    }
+
+    /** Igual, pero un estado puede pedir que la ventana contenga cierto texto (no es lo mismo «Atención: ¿salir?» que otro aviso). */
+    public static String estado(Mapa mapa, String abiertas, java.util.function.Function<String, String> textoDe) {
         List<Ventana> ventanas = leer(abiertas);
         for (Ventana w : ventanas) {
             if (w.bloqueada()) {
@@ -43,7 +48,8 @@ public final class Reconocedor {
             }
             String n = Receta.norm(w.titulo());
             for (Mapa.Estado e : mapa.estados()) {
-                if (coincide(n, e.ventana())) {
+                if (coincide(n, e.ventana()) && (e.contiene().isBlank()
+                        || llano(textoDe.apply(w.titulo())).contains(llano(e.contiene())))) {
                     return e.nombre();
                 }
             }
@@ -54,6 +60,11 @@ public final class Reconocedor {
             }
         }
         return "fuera";
+    }
+
+    static String llano(String t) {
+        return java.text.Normalizer.normalize(t == null ? "" : t, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "").toLowerCase(java.util.Locale.ROOT);
     }
 
     /** Igual, o «Cargando...» vale para «Cargando…» y «Cargando datos...»: un título que acaba en puntos suspensivos es un prefijo. */

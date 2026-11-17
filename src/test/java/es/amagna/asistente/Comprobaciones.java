@@ -1161,6 +1161,7 @@ public final class Comprobaciones {
             case "inicio" -> mn;
             case "lista" -> "- «Expedientes» (GestorConsultas) [delante, con el foco]\n" + mn;
             case "form" -> "- «Expediente 36/2026» (GestorConsultas) [delante, con el foco]\n- «Expedientes» (GestorConsultas)\n" + mn;
+            case "atencion", "atencion-otra" -> "- «Atención» (MNprogram) [delante, con el foco]\n- «Expediente 36/2026» (GestorConsultas) [BLOQUEADA: tiene un diálogo encima]\n- «Expedientes» (GestorConsultas) [BLOQUEADA]\n" + mn;
             case "selector" -> "- «Clientes» (GestorConsultas) [delante, con el foco]\n- «Expediente 36/2026» (GestorConsultas) [BLOQUEADA: tiene un diálogo encima]\n- «Expedientes» (GestorConsultas) [BLOQUEADA]\n" + mn;
             default -> throw new IllegalArgumentException(estado);
         };
@@ -1198,7 +1199,7 @@ public final class Comprobaciones {
             switch (p.accion()) {
                 case "abrir_mn" -> w.estado = "inicio";
                 case "ruta" -> w.estado = "lista";
-                case "pulsar_hasta" -> w.estado = "form";
+                case "pulsar_hasta" -> w.estado = String.valueOf(p.in().get("control")).contains("Sí") ? "lista" : "form";
                 case "pulsar_control" -> {
                     if (String.valueOf(p.in().get("control")).contains("Cancelar")) {
                         w.estado = "lista";
@@ -1230,7 +1231,16 @@ public final class Comprobaciones {
             w.rescates++;
             w.estado = "lista"; // la IA deja la pantalla limpia
         } : null;
-        return new es.amagna.asistente.estados.Ejecutor(mapa, () -> ventanasDe(w.estado), hace, rescate, reloj, x -> { })
+        es.amagna.asistente.estados.Ejecutor.Observa observa = new es.amagna.asistente.estados.Ejecutor.Observa() {
+            public String ventanas() {
+                return ventanasDe(w.estado);
+            }
+
+            public String texto(String ventana) {
+                return w.estado.equals("atencion") ? "¿Deseas salir sin guardar?" : "¿Actualizar el número a la serie?";
+            }
+        };
+        return new es.amagna.asistente.estados.Ejecutor(mapa, observa, hace, rescate, reloj, x -> { })
                 .ejecutar("crear-expediente", java.util.Map.of("descripcion", "MICRO", "cliente", "1"));
     }
 
@@ -1270,6 +1280,15 @@ public final class Comprobaciones {
             ok(r.bien() && w.guardados == 1 && r.numero().equals("36/2026") || (ini.equals("lista") || ini.equals("inicio") || ini.equals("fuera")) && r.bien() && w.guardados == 1,
                     "estados: crear-expediente sale bien y guarda UNA vez empezando en «" + ini + "»");
         }
+        var wa = new MundoFalso("atencion");
+        var ra = correrFalso(mapa, wa, false);
+        ok(ra.bien() && wa.guardados == 1, "estados: con un «Atención: ¿salir?» abierto de antes, se contesta Sí y se sigue sin IA");
+        var wb = new MundoFalso("atencion-otra");
+        var rb = correrFalso(mapa, wb, false);
+        ok(!rb.bien() && wb.guardados == 0, "estados: un «Atención» que NO es de salir no se contesta solo: se para");
+        var wc = new MundoFalso("atencion-otra");
+        var rc = correrFalso(mapa, wc, true);
+        ok(rc.bien() && wc.rescates == 1 && wc.guardados == 1, "estados: ese aviso desconocido lo resuelve la IA y la tarea sigue");
         var w1 = new MundoFalso("inicio");
         w1.falla = "ruta";
         var r1 = correrFalso(mapa, w1, false);

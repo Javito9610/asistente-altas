@@ -540,9 +540,11 @@ public final class Agente {
                 return List.of(textoBloque(r));
             }
             case "pulsar_hasta": {
-                java.util.regex.Pattern quiero = java.util.regex.Pattern.compile((String) in.get("hasta"));
+                String hasta = (String) in.get("hasta");
+                boolean negado = hasta.startsWith("!"); // «!«Atención»» = hasta que YA NO haya una ventana así
+                java.util.regex.Pattern quiero = java.util.regex.Pattern.compile(negado ? hasta.substring(1) : hasta);
                 String r = controles.pulsarInsistiendo((String) in.get("ventana"), (String) in.get("control"),
-                        () -> quiero.matcher(ventanas.abiertas()).find(), (int) num(in.getOrDefault("segundos", 20L)));
+                        () -> quiero.matcher(ventanas.abiertas()).find() != negado, (int) num(in.getOrDefault("segundos", 20L)));
                 if (!r.startsWith("Pulsado")) {
                     throw new IllegalStateException(r);
                 }

@@ -25,9 +25,15 @@ public final class Planificador {
         while (!cola.isEmpty()) {
             String e = cola.poll();
             for (Mapa.Transicion t : mapa.transiciones()) {
-                if (t.de().equals(e) && !t.de().equals(t.a()) && !vino.containsKey(t.a())) {
-                    vino.put(t.a(), t);
-                    if (t.a().equals(hasta)) {
+                if (!t.de().equals(e)) {
+                    continue;
+                }
+                for (String destino : t.destinos()) {
+                    if (destino.equals(t.de()) || vino.containsKey(destino)) {
+                        continue;
+                    }
+                    vino.put(destino, t);
+                    if (destino.equals(hasta)) {
                         List<Mapa.Transicion> ruta = new ArrayList<>();
                         for (String x = hasta; vino.get(x) != null; x = vino.get(x).de()) {
                             ruta.add(vino.get(x));
@@ -35,7 +41,7 @@ public final class Planificador {
                         Collections.reverse(ruta);
                         return ruta;
                     }
-                    cola.add(t.a());
+                    cola.add(destino);
                 }
             }
         }

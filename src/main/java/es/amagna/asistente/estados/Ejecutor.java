@@ -15,6 +15,11 @@ import java.util.regex.Pattern;
 public final class Ejecutor {
     public interface Observa {
         String ventanas();
+
+        /** El texto que hay dentro de una ventana (para distinguir un aviso de otro). */
+        default String texto(String ventana) {
+            return "";
+        }
     }
 
     /** null = hecho; si no, el motivo. */
@@ -95,6 +100,7 @@ public final class Ejecutor {
                 break;
             } catch (Fallo f) {
                 registro.accept("  FALLO: " + f.getMessage());
+                registro.accept("  Ventanas en ese momento:\n" + observa.ventanas());
                 if (comprometido) {
                     // Ya se hizo lo irreversible (Guardar). Repetir la tarea crearía un duplicado: se para y se dice.
                     return new Resultado(false, "PARADO: " + f.getMessage() + " OJO: ya se había guardado; NO se repite. "
@@ -114,11 +120,11 @@ public final class Ejecutor {
 
     /** El estado, esperando a que un «Cargando…» se quite. */
     String estado() {
-        String e = Reconocedor.estado(mapa, observa.ventanas());
+        String e = Reconocedor.estado(mapa, observa.ventanas(), observa::texto);
         long fin = reloj.ahora() + 25_000;
         while ("cargando".equals(e) && reloj.ahora() < fin) {
             reloj.dormir(500);
-            e = Reconocedor.estado(mapa, observa.ventanas());
+            e = Reconocedor.estado(mapa, observa.ventanas(), observa::texto);
         }
         anotarNumero(e);
         return e;
@@ -171,7 +177,7 @@ public final class Ejecutor {
         String ahora;
         do {
             ahora = estado();
-            if (ahora.equals(t.a())) {
+            if (t.destinos().contains(ahora)) {
                 return;
             }
             reloj.dormir(400);

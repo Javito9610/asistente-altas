@@ -6,7 +6,9 @@
     {"nombre": "lista-expedientes", "ventana": "Expedientes"},
     {"nombre": "formulario-expediente", "ventana": "Expediente 1/2026"},
     {"nombre": "selector-tipo", "ventana": "Tipo de Expediente"},
-    {"nombre": "selector-cliente", "ventana": "Clientes"}
+    {"nombre": "selector-cliente", "ventana": "Clientes"},
+    {"nombre": "atencion-salir", "ventana": "Atención", "contiene": "salir"},
+    {"nombre": "atencion", "ventana": "Atención"}
   ],
   "transiciones": [
     {"nombre": "abrir-mn", "de": "fuera", "a": "inicio", "segundos": 240,
@@ -24,10 +26,15 @@
         "in": {"ventana": "Expedientes", "control": "boton:Alta", "hasta": "«Expediente \\d+/\\d+»", "segundos": 20}}
      ]},
 
-    {"nombre": "cancelar-formulario", "de": "formulario-expediente", "a": "lista-expedientes", "segundos": 20,
+    {"nombre": "cancelar-formulario", "de": "formulario-expediente", "a": "atencion-salir|lista-expedientes", "segundos": 20,
      "pasos": [
-       {"accion": "pulsar_control", "ventana": "Expediente 1/2026", "in": {"ventana": "Expediente 1/2026", "control": "boton:Cancelar"}},
-       {"accion": "pulsar_control", "ventana": "Atención", "in": {"ventana": "Atención", "control": "boton:Sí", "_opcional": true}}
+       {"accion": "pulsar_control", "ventana": "Expediente 1/2026", "in": {"ventana": "Expediente 1/2026", "control": "boton:Cancelar"}}
+     ]},
+
+    {"nombre": "salir-sin-guardar", "de": "atencion-salir", "a": "lista-expedientes", "segundos": 20,
+     "pasos": [
+       {"accion": "pulsar_hasta", "ventana": "Atención",
+        "in": {"ventana": "Atención", "control": "boton:Sí", "hasta": "!«Atención»", "segundos": 15}}
      ]},
 
     {"nombre": "cerrar-selector-cliente", "de": "selector-cliente", "a": "formulario-expediente", "segundos": 10,
