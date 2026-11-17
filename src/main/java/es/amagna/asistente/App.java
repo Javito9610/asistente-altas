@@ -508,25 +508,24 @@ public final class App {
         if (a.contains("--luego")) {
             String boton = a.get(a.indexOf("--luego") + 1);
             System.out.println("Pulsando «" + boton + "» dentro…");
-            var antes2 = es.amagna.asistente.guion.Explorador.ventanasAhora();
             // Pulsar insistiendo: por dentro, con el ratón y con Intro, hasta que salga la ventana nueva. Hay botones
             // (Alta de Expedientes) que por dentro no se dejan, y quedarse esperando sin hacer nada no vale.
-            final String desde = pantalla;
-            java.util.regex.Pattern quiero = java.util.regex.Pattern.compile(
+                        java.util.regex.Pattern quiero = java.util.regex.Pattern.compile(
                     a.contains("--hasta") ? a.get(a.indexOf("--hasta") + 1) : "«Expediente \\d+/\\d+");
-            String r2 = ctrl.pulsarInsistiendo(pantalla, boton,
-                    () -> quiero.matcher(ventanas.abiertas()).find()
-                            || es.amagna.asistente.guion.Explorador.ventanasAhora().stream().anyMatch(h -> !antes2.contains(h)
-                                    && !String.valueOf(es.amagna.asistente.guion.Explorador.tituloDe(h)).contains("Recortes")
-                                    && !String.valueOf(es.amagna.asistente.guion.Explorador.tituloDe(h)).equals(desde)),
-                    8);
+            // Solo vale la ventana que se espera (por defecto «Expediente nn/aaaa»): un tooltip o una captura de
+            // pantalla del usuario no cuentan como «se ha abierto». Cada intento espera 20 s porque MN tarda.
+            String r2 = ctrl.pulsarInsistiendo(pantalla, boton, () -> quiero.matcher(ventanas.abiertas()).find(), 20);
+            if (!r2.startsWith("Pulsado")) {
+                System.out.println("  VENTANAS ABIERTAS AHORA:\n" + ventanas.abiertas());
+            }
             System.out.println("  " + r2);
-            var salio2 = es.amagna.asistente.guion.Explorador.esperarPantalla(antes2, espera);
-            if (salio2.ventana() != null) {
-                pantalla = es.amagna.asistente.guion.Explorador.tituloDe(salio2.ventana());
+            var m2 = quiero.matcher(ventanas.abiertas());
+            if (m2.find()) {
+                String t = ventanas.abiertas().substring(m2.start() + 1);
+                pantalla = t.substring(0, t.indexOf('»'));
                 System.out.println("Se ha abierto: «" + pantalla + "»");
             } else {
-                System.out.println("  (no se ha abierto otra ventana: la ficha debe de estar dentro de la misma)");
+                throw new IllegalStateException("No se ha abierto «" + quiero.pattern() + "» tras pulsar " + boton + ". " + r2);
             }
         }
 
