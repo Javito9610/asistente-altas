@@ -372,6 +372,12 @@ public final class App {
                 ? es.amagna.asistente.cerebro.Especialista.cargar(a.get(a.indexOf("--como") + 1), MODELO_POR_DEFECTO, Agente.TOPE_TOKENS_POR_DEFECTO)
                 : null;
         String quienes = esp == null ? instrucciones("base") : esp.instrucciones();
+        // Lo aprendido en pruebas anteriores (dónde está cada cosa en MN) pasa al agente como conocimiento propio.
+        Path aprendido = Path.of("conocimiento", "aprendido.md");
+        if (esp != null && Files.exists(aprendido)) {
+            quienes += "\n\n# Lo que ya hemos aprendido de MN en pruebas anteriores (fíate de esto antes que de lo de arriba)\n"
+                    + Files.readString(aprendido, StandardCharsets.UTF_8);
+        }
         int pasos = a.contains("--pasos") ? Integer.parseInt(a.get(a.indexOf("--pasos") + 1)) : esp == null ? 20 : esp.pasos();
         String modelo = a.contains("--modelo") ? a.get(a.indexOf("--modelo") + 1) : esp == null ? MODELO_POR_DEFECTO : esp.modelo();
         long tope = a.contains("--tope-tokens") ? Long.parseLong(a.get(a.indexOf("--tope-tokens") + 1))
@@ -402,6 +408,19 @@ public final class App {
         Agente.Resultado r = ag.ejecutar(tarea);
         registro.accept("");
         registro.accept(r.mensaje());
+        // Cada línea «APRENDIDO: …» del agente se guarda: la próxima vez ya lo sabe sin volver a buscarlo.
+        var nuevo = new StringBuilder();
+        for (String linea : r.mensaje().split("\\R")) {
+            if (linea.strip().startsWith("APRENDIDO:")) {
+                nuevo.append("- ").append(linea.strip().substring("APRENDIDO:".length()).strip()).append('\n');
+            }
+        }
+        if (nuevo.length() > 0 && esp != null) {
+            Files.createDirectories(aprendido.getParent());
+            Files.writeString(aprendido, nuevo.toString(), StandardCharsets.UTF_8,
+                    java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
+            registro.accept("Apuntado en " + aprendido.toAbsolutePath() + " (" + nuevo.toString().lines().count() + " cosas).");
+        }
         registro.accept(String.format("Pasos: %d · %.0f s · tokens: %d de entrada (+%d leídos de caché), %d de salida", r.pasos(),
                 (System.currentTimeMillis() - t0) / 1000.0, r.tokensEntrada(), r.tokensCache(), r.tokensSalida()));
         registro.accept("Registro: " + log.toAbsolutePath());
@@ -443,8 +462,21 @@ public final class App {
                 + "- Cliente (busca por): " + cliente + "\n"
                 + (contrario.isBlank() ? "- Contrario: no hay, déjalo vacío.\n" : "- Contrario (busca por): " + contrario + "\n")
                 + "- Sin adjuntos en esta prueba.\n"
-                + "Comprueba todo con UIA antes de Guardar, guarda, y cierra la ventana del expediente.";
+                + "Comprueba todo con UIA antes de Guardar, guarda, y cierra la ventana del expediente."
+                + (a.contains("--explorar") ? """
+
+                EXPLORACIÓN (solo porque esto es la Empresa de prueba): una vez guardado, reabre ese expediente
+                desde la lista (doble clic en su fila, la última) y MIRA SIN CAMBIAR NADA dónde se asigna el
+                USUARIO responsable (Lia Silva) y dónde está la REF. PROPIA: pestañas, «Alerta Ficha», «Resumen»,
+                columnas de la lista, botón «Configuracion» (solo abrir, leer y cerrar con Cancelar/Cerrar), y el
+                menú de la lista. Si encuentras dónde, ponlo y comprueba que queda; solo en este expediente de prueba.
+                Termina con líneas «APRENDIDO: …» (una por cosa, con el nombre exacto del control y cómo se llega).
+                """ : "\nSi aprendes algo útil de la pantalla (dónde está algo, un aviso, un truco), añade al final una línea «APRENDIDO: …» por cosa.");
         List<String> b = new java.util.ArrayList<>(List.of(tarea, "--como", "expedientes"));
+        if (a.contains("--explorar") && !a.contains("--pasos")) {
+            b.add("--pasos");
+            b.add("100");
+        }
         for (String x : List.of("--pasos", "--modelo", "--tope-tokens", "--sin-aviso", "--tope-segundos")) {
             int i = a.indexOf(x);
             if (i >= 0) {

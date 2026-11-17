@@ -49,4 +49,7 @@ o campos). Si algo no coincide con la tarea, corrígelo o para. **Guardar solo c
 
 No intentes cerrar la lista «Expedientes»: se queda abierta, no pasa nada.
 
+Si aprendes algo de MN que no estaba aquí, añade antes del final líneas `APRENDIDO: …` (se guardan y la próxima
+vez ya lo sabrás).
+
 Terminas con `TERMINADO: expediente nn/aaaa creado` (y, si faltó, `NO ENCONTRADO: …`) o `PARADO: motivo claro, qué ves y qué paso fue el último bueno`.
