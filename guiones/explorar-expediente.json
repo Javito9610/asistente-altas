@@ -1,0 +1,146 @@
+{
+ "_nota": "Exploración del formulario de expediente. Solo mira y cancela; no guarda nada.",
+ "pasos": [
+  {
+   "hacer": "volcar",
+   "ventana": "Expediente ",
+   "valor": "exp-exploracion.txt",
+   "nota": "formulario base"
+  },
+  {
+   "hacer": "pulsar",
+   "ventana": "Expediente ",
+   "apodo": "pestana:Clientes",
+   "opcional": true
+  },
+  {
+   "hacer": "dormir",
+   "segundos": 2
+  },
+  {
+   "hacer": "volcar",
+   "ventana": "Expediente ",
+   "valor": "exp-exploracion.txt",
+   "nota": "pestaña Clientes"
+  },
+  {
+   "hacer": "pulsar",
+   "ventana": "Expediente ",
+   "apodo": "pestana:Contrarios",
+   "opcional": true
+  },
+  {
+   "hacer": "dormir",
+   "segundos": 2
+  },
+  {
+   "hacer": "volcar",
+   "ventana": "Expediente ",
+   "valor": "exp-exploracion.txt",
+   "nota": "pestaña Contrarios"
+  },
+  {
+   "hacer": "pulsar",
+   "ventana": "Expediente ",
+   "apodo": "pestana:Adjuntos",
+   "opcional": true
+  },
+  {
+   "hacer": "dormir",
+   "segundos": 2
+  },
+  {
+   "hacer": "volcar",
+   "ventana": "Expediente ",
+   "valor": "exp-exploracion.txt",
+   "nota": "pestaña Adjuntos"
+  },
+  {
+   "hacer": "pulsar",
+   "ventana": "Expediente ",
+   "apodo": "campo:Tipo de Expediente",
+   "opcional": true
+  },
+  {
+   "hacer": "dormir",
+   "segundos": 2
+  },
+  {
+   "hacer": "ventanas",
+   "valor": "exp-exploracion.txt",
+   "nota": "tras pulsar Tipo de Expediente"
+  },
+  {
+   "hacer": "volcar",
+   "ventana": "Expediente ",
+   "valor": "exp-exploracion.txt",
+   "nota": "tras pulsar Tipo de Expediente"
+  },
+  {
+   "hacer": "pulsar",
+   "ventana": "Expediente ",
+   "apodo": "campo:Cliente",
+   "opcional": true
+  },
+  {
+   "hacer": "dormir",
+   "segundos": 2
+  },
+  {
+   "hacer": "ventanas",
+   "valor": "exp-exploracion.txt",
+   "nota": "tras pulsar Cliente"
+  },
+  {
+   "hacer": "volcar",
+   "ventana": "Expediente ",
+   "valor": "exp-exploracion.txt",
+   "nota": "tras pulsar Cliente"
+  },
+  {
+   "hacer": "pulsar",
+   "ventana": "Expediente ",
+   "apodo": "campo:Contrario",
+   "opcional": true
+  },
+  {
+   "hacer": "dormir",
+   "segundos": 2
+  },
+  {
+   "hacer": "ventanas",
+   "valor": "exp-exploracion.txt",
+   "nota": "tras pulsar Contrario"
+  },
+  {
+   "hacer": "volcar",
+   "ventana": "Expediente ",
+   "valor": "exp-exploracion.txt",
+   "nota": "tras pulsar Contrario"
+  },
+  {
+   "hacer": "tecla",
+   "valor": "Escape",
+   "opcional": true
+  },
+  {
+   "hacer": "dormir",
+   "segundos": 1
+  },
+  {
+   "hacer": "pulsar",
+   "ventana": "Expediente ",
+   "apodo": "boton:Cancelar",
+   "opcional": true
+  },
+  {
+   "hacer": "dormir",
+   "segundos": 2
+  },
+  {
+   "hacer": "ventanas",
+   "valor": "exp-exploracion.txt",
+   "nota": "tras Cancelar"
+  }
+ ]
+}

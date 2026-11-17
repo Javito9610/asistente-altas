@@ -520,6 +520,45 @@ public final class Guion {
                     }
                 }
                 return null;
+            case "volcar": {
+                // Solo mirar: apunta en un fichero lo que hay en la ventana (para entender una pantalla nueva).
+                if (valor == null || valor.isBlank()) {
+                    return "«volcar» necesita el fichero en «valor»";
+                }
+                try {
+                    String t = controles.arbol(ventana, 14, 4000);
+                    java.nio.file.Files.writeString(java.nio.file.Path.of(valor),
+                            "\n===== " + ventana + " · " + (m.get("nota") == null ? "" : m.get("nota")) + " =====\n" + t + "\n",
+                            java.nio.charset.StandardCharsets.UTF_8, java.nio.file.StandardOpenOption.CREATE,
+                            java.nio.file.StandardOpenOption.APPEND);
+                    return null;
+                } catch (IOException ex) {
+                    return "no se ha podido escribir «" + valor + "»: " + ex.getMessage();
+                }
+            }
+            case "ventanas": {
+                if (valor == null || valor.isBlank() || ventanas == null) {
+                    return "«ventanas» necesita el fichero en «valor»";
+                }
+                try {
+                    java.nio.file.Files.writeString(java.nio.file.Path.of(valor),
+                            "\n===== VENTANAS · " + (m.get("nota") == null ? "" : m.get("nota")) + " =====\n"
+                                    + ventanas.abiertas() + "\n",
+                            java.nio.charset.StandardCharsets.UTF_8, java.nio.file.StandardOpenOption.CREATE,
+                            java.nio.file.StandardOpenOption.APPEND);
+                    return null;
+                } catch (IOException ex) {
+                    return "no se ha podido escribir «" + valor + "»: " + ex.getMessage();
+                }
+            }
+            case "dormir":
+                try {
+                    Thread.sleep((long) (segundos * 1000));
+                    return null;
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                    return "interrumpido";
+                }
             case "tecla":
                 if (valor == null || valor.isBlank()) {
                     return "el guion no dice qué tecla pulsar";

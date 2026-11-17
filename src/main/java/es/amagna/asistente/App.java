@@ -520,6 +520,14 @@ public final class App {
             }
         }
 
+        // 3b. Y si hay un guion de exploración (pulsar pestañas, abrir selectores, volcar…), se hace aquí, en la
+        // pantalla a la que se ha llegado. El guion decide sus ventanas por su cuenta.
+        if (a.contains("--guion")) {
+            var g = new es.amagna.asistente.guion.Guion(ctrl, ventanas, mapa, System.out::println);
+            var parte = g.ejecutar(Path.of(a.get(a.indexOf("--guion") + 1)), false);
+            System.out.println(parte.resumen());
+        }
+
         // 4. Enseñarla.
         String arbol = ctrl.arbol(pantalla, 14, 3000);
         if (a.contains("--a")) {
