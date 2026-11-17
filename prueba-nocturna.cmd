@@ -5,7 +5,7 @@ rem Deja: registro\nocturna.log (todo) y registro\nocturna-estado.txt (una linea
 cd /d C:\Proyectos\asistente-altas
 if not exist registro mkdir registro
 echo ===== %DATE% %TIME% ===== >> registro\nocturna.log
-call asistente.cmd tarea crear-expediente --repetir --param "descripcion=PRUEBA-NOCTURNA" --param "cliente=LUCIA FERNANDEZ PRUEBA" --param "cliente_nombre=LUCIA FERNANDEZ PRUEBA" --clave "nocturna-%DATE%-%TIME%" >> registro\nocturna.log 2>&1
+call asistente.cmd tarea crear-expediente --repetir --param-fichero pruebas\expediente-completo.params --param "descripcion=PRUEBA-NOCTURNA" --clave "nocturna-%DATE%-%TIME%" >> registro\nocturna.log 2>&1
 if %ERRORLEVEL%==0 (
   echo OK %DATE% %TIME% > registro\nocturna-estado.txt
 ) else (

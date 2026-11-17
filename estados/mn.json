@@ -9,7 +9,9 @@
     {"nombre": "selector-tipo", "ventana": "Tipo de Expediente"},
     {"nombre": "selector-cliente", "ventana": "Clientes"},
     {"nombre": "atencion-salir", "ventana": "Atención", "contiene": "salir"},
-    {"nombre": "atencion", "ventana": "Atención"}
+    {"nombre": "atencion", "ventana": "Atención"},
+    {"nombre": "selector-contrario", "ventana": "Contrarios"},
+    {"nombre": "aviso-informacion", "ventana": "Información"}
   ],
   "transiciones": [
     {"nombre": "abrir-mn", "de": "fuera", "a": "inicio", "segundos": 240,
@@ -76,6 +78,41 @@
        {"accion": "wait", "in": {"duration": 2}}
      ]},
 
+    {"nombre": "cerrar-selector-contrario", "de": "selector-contrario", "a": "formulario-expediente", "segundos": 10,
+     "pasos": [{"accion": "key", "in": {"text": "Escape"}}]},
+
+    {"nombre": "cerrar-aviso-informacion", "de": "aviso-informacion", "a": "selector-contrario|selector-cliente|formulario-expediente", "segundos": 10,
+     "pasos": [{"accion": "pulsar_control", "ventana": "Información", "in": {"ventana": "Información", "control": "boton:Aceptar"}}]},
+
+    {"nombre": "elegir-contrario", "de": "formulario-expediente", "a": "formulario-expediente", "segundos": 40,
+     "pasos": [
+       {"accion": "pulsar_control", "ventana": "Expediente 1/2026", "in": {"ventana": "Expediente 1/2026", "control": "pestana:Contrarios", "_si": "contrario"}},
+       {"accion": "left_click", "ventana": "Expediente 1/2026", "rel": [31, 346], "in": {"_si": "contrario"}},
+       {"accion": "esperar_a", "in": {"que": "aparezca", "ventana": "Contrarios", "segundos": 15, "_si": "contrario"}},
+       {"accion": "left_click", "ventana": "Contrarios", "rel": [456, 33], "in": {"_si": "contrario"}},
+       {"accion": "wait", "in": {"duration": 1, "_si": "contrario"}},
+       {"accion": "left_click", "ventana": "Contrarios", "rel": [422, 66], "in": {"_si": "contrario"}},
+       {"accion": "left_click", "ventana": "Contrarios", "rel": [175, 33], "in": {"_si": "contrario"}},
+       {"accion": "type", "in": {"text": "{contrario}", "_si": "contrario"}},
+       {"accion": "key", "in": {"text": "Return", "_si": "contrario"}},
+       {"accion": "wait", "in": {"duration": 3, "_si": "contrario"}}
+     ]},
+
+    {"nombre": "adjuntar", "de": "formulario-expediente", "a": "formulario-expediente", "segundos": 50,
+     "pasos": [
+       {"accion": "pulsar_control", "ventana": "Expediente 1/2026", "in": {"ventana": "Expediente 1/2026", "control": "pestana:Adjuntos", "_si": "adjunto"}},
+       {"accion": "pulsar_control", "ventana": "Expediente 1/2026", "in": {"ventana": "Expediente 1/2026", "control": "#btnAnadirAdjNew", "_si": "adjunto"}},
+       {"accion": "wait", "in": {"duration": 1, "_si": "adjunto"}},
+       {"accion": "left_click", "ventana": "Expediente 1/2026", "rel": [95, 425], "in": {"_si": "adjunto"}},
+       {"accion": "esperar_a", "in": {"que": "aparezca", "ventana": "Abrir", "segundos": 15, "_si": "adjunto"}},
+       {"accion": "type", "in": {"text": "{adjunto}", "_si": "adjunto"}},
+       {"accion": "wait", "in": {"duration": 1, "_si": "adjunto"}},
+       {"accion": "key", "in": {"text": "Return", "_si": "adjunto"}},
+       {"accion": "esperar_a", "in": {"que": "aparezca", "ventana": "Documento", "segundos": 15, "_si": "adjunto"}},
+       {"accion": "pulsar_control", "ventana": "Documento", "in": {"ventana": "Documento", "control": "boton:Aceptar", "_si": "adjunto"}},
+       {"accion": "wait", "in": {"duration": 2, "_si": "adjunto"}}
+     ]},
+
     {"nombre": "comprobar-antes-de-guardar", "de": "formulario-expediente", "a": "formulario-expediente", "segundos": 20,
      "pasos": [
        {"accion": "comprobar", "ventana": "Expediente 1/2026",
@@ -87,6 +124,8 @@
        {"accion": "comprobar", "ventana": "Expediente 1/2026",
         "in": {"ventana": "Expediente 1/2026", "control": "campo junto a Tipo de Expediente", "esperado": "Extrajudicial"}},
        {"accion": "comprobar", "ventana": "Expediente 1/2026",
+        "in": {"ventana": "Expediente 1/2026", "control": "campo junto a Contrario", "esperado": "{contrario_nombre}", "_si": "contrario_nombre"}},
+       {"accion": "comprobar", "ventana": "Expediente 1/2026",
         "in": {"ventana": "Expediente 1/2026", "control": "campo junto a Etapa", "esperado": "PEND. ENVIAR"}},
        {"accion": "auditar", "ventana": "Expediente 1/2026",
         "in": {"ventana": "Expediente 1/2026", "esperado": {
@@ -95,7 +134,8 @@
           "Etapa": "PEND. ENVIAR",
           "Estado Expediente": "Abierto",
           "Cliente": "{cliente_nombre}",
-          "Contrario": "{contrario}"}}}
+          "Contrario": "{contrario_nombre}",
+          "Lista de adjuntos (pestaña Adjuntos)": "{adjunto_nombre}"}}}
      ]},
 
     {"nombre": "guardar", "de": "formulario-expediente", "a": "lista-expedientes", "segundos": 45, "toca": true,
@@ -111,6 +151,8 @@
       {"hacer": "alta"},
       {"hacer": "rellenar-datos"},
       {"hacer": "elegir-cliente"},
+      {"hacer": "elegir-contrario"},
+      {"hacer": "adjuntar"},
       {"hacer": "comprobar-antes-de-guardar"},
       {"hacer": "guardar"}
     ]

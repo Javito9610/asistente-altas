@@ -707,6 +707,19 @@ public final class App {
     static java.util.Map<String, String> parametros(List<String> a) {
         var m = new java.util.LinkedHashMap<String, String>();
         for (int i = 0; i + 1 < a.size(); i++) {
+            if (a.get(i).equals("--param-fichero")) {
+                // Los datos con tildes van en un fichero UTF-8 (una línea clave=valor): por la línea de comandos de Windows se rompen.
+                try {
+                    for (String l : Files.readAllLines(Path.of(a.get(i + 1)), java.nio.charset.StandardCharsets.UTF_8)) {
+                        int ig = l.indexOf('=');
+                        if (ig > 0 && !l.stripLeading().startsWith("#")) {
+                            m.put(l.substring(0, ig).strip(), l.substring(ig + 1).strip());
+                        }
+                    }
+                } catch (IOException e) {
+                    throw new IllegalArgumentException("No se puede leer el fichero de parámetros " + a.get(i + 1) + ": " + e.getMessage());
+                }
+            }
             if (a.get(i).equals("--param")) {
                 String kv = a.get(i + 1);
                 int ig = kv.indexOf('=');

@@ -1178,6 +1178,8 @@ public final class Comprobaciones {
         boolean fallaGuardar;
         boolean auditaMal;
         String fallaSiempre;
+        java.util.List<String> espia;
+        java.util.Map<String, String> extra = java.util.Map.of();
         String cliente = "1";
 
         MundoFalso(String e) {
@@ -1200,6 +1202,9 @@ public final class Comprobaciones {
             if (w.falla != null && w.falla.equals(p.accion())) {
                 w.falla = null;
                 return "no ha reaccionado";
+            }
+            if (w.espia != null && p.accion().equals("type")) {
+                w.espia.add(es.amagna.asistente.cerebro.Receta.sustituir(String.valueOf(p.in().get("text")), ps));
             }
             if (w.fallaSiempre != null && w.fallaSiempre.equals(p.accion())) {
                 return "no ha reaccionado nunca";
@@ -1252,7 +1257,15 @@ public final class Comprobaciones {
             }
         };
         return new es.amagna.asistente.estados.Ejecutor(mapa, observa, hace, rescate, reloj, x -> { })
-                .ejecutar("crear-expediente", java.util.Map.of("descripcion", "MICRO", "cliente", w.cliente));
+                .ejecutar("crear-expediente", parametrosFalsos(w));
+    }
+
+    static java.util.Map<String, String> parametrosFalsos(MundoFalso w) {
+        var m = new java.util.LinkedHashMap<String, String>();
+        m.put("descripcion", "MICRO");
+        m.put("cliente", w.cliente);
+        m.putAll(w.extra);
+        return m;
     }
 
     static void estados() {
@@ -1300,6 +1313,18 @@ public final class Comprobaciones {
         var wc = new MundoFalso("atencion-otra");
         var rc = correrFalso(mapa, wc, true);
         ok(rc.bien() && wc.rescates == 1 && wc.guardados == 1, "estados: ese aviso desconocido lo resuelve la IA y la tarea sigue");
+        var wk = new MundoFalso("lista");
+        var vistos = new java.util.ArrayList<String>();
+        wk.espia = vistos;
+        wk.extra = java.util.Map.of("contrario", "33857008-L", "adjunto", "C:\\x.txt");
+        var rk = correrFalso(mapa, wk, false);
+        ok(rk.bien() && wk.guardados == 1 && vistos.contains("33857008-L") && vistos.contains("C:\\x.txt"),
+                "estados: con contrario y adjunto se teclean sus datos; sin ellos esos pasos se saltan");
+        var sinExtras = new MundoFalso("lista");
+        var vistos2 = new java.util.ArrayList<String>();
+        sinExtras.espia = vistos2;
+        ok(correrFalso(mapa, sinExtras, false).bien() && vistos2.stream().noneMatch(t -> t.contains("33857008")),
+                "estados: sin contrario ni adjunto no se hace nada de eso");
         var wm = new MundoFalso("lista");
         wm.cliente = "LucÃ\u00ada";
         var rm = correrFalso(mapa, wm, true);
