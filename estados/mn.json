@@ -1,6 +1,7 @@
 {
   "_nota": "Mapa de estados de MN para expedientes. Construido a partir de lo que el agente hizo bien en la Empresa de prueba. Cada transición tiene su estado de llegada: si no se llega, se para y entra la IA.",
   "principal": "MNprogram - Abogados",
+  "reposo": "lista-expedientes",
   "estados": [
     {"nombre": "cargando", "ventana": "Cargando..."},
     {"nombre": "lista-expedientes", "ventana": "Expedientes"},

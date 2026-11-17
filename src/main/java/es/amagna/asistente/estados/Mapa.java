@@ -47,6 +47,12 @@ public final class Mapa {
     private final List<Transicion> transiciones;
     private final Map<String, List<Orden>> tareas;
     private final String principal;
+    private String reposo = "inicio";
+
+    /** El estado limpio al que se vuelve cuando hay que abandonar una tarea sin guardar. */
+    public String reposo() {
+        return reposo;
+    }
 
     public Mapa(List<Estado> estados, List<Transicion> transiciones, Map<String, List<Orden>> tareas, String principal) {
         this.estados = estados;
@@ -128,12 +134,16 @@ public final class Mapa {
             tareas.put(e.getKey(), ord);
         }
         Mapa mapa = new Mapa(es, ts, tareas, String.valueOf(raiz.getOrDefault("principal", "")));
+        mapa.reposo = String.valueOf(raiz.getOrDefault("reposo", "inicio"));
         mapa.validar();
         return mapa;
     }
 
     /** Un mapa mal escrito se rechaza al leerlo, no a mitad de un alta. */
     void validar() {
+        if (!existe(reposo)) {
+            throw new IllegalArgumentException("El estado de reposo «" + reposo + "» no existe");
+        }
         for (Transicion t : transiciones) {
             if (!existe(t.de()) || !t.destinos().stream().allMatch(this::existe)) {
                 throw new IllegalArgumentException("Transición «" + t.nombre() + "»: estado desconocido (" + t.de() + " → " + t.a() + ")");

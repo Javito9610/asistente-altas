@@ -1175,6 +1175,7 @@ public final class Comprobaciones {
         int rescates;
         String falla; // acción que falla una vez
         boolean fallaGuardar;
+        boolean auditaMal;
 
         MundoFalso(String e) {
             estado = e;
@@ -1196,6 +1197,9 @@ public final class Comprobaciones {
             if (w.falla != null && w.falla.equals(p.accion())) {
                 w.falla = null;
                 return "no ha reaccionado";
+            }
+            if (w.auditaMal && p.accion().equals("auditar")) {
+                return "AUDITORÍA NO OK (no coincide: Cliente)";
             }
             switch (p.accion()) {
                 case "abrir_mn" -> w.estado = "inicio";
@@ -1290,6 +1294,12 @@ public final class Comprobaciones {
         var wc = new MundoFalso("atencion-otra");
         var rc = correrFalso(mapa, wc, true);
         ok(rc.bien() && wc.rescates == 1 && wc.guardados == 1, "estados: ese aviso desconocido lo resuelve la IA y la tarea sigue");
+        var wv = new MundoFalso("inicio");
+        wv.auditaMal = true;
+        var rv = correrFalso(mapa, wv, true);
+        ok(!rv.bien() && wv.guardados == 0 && wv.rescates == 0 && rv.mensaje().contains("no se ha guardado nada")
+                        && wv.estado.equals("lista"),
+                "estados: si la auditoría no cuadra NO se guarda, NO se llama a la IA (no es un atasco) y la pantalla queda limpia");
         var w1 = new MundoFalso("inicio");
         w1.falla = "ruta";
         var r1 = correrFalso(mapa, w1, false);

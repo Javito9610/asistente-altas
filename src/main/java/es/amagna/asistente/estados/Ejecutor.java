@@ -75,8 +75,18 @@ public final class Ejecutor {
         this.registro = registro;
     }
 
-    private static final class Fallo extends RuntimeException {
+    private static class Fallo extends RuntimeException {
         Fallo(String m) {
+            super(m);
+        }
+    }
+
+    /**
+     * Una comprobación o una auditoría que dice que lo escrito NO es lo esperado. No es un atasco: repetirlo daría lo
+     * mismo, y la IA no lo arregla. Se deja la pantalla limpia (sin guardar) y se para diciendo qué no cuadra.
+     */
+    private static final class Verificacion extends Fallo {
+        Verificacion(String m) {
             super(m);
         }
     }
@@ -101,6 +111,11 @@ public final class Ejecutor {
             } catch (Fallo f) {
                 registro.accept("  FALLO: " + f.getMessage());
                 registro.accept("  Ventanas en ese momento:\n" + observa.ventanas());
+                if (f instanceof Verificacion && !comprometido) {
+                    String limpio = dejarLimpio();
+                    return new Resultado(false, "PARADO: la verificación no cuadra, no se ha guardado nada. " + f.getMessage() + " " + limpio,
+                            numero, rescates);
+                }
                 if (comprometido) {
                     // Ya se hizo lo irreversible (Guardar). Repetir la tarea crearía un duplicado: se para y se dice.
                     return new Resultado(false, "PARADO: " + f.getMessage() + " OJO: ya se había guardado; NO se repite. "
@@ -116,6 +131,16 @@ public final class Ejecutor {
             }
         }
         return new Resultado(true, "HECHO: «" + tarea + "»" + (numero.isBlank() ? "" : " (expediente " + numero + ")"), numero, rescates);
+    }
+
+    /** Sale de lo que haya abierto sin guardar (Cancelar y «¿salir?» → Sí) hasta el estado de reposo del mapa. */
+    private String dejarLimpio() {
+        try {
+            alcanzar(mapa.reposo(), java.util.Map.of());
+            return "Pantalla limpia: «" + mapa.reposo() + "».";
+        } catch (RuntimeException e) {
+            return "OJO: no he podido dejar la pantalla limpia (" + e.getMessage() + "): míralo a mano.";
+        }
     }
 
     /** El título real (con sus números) de la ventana que se parece al título dado (el número no importa). */
@@ -177,6 +202,9 @@ public final class Ejecutor {
                 continue;
             }
             String err = hace.paso(p, params);
+            if (err != null && (p.accion().equals("comprobar") || p.accion().equals("auditar") || err.startsWith("falta un parámetro"))) {
+                throw new Verificacion("«" + t.nombre() + "», paso «" + p.accion() + "»: " + err);
+            }
             if (err != null) {
                 throw new Fallo("«" + t.de() + " → " + t.a() + "», paso «" + p.accion() + "»: " + err);
             }
