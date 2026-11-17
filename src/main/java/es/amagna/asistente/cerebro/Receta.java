@@ -381,10 +381,12 @@ public final class Receta {
             int[] dentro = es.amagna.asistente.manos.Ancla.puntoEnRecorte(cap.imagen(), ex, ey);
             var hallazgo = es.amagna.asistente.manos.Ancla.buscar(cap.imagen(), recorte, ex - dentro[0], ey - dentro[1]);
             if (hallazgo == null) {
+                System.out.println("  ancla " + p.ventana() + "@" + rx + "," + ry + ": no encontrada, uso la posición de siempre");
                 return null;
             }
             int vx = hallazgo.x() + dentro[0];
             int vy = hallazgo.y() + dentro[1];
+            System.out.println("  ancla " + p.ventana() + "@" + rx + "," + ry + ": encontrada (desvío " + (vx - ex) + "," + (vy - ey) + " px)");
             return manos.escala().aImagen(r[0] + vx, r[1] + vy);
         } catch (RuntimeException e) {
             return null;

@@ -479,7 +479,7 @@ public final class App {
             System.exit(2);
         }
         String cliente = a.contains("--cliente") ? a.get(a.indexOf("--cliente") + 1) : "";
-        if (cliente.isBlank() && !a.contains("--solo-explorar")) {
+        if (cliente.isBlank() && !a.contains("--solo-explorar") && !a.contains("--solo-contrario")) {
             throw new IllegalArgumentException("Falta --cliente \"texto con el que buscar al cliente de prueba\"");
         }
         String contrario = a.contains("--contrario") ? a.get(a.indexOf("--contrario") + 1) : "";
@@ -489,7 +489,23 @@ public final class App {
         if (es.amagna.asistente.altas.Plan.descripcionValida(desc).isEmpty()) {
             throw new IllegalArgumentException("Descripción no válida: " + desc);
         }
-        String tarea = a.contains("--solo-explorar")
+        String tarea = a.contains("--solo-contrario")
+                ? """
+                Estás en la Empresa de prueba. NO crees expedientes nuevos. Abre desde la lista «Expedientes» el expediente
+                de prueba MÁS RECIENTE (la última fila; doble clic) y explora, en ESE expediente, dos cosas:
+                1) CONTRARIO: cómo se asigna uno. Mira la pestaña «Contrarios» y el campo/botón de contrario del formulario.
+                   Se abre una ventana selectora (probablemente «Contrarios») con caja de búsqueda y lista. Describe sus
+                   controles y cómo se maneja (qué lee UIA y qué no, dónde pulsar). Busca sin escribir nada y mira qué
+                   contrarios hay; elige UNO existente (nunca «Crear…» ni cambiar CIF o denominación de ninguno), asígnalo,
+                   comprueba con UIA o captura que queda en el expediente y guarda.
+                2) ADJUNTOS: la pestaña «Adjuntos». Mira cómo se añade un fichero («Añadir Adjunto» / «Importar Adjuntos»).
+                   El fichero de prueba es C:\\Proyectos\\asistente-altas\\pruebas\\adjunto-prueba.txt (ficticio). Añádelo
+                   tecleando su ruta en el diálogo de Windows y comprueba que aparece en la lista de adjuntos. Guarda.
+                Para cada cosa anota el orden exacto de pasos, los nombres exactos de los controles, los diálogos que salen
+                y cualquier aviso. Cierra todo lo que abras (Cancelar/Cerrar). Si algo no está claro en 2 intentos, para y
+                dilo. Termina con líneas «APRENDIDO: …», una por cosa.
+                """
+                : a.contains("--solo-explorar")
                 ? """
                 Estás en la Empresa de prueba. Hay un expediente de prueba ya guardado (el último de la lista «Expedientes»,
                 «Expediente 34/2026» o el más reciente). NO crees ninguno nuevo. Ábrelo desde la lista (doble clic en su
@@ -519,11 +535,11 @@ public final class App {
                 Termina con líneas «APRENDIDO: …» (una por cosa, con el nombre exacto del control y cómo se llega).
                 """ : "\nSi aprendes algo útil de la pantalla (dónde está algo, un aviso, un truco), añade al final una línea «APRENDIDO: …» por cosa.");
         List<String> b = new java.util.ArrayList<>(List.of(tarea, "--como", "expedientes"));
-        if (a.contains("--solo-explorar") && !a.contains("--tope-tokens")) {
+        if ((a.contains("--solo-explorar") || a.contains("--solo-contrario")) && !a.contains("--tope-tokens")) {
             b.add("--tope-tokens");
             b.add("900000");
         }
-        if ((a.contains("--explorar") || a.contains("--solo-explorar")) && !a.contains("--pasos")) {
+        if ((a.contains("--explorar") || a.contains("--solo-explorar") || a.contains("--solo-contrario")) && !a.contains("--pasos")) {
             b.add("--pasos");
             b.add("100");
         }
