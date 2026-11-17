@@ -39,6 +39,9 @@ public final class App {
 
     public static void main(String[] args) throws Exception {
         String orden = args.length > 0 ? args[0] : "ayuda";
+        // Engancharse a los avisos de Windows cuesta milisegundos y ahorra segundos en cada paso. Si no se puede,
+        // no pasa nada: todo sigue funcionando preguntando, como antes.
+        es.amagna.asistente.manos.Percepcion.arrancar();
         try {
             switch (orden) {
                 case "mirar" -> mirar();
@@ -49,6 +52,7 @@ public final class App {
                 case "leer" -> leer(Arrays.asList(args).subList(1, args.length));
                 case "alta" -> alta(Arrays.asList(args).subList(1, args.length));
                 case "campo" -> campo();
+                case "entorno" -> System.out.println(es.amagna.asistente.manos.Entorno.informe());
                 case "controles" -> controles(Arrays.asList(args).subList(1, args.length));
                 case "probar-windows" -> PruebasWindows.main(new String[0]);
                 case "agente" -> agente(Arrays.asList(args).subList(1, args.length));
@@ -95,6 +99,8 @@ public final class App {
                                                         (da de alta en Clientes solo si la lectura está LISTO,
                                                          con nombre, apellidos y NIF. Si está PARADO o falta un
                                                          dato, no abre MN. No guarda si la ficha no cuadra)
+                          asistente entorno             (qué puede hacer esta máquina ahora mismo: si hay
+                                                         pantalla, si la sesión está conectada, si el ratón sirve)
                           asistente campo               (lee el campo donde hagas clic, sin IA)
                           asistente controles "<ventana>" [--hondo N] [--a arbol.txt]
                                                         (los controles por dentro, sin IA)

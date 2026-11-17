@@ -810,6 +810,75 @@ public final class PruebasWindows {
                 "la despierta él solo y la lee: a la persona no se le pide nada");
         ((VentanasNativas) v).cerrarSiEsNuestra(dormida);
 
+        System.out.println("16) Percepción: Windows AVISA de una ventana nueva, y se puede ver una ventana sin fotografiar la pantalla");
+        var entorno = es.amagna.asistente.manos.Entorno.mirar();
+        System.out.println("   " + entorno.enUnaFrase());
+        ok(entorno.puedeManejarVentanas(), "aquí se pueden manejar ventanas (no es la sesión 0 de los servicios)");
+        boolean enganchado = es.amagna.asistente.manos.Percepcion.arrancar();
+        System.out.println("   enganche a los avisos de Windows: " + (enganchado ? "sí" : "NO — " + es.amagna.asistente.manos.Percepcion.porQueNo()));
+        ok(enganchado, "se engancha a los avisos de Windows (SetWinEventHook)");
+
+        // Se abre la vigilia ANTES de lanzar la ventana: así no se pierde el aviso aunque salga enseguida.
+        String vPerc = "prueba-percepcion-" + (System.currentTimeMillis() % 100000);
+        var vigilia = es.amagna.asistente.manos.Percepcion.mirar();
+        long tIni = System.currentTimeMillis();
+        Process pPerc = new ProcessBuilder(exeJava, "-cp", cp, "es.amagna.asistente.VentanaDePrueba", vPerc, "formulario").inheritIO().start();
+        try {
+            var aviso = es.amagna.asistente.manos.Percepcion.esperar(vigilia, cam ->
+                    (cam.evento() == es.amagna.asistente.manos.Percepcion.MOSTRADO
+                            || cam.evento() == es.amagna.asistente.manos.Percepcion.CREADO
+                            || cam.evento() == es.amagna.asistente.manos.Percepcion.RENOMBRADO)
+                            && cam.titulo().contains(vPerc), 40);
+            long tAviso = System.currentTimeMillis() - tIni;
+            System.out.println("   Windows avisó de «" + vPerc + "» (" + (aviso == null ? "nada" : aviso.comoSeLlama()) + ") a los " + tAviso + " ms de lanzar el proceso");
+            ok(aviso != null, "Windows avisa de que ha salido la ventana, sin preguntarle");
+            ok(ctrl.esperar(vPerc, null, es.amagna.asistente.manos.Controles.Que.APAREZCA, null, 25).startsWith("Ya está"),
+                    "y la ventana está lista para trabajar");
+
+            // Ver la ventana: se le pide el dibujo a ella, no se copia el monitor.
+            var dibujo = ctrl.dibujar(vPerc);
+            System.out.println("   dibujo de la ventana: " + (dibujo.valido() ? dibujo.ancho() + "x" + dibujo.alto()
+                    + (dibujo.enBlanco() ? " (EN BLANCO)" : "") : "NO: " + dibujo.problema()));
+            ok(dibujo.valido(), "se puede dibujar la ventana pidiéndoselo a ella");
+            ok(dibujo.valido() && dibujo.ancho() > 150 && dibujo.alto() > 100, "con un tamaño de ventana de verdad");
+            ok(dibujo.valido() && !dibujo.enBlanco(), "y sale con contenido, no de un solo color");
+            byte[] png = dibujo.valido() ? dibujo.pngQueCabe(1280, 720) : null;
+            BufferedImage leida = png == null ? null : ImageIO.read(new ByteArrayInputStream(png));
+            ok(leida != null && leida.getWidth() <= 1280 && leida.getHeight() <= 720, "el PNG se lee y cabe en lo que le mandamos a Claude");
+            if (png != null) {
+                Files.write(Path.of("ventana-dibujada.png"), png);
+            }
+
+            // Minimizada: ctrl.dibujar la despierta antes (la persona no tiene que hacer nada) y la dibuja.
+            com.sun.jna.Pointer hP = ((VentanasNativas) v).handleDe(vPerc);
+            es.amagna.asistente.manos.Win32.User32.I.ShowWindow(hP, es.amagna.asistente.manos.Win32.SW_MINIMIZE);
+            manos.esperar(1);
+            ok(es.amagna.asistente.manos.Win32.User32.I.IsIconic(hP), "la ventana está minimizada de verdad");
+            var dormidaDibujo = ctrl.dibujar(vPerc);
+            System.out.println("   dibujo de una ventana minimizada: " + (dormidaDibujo.valido() ? dormidaDibujo.ancho() + "x"
+                    + dormidaDibujo.alto() + (dormidaDibujo.enBlanco() ? " (EN BLANCO)" : "") : "NO: " + dormidaDibujo.problema()));
+            ok(dormidaDibujo.valido() && !dormidaDibujo.enBlanco(), "una ventana minimizada se despierta y se dibuja con contenido");
+
+            // Y lo que no existe no se inventa.
+            var nada = ctrl.dibujar("ventana-que-no-existe-" + tIni);
+            ok(!nada.valido() && nada.problema().contains("No hay ninguna ventana") && nada.png() == null,
+                    "una ventana que no existe da un motivo y ninguna imagen");
+
+            // El aviso de que se cierra también llega.
+            var vigiliaCierre = es.amagna.asistente.manos.Percepcion.mirar();
+            ((VentanasNativas) v).cerrarSiEsNuestra(vPerc);
+            var cierre = es.amagna.asistente.manos.Percepcion.esperar(vigiliaCierre, cam ->
+                    cam.evento() == es.amagna.asistente.manos.Percepcion.DESTRUIDO
+                            || cam.evento() == es.amagna.asistente.manos.Percepcion.OCULTADO, 15);
+            ok(cierre != null, "Windows avisa también de que la ventana se ha cerrado");
+        } finally {
+            pPerc.destroy();
+        }
+        // El cinturón: aunque el aviso no llegara, esperarA mira la condición igualmente.
+        long tEs = System.currentTimeMillis();
+        boolean logro = es.amagna.asistente.manos.Percepcion.esperarA(() -> ((VentanasNativas) v).handleDe(vPerc) == null, 15);
+        ok(logro, "esperarA ve que la ventana ya no está (" + (System.currentTimeMillis() - tEs) + " ms)");
+
         ((VentanasNativas) v).cerrarSiEsNuestra(vent);
 
         terminar(manos, v);

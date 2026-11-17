@@ -3,7 +3,9 @@ package es.amagna.asistente.cerebro;
 import es.amagna.asistente.Json;
 import es.amagna.asistente.manos.FrenoDeEmergencia;
 import es.amagna.asistente.manos.Manos;
+import es.amagna.asistente.manos.Captura;
 import es.amagna.asistente.manos.Controles;
+import es.amagna.asistente.manos.Escala;
 import es.amagna.asistente.manos.Ventanas;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -182,6 +184,13 @@ public final class Agente {
                     + "un lector de pantalla. Es mucho más fiable que mirar la captura: úsalo antes de rellenar nada.",
                     "input_schema", Json.obj("type", "object", "properties", Json.obj(
                             "ventana", ventana, "profundidad", Json.obj("type", "integer", "description", "Niveles a mirar (3 por defecto)")),
+                            "required", List.of("ventana"))));
+            h.add(Json.obj("name", "ver_ventana", "description",
+                    "Te da el DIBUJO de una ventana concreta, pidiéndoselo a la propia ventana en vez de fotografiar la pantalla. "
+                    + "Funciona aunque otra ventana la tape y aunque no haya pantalla (un servidor del que se ha desconectado el "
+                    + "escritorio remoto), que es cuando «screenshot» sale en negro. Si la ventana no se deja dibujar te lo dice: "
+                    + "no la des por vista. Para saber QUÉ hay y poder pulsarlo, usa siempre ver_controles; esto es para mirar.",
+                    "input_schema", Json.obj("type", "object", "properties", Json.obj("ventana", ventana),
                             "required", List.of("ventana"))));
             h.add(Json.obj("name", "leer_control", "description",
                     "Lee el valor EXACTO de un control concreto de una ventana, sin tocarlo.",
@@ -454,6 +463,20 @@ public final class Agente {
                     }
                 }
                 return List.of(textoBloque(arbol));
+            }
+            case "ver_ventana": {
+                String pedida = (String) in.get("ventana");
+                Captura.Resultado d = controles.dibujar(pedida);
+                if (!d.valido()) {
+                    return List.of(textoBloque("No he podido ver «" + pedida + "»: " + d.problema()
+                            + " No des por visto nada de esa ventana; usa ver_controles."));
+                }
+                if (d.enBlanco()) {
+                    return List.of(textoBloque("La ventana «" + pedida + "» se ha dibujado toda de un solo color: la "
+                            + "ventana se niega a dibujarse, no es que esté vacía. No decidas nada por esto; usa ver_controles."));
+                }
+                return List.of(textoBloque("Dibujo de la ventana «" + pedida + "» (" + d.ancho() + "x" + d.alto() + " px):"),
+                        imagen(d.pngQueCabe(Escala.ANCHO_MAX, Escala.ALTO_MAX)));
             }
             case "leer_control":
                 yaMiroUia = true;

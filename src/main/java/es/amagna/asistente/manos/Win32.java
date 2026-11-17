@@ -68,6 +68,53 @@ public final class Win32 {
         int MapVirtualKeyW(int codigo, int tipo);
 
         short VkKeyScanW(char c);
+
+        /**
+         * El aviso de Windows cuando pasa algo en la pantalla.
+         *
+         * <p>Corre en NUESTRO hilo y deja esperando a quien lo manda hasta que volvemos, así que aquí dentro no se
+         * llama a nada que pueda tardar (y pedir el título de una ventana puede tardar: es un mensaje a otro
+         * programa, y un programa colgado nos colgaría a nosotros).
+         */
+        interface WinEventProc extends StdCallCallback {
+            void invoke(Pointer enganche, int evento, Pointer hwnd, int idObjeto, int idHijo, int hiloEvento, int cuando);
+        }
+
+        Pointer SetWinEventHook(int desde, int hasta, Pointer dll, WinEventProc aviso, int pid, int hilo, int opciones);
+
+        boolean UnhookWinEvent(Pointer enganche);
+
+        int GetMessageW(MSG msg, Pointer hwnd, int min, int max);
+
+        boolean TranslateMessage(MSG msg);
+
+        Pointer DispatchMessageW(MSG msg);
+
+        /**
+         * Dibuja la ventana en un lienzo nuestro, pidiéndoselo a ella.
+         *
+         * <p>Es la forma de ver una ventana que NO se puede fotografiar de la pantalla: tapada por otra, en un
+         * escritorio al que nadie está mirando, o en un servidor del que te acabas de desconectar por escritorio
+         * remoto. Ahí una foto de la pantalla sale negra y esto sigue dando la ventana.
+         */
+        boolean PrintWindow(Pointer hwnd, Pointer hdc, int opciones);
+
+        Pointer GetWindowDC(Pointer hwnd);
+
+        int ReleaseDC(Pointer hwnd, Pointer hdc);
+    }
+
+    /** Un mensaje de Windows. Solo hace falta para el bucle que escucha los avisos. */
+    @Structure.FieldOrder({"hwnd", "mensaje", "wParam", "lParam", "cuando", "x", "y", "relleno"})
+    public static class MSG extends Structure {
+        public Pointer hwnd;
+        public int mensaje;
+        public Pointer wParam;
+        public Pointer lParam;
+        public int cuando;
+        public int x;
+        public int y;
+        public int relleno;
     }
 
     public interface Kernel32 extends StdCallLibrary {

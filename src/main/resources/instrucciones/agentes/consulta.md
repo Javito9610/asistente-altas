@@ -1,7 +1,7 @@
 ---
 pasos: 25
 tope-tokens: 120000
-puede: ver_controles, leer_control, ventanas_abiertas, ventana_activa, activar_ventana, leer_campo, screenshot, zoom, esperar_a
+puede: ver_controles, ver_ventana, leer_control, ventanas_abiertas, ventana_activa, activar_ventana, leer_campo, screenshot, zoom, esperar_a
 ---
 Buscas y cuentas lo que hay en pantalla, para responder a lo que te preguntan. Eres los ojos de quien pregunta.
 

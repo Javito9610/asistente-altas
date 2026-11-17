@@ -57,6 +57,19 @@ public final class Controles {
 
     // ---------- ver ----------
 
+    /**
+     * El dibujo de una ventana, pedido a la propia ventana: vale aunque esté tapada y aunque no haya pantalla
+     * (servidor con la sesión de escritorio remoto desconectada). Ver {@link Captura}.
+     */
+    public Captura.Resultado dibujar(String tituloVentana) {
+        ventanas.despertar(tituloVentana);
+        Pointer hwnd = ventanas.handleDe(tituloVentana);
+        if (hwnd == null) {
+            return Captura.noHay("No hay ninguna ventana cuyo título contenga «" + tituloVentana + "».");
+        }
+        return Captura.deVentana(hwnd);
+    }
+
     /** Lo que el asistente «ve por dentro» de una ventana, en texto. */
     public String arbol(String tituloVentana, int profundidad) {
         return arbol(tituloVentana, profundidad, TOPE);
@@ -1705,6 +1718,7 @@ public final class Controles {
     public String esperar(String ventana, String apodo, Que que, String valor, double segundos) {
         long fin = System.currentTimeMillis() + (long) (Math.max(0.5, segundos) * 1000);
         String ultimo = "";
+        Percepcion.Vigilia vigilia = Percepcion.mirar();
         while (true) {
             boolean ventanaHay = ventanas.handleDe(ventana) != null;
             if (apodo == null || apodo.isBlank()) {
@@ -1754,10 +1768,9 @@ public final class Controles {
             if (System.currentTimeMillis() >= fin) {
                 return "Se han pasado los " + (long) segundos + " s esperando y no ha ocurrido: " + ultimo + ".";
             }
-            try {
-                Thread.sleep(300);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+            // Se despierta en cuanto Windows avisa de un cambio; los 300 ms son solo el tope por si no avisa.
+            Percepcion.esperar(vigilia, c -> true, Math.min(0.3, (fin - System.currentTimeMillis()) / 1000.0));
+            if (Thread.currentThread().isInterrupted()) {
                 return "Interrumpido.";
             }
         }

@@ -462,6 +462,9 @@ public final class Explorador {
         long fin = System.currentTimeMillis() + (long) (segundos * 1000);
         boolean huboMenu = false;
         String ultimoCargando = null;
+        // Se empieza a mirar ANTES del primer repaso: si la ventana sale en ese hueco, el aviso ya está apuntado y
+        // no se pierde. Luego cada vuelta se despierta en cuanto Windows avisa, no cuando toca el reloj.
+        es.amagna.asistente.manos.Percepcion.Vigilia vigilia = es.amagna.asistente.manos.Percepcion.mirar();
         do {
             for (Map.Entry<Long, String> e : VentanasNativas.instantanea().entrySet()) {
                 if (antes.contains(e.getKey())) {
@@ -481,7 +484,16 @@ public final class Explorador {
                 }
                 return new Salio(e.getKey(), false, null);
             }
-            esperarQuieto(0.3);
+            double queda = (fin - System.currentTimeMillis()) / 1000.0;
+            if (queda <= 0) {
+                break;
+            }
+            es.amagna.asistente.manos.Percepcion.esperar(vigilia,
+                    c -> c.evento() == es.amagna.asistente.manos.Percepcion.MOSTRADO
+                            || c.evento() == es.amagna.asistente.manos.Percepcion.CREADO
+                            || c.evento() == es.amagna.asistente.manos.Percepcion.AL_FRENTE
+                            || c.evento() == es.amagna.asistente.manos.Percepcion.DIALOGO,
+                    Math.min(queda, 0.3));
         } while (System.currentTimeMillis() < fin);
         return new Salio(null, huboMenu, ultimoCargando);
     }

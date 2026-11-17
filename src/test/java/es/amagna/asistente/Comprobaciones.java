@@ -36,6 +36,7 @@ public final class Comprobaciones {
         filas();
         zips();
         lectura();
+        percepcion();
         alta();
         System.out.println("\nTODO BIEN: " + bien + " comprobaciones.");
     }
@@ -1011,6 +1012,136 @@ public final class Comprobaciones {
         } catch (java.io.IOException e) {
             ok(false, "los ZIPs se listan sin romperse: " + e.getMessage());
         }
+    }
+
+    /**
+     * Percepción de la pantalla y entorno: la parte que se puede comprobar sin una pantalla delante. (Que Windows
+     * avise de verdad de una ventana nueva se comprueba en PruebasWindows, contra Windows de verdad.)
+     */
+    static void percepcion() {
+        // --- Dónde estamos: de tres datos sueltos a una respuesta ---
+        var S = es.amagna.asistente.manos.Entorno.Sesion.class;
+        ok(es.amagna.asistente.manos.Entorno.deducir(0, true, 0) == S.getEnumConstants()[3]
+                        && es.amagna.asistente.manos.Entorno.deducir(0, false, -1).name().equals("SIN_ESCRITORIO"),
+                "la sesión 0 (la de los servicios) no tiene escritorio, aunque Windows diga lo que diga");
+        ok(es.amagna.asistente.manos.Entorno.deducir(2, true, 0).name().equals("ACTIVA")
+                        && es.amagna.asistente.manos.Entorno.deducir(2, false, 0).name().equals("BLOQUEADA"),
+                "una sesión «activa» sin escritorio de entrada es una pantalla bloqueada");
+        ok(es.amagna.asistente.manos.Entorno.deducir(2, false, 4).name().equals("DESCONECTADA")
+                        && es.amagna.asistente.manos.Entorno.deducir(2, true, 4).name().equals("DESCONECTADA"),
+                "escritorio remoto cerrado: la sesión sigue viva pero desconectada");
+        ok(es.amagna.asistente.manos.Entorno.deducir(2, false, 5).name().equals("BLOQUEADA"),
+                "pantalla bloqueada");
+        ok(es.amagna.asistente.manos.Entorno.deducir(1, false, -1).name().equals("NO_SE_SABE")
+                        && es.amagna.asistente.manos.Entorno.deducir(-1, true, -1).name().equals("ACTIVA"),
+                "si Windows no contesta, se dice «no se sabe» y no se inventa");
+
+        // --- Qué se puede hacer según dónde estemos ---
+        var desconectada = new es.amagna.asistente.manos.Entorno.Estado(
+                es.amagna.asistente.manos.Entorno.Sesion.DESCONECTADA, false, true, 2, false);
+        ok(desconectada.puedeManejarVentanas() && !desconectada.puedeUsarRaton() && !desconectada.puedeFotografiarLaPantalla(),
+                "sesión desconectada: las ventanas se manejan por dentro, pero no hay ratón ni foto de pantalla");
+        ok(desconectada.enUnaFrase().contains("sin ratón"), "y lo dice con palabras");
+        var servicio = new es.amagna.asistente.manos.Entorno.Estado(
+                es.amagna.asistente.manos.Entorno.Sesion.SIN_ESCRITORIO, false, false, 0, false);
+        ok(!servicio.puedeManejarVentanas() && servicio.enUnaFrase().startsWith("Aquí no se puede trabajar"),
+                "como servicio de Windows no se puede trabajar, y no lo disimula");
+        var activa = new es.amagna.asistente.manos.Entorno.Estado(
+                es.amagna.asistente.manos.Entorno.Sesion.ACTIVA, true, false, 1, false);
+        ok(activa.puedeManejarVentanas() && activa.puedeUsarRaton() && activa.puedeFotografiarLaPantalla(),
+                "sesión normal: todo disponible");
+        var sinPantallaJava = new es.amagna.asistente.manos.Entorno.Estado(
+                es.amagna.asistente.manos.Entorno.Sesion.ACTIVA, true, false, 1, true);
+        ok(!sinPantallaJava.puedeUsarRaton(), "si Java no tiene pantalla (headless) tampoco hay ratón");
+
+        // --- El dibujo de una ventana: cuándo se da por «en blanco» ---
+        int[] liso = new int[3840 * 2160];
+        ok(es.amagna.asistente.manos.Captura.esUniforme(liso), "un lienzo de un solo color es «en blanco»");
+        int[] conTexto = new int[3840 * 2160];
+        conTexto[1234567] = 0x00FFFFFF; // un solo píxel de texto en una pantalla 4K
+        ok(!es.amagna.asistente.manos.Captura.esUniforme(conTexto),
+                "un solo píxel distinto basta: una ventana casi toda gris con una línea de texto NO está en blanco");
+        int[] soloRelleno = {0xFF000000, 0x00000000, 0x7F000000};
+        ok(es.amagna.asistente.manos.Captura.esUniforme(soloRelleno),
+                "el cuarto byte es relleno, no transparencia: no cuenta como un color distinto");
+        ok(es.amagna.asistente.manos.Captura.esUniforme(new int[0]) && es.amagna.asistente.manos.Captura.esUniforme(null),
+                "sin píxeles no hay nada visto");
+
+        // --- Reducir sin deformar y sin agrandar ---
+        var grande = new java.awt.image.BufferedImage(3840, 2160, java.awt.image.BufferedImage.TYPE_INT_RGB);
+        var r1 = es.amagna.asistente.manos.Captura.reducida(grande, 1280, 720);
+        ok(r1.getWidth() == 1280 && r1.getHeight() == 720, "4K cabe en 1280x720 exacto");
+        var ancha = new java.awt.image.BufferedImage(2000, 1000, java.awt.image.BufferedImage.TYPE_INT_RGB);
+        var r2 = es.amagna.asistente.manos.Captura.reducida(ancha, 1280, 720);
+        ok(r2.getWidth() == 1280 && r2.getHeight() == 640 || r2.getWidth() == 1440 && r2.getHeight() == 720,
+                "se conserva la proporción: 2:1 sigue siendo 2:1");
+        ok(r2.getHeight() <= 720 && r2.getWidth() <= 1280 && (double) r2.getWidth() / r2.getHeight() > 1.99,
+                "y cabe en el recuadro");
+        var pequena = new java.awt.image.BufferedImage(100, 50, java.awt.image.BufferedImage.TYPE_INT_RGB);
+        ok(es.amagna.asistente.manos.Captura.reducida(pequena, 1280, 720) == pequena, "una imagen pequeña no se agranda");
+        var noHay = es.amagna.asistente.manos.Captura.noHay("sin ventana");
+        ok(!noHay.valido() && noHay.png() == null && noHay.pngQueCabe(100, 100) == null && noHay.problema().equals("sin ventana"),
+                "cuando no hay ventana, no hay imagen y se dice por qué (nunca una imagen vacía)");
+
+        // --- Los avisos de Windows: lo que se puede comprobar sin Windows ---
+        var P = es.amagna.asistente.manos.Percepcion.class;
+        es.amagna.asistente.manos.Percepcion.registrar(new es.amagna.asistente.manos.Percepcion.Cambio(1, 0x8002, 111));
+        var vig = es.amagna.asistente.manos.Percepcion.mirar();
+        es.amagna.asistente.manos.Percepcion.registrar(new es.amagna.asistente.manos.Percepcion.Cambio(2, 0x8002, 222));
+        es.amagna.asistente.manos.Percepcion.registrar(new es.amagna.asistente.manos.Percepcion.Cambio(3, 0x8000, 333));
+        var visto = es.amagna.asistente.manos.Percepcion.esperar(vig, c -> c.evento() == 0x8000, 2);
+        ok(visto != null && visto.ventana() == 333,
+                "lo que pasó DESPUÉS de abrir la vigilia se ve, aunque pasara antes de ponerse a esperar");
+        ok(es.amagna.asistente.manos.Percepcion.esperar(vig, c -> c.ventana() == 111, 0.2) == null,
+                "y lo que pasó ANTES de abrirla no se cuela");
+        ok(es.amagna.asistente.manos.Percepcion.esperar(vig, c -> true, 0.2) == null,
+                "un cambio ya visto no se entrega dos veces");
+        ok(visto != null && visto.comoSeLlama().equals("creada"), "los eventos se cuentan con palabras");
+
+        // El caso que importa: SIN enganche de Windows, esperar tiene que DORMIR, no devolver al instante.
+        // (Quien lo llama espera para no martillear UI Automation; si volviera de inmediato sería un bucle sin pausa.)
+        ok(!es.amagna.asistente.manos.Percepcion.disponible(), "en esta prueba no hay enganche de Windows");
+        var v2 = es.amagna.asistente.manos.Percepcion.mirar();
+        long t0 = System.nanoTime();
+        var nada = es.amagna.asistente.manos.Percepcion.esperar(v2, c -> true, 0.4);
+        long ms = (System.nanoTime() - t0) / 1_000_000;
+        ok(nada == null && ms >= 350 && ms < 1500,
+                "sin enganche, esperar duerme lo que se le pide (" + ms + " ms), no devuelve al instante");
+
+        long t1 = System.nanoTime();
+        boolean nunca = es.amagna.asistente.manos.Percepcion.esperarA(() -> false, 0.6);
+        long ms1 = (System.nanoTime() - t1) / 1_000_000;
+        ok(!nunca && ms1 >= 550 && ms1 < 2000, "esperarA se rinde al acabar el tiempo (" + ms1 + " ms)");
+
+        long t2 = System.nanoTime();
+        ok(es.amagna.asistente.manos.Percepcion.esperarA(() -> true, 5), "esperarA con la condición ya cumplida contesta que sí");
+        ok((System.nanoTime() - t2) / 1_000_000 < 200, "y no espera nada");
+
+        long[] cuando = {0};
+        long ini = System.currentTimeMillis();
+        Thread t = new Thread(() -> {
+            try {
+                Thread.sleep(300);
+            } catch (InterruptedException e) {
+                return;
+            }
+            cuando[0] = System.currentTimeMillis();
+        });
+        t.start();
+        boolean llego = es.amagna.asistente.manos.Percepcion.esperarA(() -> cuando[0] != 0, 5);
+        long tardo = System.currentTimeMillis() - ini;
+        ok(llego && tardo < 1200, "si la condición se cumple a mitad de espera, se entera enseguida (" + tardo + " ms)");
+
+        // La memoria no crece sin fin y las vigilias antiguas no se rompen al tirar lo viejo.
+        var vieja = es.amagna.asistente.manos.Percepcion.mirar();
+        long antes = es.amagna.asistente.manos.Percepcion.vistos();
+        for (int i = 0; i < 6000; i++) {
+            es.amagna.asistente.manos.Percepcion.registrar(new es.amagna.asistente.manos.Percepcion.Cambio(i, 0x8003, 1000 + i));
+        }
+        ok(es.amagna.asistente.manos.Percepcion.vistos() == antes + 6000, "se cuentan todos los cambios aunque se tiren los viejos");
+        ok(es.amagna.asistente.manos.Percepcion.ultimos(10_000).size() <= 4000, "pero solo se guardan los últimos 4000");
+        var tras = es.amagna.asistente.manos.Percepcion.esperar(vieja, c -> true, 0.2);
+        ok(tras != null && tras.ventana() >= 1000, "una vigilia abierta antes de la poda sigue funcionando: ve lo que queda");
     }
 
     /**

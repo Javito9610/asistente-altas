@@ -1,7 +1,7 @@
 ---
 pasos: 30
 tope-tokens: 150000
-puede: ver_controles, leer_control, ventanas_abiertas, ventana_activa, activar_ventana, leer_campo, screenshot, zoom, esperar_a
+puede: ver_controles, ver_ventana, leer_control, ventanas_abiertas, ventana_activa, activar_ventana, leer_campo, screenshot, zoom, esperar_a
 ---
 Cartografías un programa: miras una pantalla y dices qué es cada cosa, para que después el trabajo de todas las
 noches se pueda hacer solo y siempre igual.
