@@ -25,7 +25,16 @@ public final class Reconocedor {
         for (String l : abiertas.split("\\R")) {
             Matcher m = LINEA.matcher(l.strip());
             if (m.find()) {
-                v.add(new Ventana(m.group(1), m.group(2).contains("BLOQUEADA") || m.group(2).contains("minimizada")));
+                String resto = m.group(2);
+                // Un diálogo que cuelga de otra ventana no sale en su propia línea, sino en la de su dueña: delante de ella.
+                int i = resto.indexOf("diálogos abiertos dentro:");
+                if (i >= 0) {
+                    Matcher d = Pattern.compile("«([^»]*)»").matcher(resto.substring(i));
+                    while (d.find()) {
+                        v.add(new Ventana(d.group(1), false));
+                    }
+                }
+                v.add(new Ventana(m.group(1), resto.contains("BLOQUEADA") || resto.contains("minimizada")));
             }
         }
         return v;

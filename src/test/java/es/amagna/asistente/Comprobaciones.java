@@ -1294,6 +1294,11 @@ public final class Comprobaciones {
         var wc = new MundoFalso("atencion-otra");
         var rc = correrFalso(mapa, wc, true);
         ok(rc.bien() && wc.rescates == 1 && wc.guardados == 1, "estados: ese aviso desconocido lo resuelve la IA y la tarea sigue");
+        String conDialogo = "- «Expediente 37/2026» (GestorConsultas) — diálogos abiertos dentro: «Atención»  [BLOQUEADA: tiene un diálogo encima]\n"
+                + "- «Expedientes» (GestorConsultas) [BLOQUEADA: tiene un diálogo encima]\n"
+                + "- «MNprogram - Abogados - Empresa de prueba» (MNprogram)\n";
+        ok(es.amagna.asistente.estados.Reconocedor.estado(mapa, conDialogo, t -> "¿Deseas salir?").equals("atencion-salir"),
+                "estados: un diálogo que cuelga de otra ventana (sale en la línea de su dueña) también se reconoce");
         var wv = new MundoFalso("inicio");
         wv.auditaMal = true;
         var rv = correrFalso(mapa, wv, true);
