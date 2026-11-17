@@ -83,10 +83,12 @@
      "pasos": [{"accion": "key", "in": {"text": "Escape"}}]},
 
     {"nombre": "cerrar-aviso-informacion", "de": "aviso-informacion", "a": "selector-contrario|selector-cliente|formulario-expediente", "segundos": 10,
-     "pasos": [{"accion": "pulsar_control", "ventana": "Información", "in": {"ventana": "Información", "control": "boton:Aceptar"}}]},
+     "pasos": [{"accion": "pulsar_hasta", "ventana": "Información",
+        "in": {"ventana": "Información", "control": "boton:Aceptar", "hasta": "!«Información»", "segundos": 15}}]},
 
     {"nombre": "cerrar-aviso-error", "de": "aviso-error", "a": "selector-contrario|selector-cliente|selector-tipo|formulario-expediente", "segundos": 10,
-     "pasos": [{"accion": "pulsar_control", "ventana": "Error", "in": {"ventana": "Error", "control": "boton:Aceptar"}}]},
+     "pasos": [{"accion": "pulsar_hasta", "ventana": "Error",
+        "in": {"ventana": "Error", "control": "boton:Aceptar", "hasta": "!«Error»", "segundos": 15}}]},
 
     {"nombre": "elegir-contrario", "de": "formulario-expediente", "a": "formulario-expediente", "segundos": 40,
      "pasos": [

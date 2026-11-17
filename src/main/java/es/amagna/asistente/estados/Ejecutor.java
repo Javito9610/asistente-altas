@@ -118,7 +118,14 @@ public final class Ejecutor {
                 break;
             } catch (Fallo f) {
                 registro.accept("  FALLO: " + f.getMessage());
-                registro.accept("  Ventanas en ese momento:\n" + observa.ventanas());
+                String vs = observa.ventanas();
+                registro.accept("  Ventanas en ese momento:\n" + vs);
+                var dlg = java.util.regex.Pattern.compile("diálogo «([^»]+)»").matcher(vs);
+                if (dlg.find()) {
+                    String leido = observa.texto(dlg.group(1));
+                    registro.accept("  Lo que se lee del diálogo «" + dlg.group(1) + "»: "
+                            + (leido == null ? "" : leido.replaceAll("\\s+", " ").strip()).substring(0, Math.min(300, leido == null ? 0 : leido.replaceAll("\\s+", " ").strip().length())));
+                }
                 if (f instanceof Verificacion && !comprometido) {
                     String limpio = dejarLimpio();
                     return new Resultado(false, "PARADO: la verificación no cuadra, no se ha guardado nada. " + f.getMessage() + " " + limpio,
