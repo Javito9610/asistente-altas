@@ -6,7 +6,7 @@ call asistente.cmd expediente-prueba --cliente "Lucía" --descripcion MICRO --re
 echo ===== FIN (codigo %ERRORLEVEL%) ===== >> probar-expediente.log
 echo.
 echo ---------- RESUMEN ----------
-findstr /B /C:"TERMINADO" /C:"PARADO" /C:"TIEMPO" /C:"Pasos:" /C:"ERROR" /C:"=====" probar-expediente.log
+%SystemRoot%\System32\findstr.exe /B /C:"TERMINADO" /C:"PARADO" /C:"TIEMPO" /C:"Pasos:" /C:"ERROR" /C:"=====" probar-expediente.log
 echo.
 echo Terminado. Si queda algo abierto en MN, cierralo con Cancelar (sin guardar).
 pause

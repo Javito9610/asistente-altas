@@ -438,8 +438,8 @@ public final class App {
         String tarea = "Crea UN expediente de prueba en la Empresa de prueba (solo datos ficticios).\n"
                 + "- Entra en Bases de Datos > Expedientes > Expedientes (si no está abierta la lista) y pulsa Alta.\n"
                 + "- Descripción Expediente: " + desc + "\n"
-                + "- Ref. Propia / referencia: " + ref + "\n"
-                + "- Tipo de Expediente: Expediente Extrajudicial · Estado: Abierto · Etapa: PEND. ENVIAR · Usuario: Lia Silva\n"
+                + "- Ref. Propia (si existe un campo para ella; si no, sigue sin ella): " + ref + "\n"
+                + "- Tipo de Expediente: Expediente Extrajudicial · Estado: Abierto · Etapa: PEND. ENVIAR · Usuario: Lia Silva (si no hay campo, sigue sin él)\n"
                 + "- Cliente (busca por): " + cliente + "\n"
                 + (contrario.isBlank() ? "- Contrario: no hay, déjalo vacío.\n" : "- Contrario (busca por): " + contrario + "\n")
                 + "- Sin adjuntos en esta prueba.\n"

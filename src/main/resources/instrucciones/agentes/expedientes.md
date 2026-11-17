@@ -29,7 +29,10 @@ leer. Nada más: no creas clientes, no tocas otros expedientes, no borras nada.
   **Sí**. Después el estado puede saltar a «Nuevo».
 - Estado Expediente: **Abierto** (compruébalo con UIA antes de Guardar; si no está, ponlo).
 - Etapa: **PEND. ENVIAR** (si no la ofrece, déjala vacía y dilo).
-- Usuario/responsable: **Lia Silva** si hay ese campo.
+- Usuario/responsable: **Lia Silva**, pero en el formulario principal NO hay campo «Usuario» ni «Ref. Propia» (eran nombres del
+  importador). Mira un momento las pestañas y el botón «Alerta Ficha»; **no abras «Configuracion» ni cambies nada
+  de ajustes**. Si no los encuentras, **no es motivo para parar**: guarda sin ellos y dilo en el resultado como
+  «NO ENCONTRADO: usuario / ref. propia».
 - Tipos de Asunto y Tipos de Procedimiento: **vacíos**.
 - Descripción Expediente y Ref. Propia: los que te pasen en la tarea, tal cual.
 - Cliente y Contrario: busca por lo que te den. Si no sale **exactamente uno**, `PARADO:` con lo que ves. **Jamás** crees
@@ -44,4 +47,6 @@ o campos). Si algo no coincide con la tarea, corrígelo o para. **Guardar solo c
   **cierra la ventana del expediente** (Cerrar). Dime el número que ha puesto MN.
 - Fallo o duda: **Cancelar** y «Sí» a salir sin guardar. Deja el escritorio sin ventanas tuyas abiertas.
 
-Terminas con `TERMINADO: expediente nn/aaaa creado` o `PARADO: motivo claro, qué ves y qué paso fue el último bueno`.
+No intentes cerrar la lista «Expedientes»: se queda abierta, no pasa nada.
+
+Terminas con `TERMINADO: expediente nn/aaaa creado` (y, si faltó, `NO ENCONTRADO: …`) o `PARADO: motivo claro, qué ves y qué paso fue el último bueno`.
