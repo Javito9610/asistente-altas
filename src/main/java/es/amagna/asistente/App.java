@@ -37,11 +37,57 @@ import java.util.List;
 public final class App {
     public static final String MODELO_POR_DEFECTO = "claude-sonnet-5-5";
 
+    /** Segundos máximos de cada orden (0 = sin límite). Se pisa con --tope-segundos N. Nada espera «mil años». */
+    static int topeSegundos(String orden, List<String> args) {
+        int i = args.indexOf("--tope-segundos");
+        if (i >= 0 && i + 1 < args.size()) {
+            return Integer.parseInt(args.get(i + 1));
+        }
+        return switch (orden) {
+            case "pantalla" -> 240;
+            case "guion", "sesion", "explorar", "aprender" -> 420;
+            case "agente", "expediente-prueba" -> 900;
+            case "alta" -> 1200;
+            case "probar-windows", "arranque", "secretos", "secreto", "guardar-clave", "ayuda" -> 0;
+            default -> 300;
+        };
+    }
+
+    /** El vigilante: si la orden no ha terminado a tiempo, escribe qué ventanas hay y sale con el código 3. */
+    private static void vigilar(String orden, String[] args) {
+        int tope = topeSegundos(orden, Arrays.asList(args));
+        if (tope <= 0) {
+            return;
+        }
+        Thread t = new Thread(() -> {
+            try {
+                Thread.sleep(tope * 1000L);
+            } catch (InterruptedException e) {
+                return;
+            }
+            System.out.println();
+            System.out.println("TIEMPO AGOTADO: «" + orden + "» no ha terminado en " + tope + " s. Se corta. Ventanas ahora:");
+            Thread v = new Thread(() -> System.out.println(new VentanasNativas(true).abiertas()));
+            v.setDaemon(true);
+            v.start();
+            try {
+                v.join(5000);
+            } catch (InterruptedException ignorada) {
+                // da igual
+            }
+            System.out.flush();
+            Runtime.getRuntime().halt(3);
+        }, "vigilante");
+        t.setDaemon(true);
+        t.start();
+    }
+
     public static void main(String[] args) throws Exception {
         String orden = args.length > 0 ? args[0] : "ayuda";
         // Engancharse a los avisos de Windows cuesta milisegundos y ahorra segundos en cada paso. Si no se puede,
         // no pasa nada: todo sigue funcionando preguntando, como antes.
         es.amagna.asistente.manos.Percepcion.arrancar();
+        vigilar(orden, args);
         try {
             switch (orden) {
                 case "mirar" -> mirar();
@@ -55,6 +101,7 @@ public final class App {
                 case "entorno" -> System.out.println(es.amagna.asistente.manos.Entorno.informe());
                 case "controles" -> controles(Arrays.asList(args).subList(1, args.length));
                 case "probar-windows" -> PruebasWindows.main(new String[0]);
+                case "expediente-prueba" -> expedientePrueba(Arrays.asList(args).subList(1, args.length));
                 case "agente" -> agente(Arrays.asList(args).subList(1, args.length));
                 case "guion" -> guion(Arrays.asList(args).subList(1, args.length));
                 case "aprender" -> aprender(Arrays.asList(args).subList(1, args.length));
@@ -365,6 +412,49 @@ public final class App {
             registro.accept("Expediente (lo que hizo, con capturas): " + ag.expediente().carpeta().resolve("informe.html"));
         }
         System.exit(r.terminado() ? 0 : 1);
+    }
+
+    /**
+     * Crea UN expediente de prueba en la «Empresa de prueba» con el especialista de expedientes (ojos y manos + UIA).
+     *   asistente expediente-prueba --cliente "texto" [--contrario "texto"] [--descripcion MICRO] [--ref "PRUEBA-1 (AND)"]
+     */
+    private static void expedientePrueba(List<String> a) throws IOException {
+        String ventanasAhora = new VentanasNativas(true).abiertas();
+        if (!ventanasAhora.contains("Empresa de prueba")) {
+            System.out.println("PARADO: MN no está en «Empresa de prueba». No se toca nada.\n" + ventanasAhora);
+            System.exit(2);
+        }
+        String cliente = a.contains("--cliente") ? a.get(a.indexOf("--cliente") + 1) : "";
+        if (cliente.isBlank()) {
+            throw new IllegalArgumentException("Falta --cliente \"texto con el que buscar al cliente de prueba\"");
+        }
+        String contrario = a.contains("--contrario") ? a.get(a.indexOf("--contrario") + 1) : "";
+        String desc = a.contains("--descripcion") ? a.get(a.indexOf("--descripcion") + 1) : "MICRO";
+        desc = es.amagna.asistente.altas.Plan.descripcionValida(desc).isEmpty() ? desc : es.amagna.asistente.altas.Plan.descripcionValida(desc);
+        String ref = a.contains("--ref") ? a.get(a.indexOf("--ref") + 1) : "PRUEBA-1 (AND)";
+        if (es.amagna.asistente.altas.Plan.descripcionValida(desc).isEmpty()) {
+            throw new IllegalArgumentException("Descripción no válida: " + desc);
+        }
+        String tarea = "Crea UN expediente de prueba en la Empresa de prueba (solo datos ficticios).\n"
+                + "- Entra en Bases de Datos > Expedientes > Expedientes (si no está abierta la lista) y pulsa Alta.\n"
+                + "- Descripción Expediente: " + desc + "\n"
+                + "- Ref. Propia / referencia: " + ref + "\n"
+                + "- Tipo de Expediente: Expediente Extrajudicial · Estado: Abierto · Etapa: PEND. ENVIAR · Usuario: Lia Silva\n"
+                + "- Cliente (busca por): " + cliente + "\n"
+                + (contrario.isBlank() ? "- Contrario: no hay, déjalo vacío.\n" : "- Contrario (busca por): " + contrario + "\n")
+                + "- Sin adjuntos en esta prueba.\n"
+                + "Comprueba todo con UIA antes de Guardar, guarda, y cierra la ventana del expediente.";
+        List<String> b = new java.util.ArrayList<>(List.of(tarea, "--como", "expedientes"));
+        for (String x : List.of("--pasos", "--modelo", "--tope-tokens", "--sin-aviso", "--tope-segundos")) {
+            int i = a.indexOf(x);
+            if (i >= 0) {
+                b.add(x);
+                if (!x.equals("--sin-aviso")) {
+                    b.add(a.get(i + 1));
+                }
+            }
+        }
+        agente(b);
     }
 
     /** El guion: hacer una tarea de forma determinista con el mapa del programa, sin gastar un token. */
