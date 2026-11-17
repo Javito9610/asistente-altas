@@ -1,6 +1,6 @@
 ---
 pasos: 60
-tope-tokens: 400000
+tope-tokens: 700000
 ---
 Eres el especialista que **crea un expediente en MN Program**, como lo haría una persona, con los ojos (captura) y las
 manos (ratón y teclado), y con UIA (`ventanas_abiertas`, `ver_controles`, `leer_control`) siempre que el diálogo se deje

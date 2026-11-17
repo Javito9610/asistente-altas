@@ -444,7 +444,7 @@ public final class App {
             System.exit(2);
         }
         String cliente = a.contains("--cliente") ? a.get(a.indexOf("--cliente") + 1) : "";
-        if (cliente.isBlank()) {
+        if (cliente.isBlank() && !a.contains("--solo-explorar")) {
             throw new IllegalArgumentException("Falta --cliente \"texto con el que buscar al cliente de prueba\"");
         }
         String contrario = a.contains("--contrario") ? a.get(a.indexOf("--contrario") + 1) : "";
@@ -454,7 +454,18 @@ public final class App {
         if (es.amagna.asistente.altas.Plan.descripcionValida(desc).isEmpty()) {
             throw new IllegalArgumentException("Descripción no válida: " + desc);
         }
-        String tarea = "Crea UN expediente de prueba en la Empresa de prueba (solo datos ficticios).\n"
+        String tarea = a.contains("--solo-explorar")
+                ? """
+                Estás en la Empresa de prueba. Hay un expediente de prueba ya guardado (el último de la lista «Expedientes»,
+                «Expediente 34/2026» o el más reciente). NO crees ninguno nuevo. Ábrelo desde la lista (doble clic en su
+                fila) y MIRA SIN CAMBIAR NADA dónde se asigna el USUARIO responsable (Lia Silva) y dónde va la REF. PROPIA:
+                pestañas, «Alerta Ficha», «Resumen», columnas de la lista (desplázala a la derecha), menús de la lista,
+                clic derecho en la fila. Ya sabemos que «Configuracion > Gestionar Campos» pide credenciales de
+                supervisor: no insistas ahí. Si encuentras el sitio, rellénalo en ESTE expediente de prueba y comprueba que
+                queda. Cierra todo lo que abras (Cancelar/Cerrar). Termina con líneas «APRENDIDO: …», una por cosa, con el
+                nombre exacto del control y cómo se llega.
+                """
+                : "Crea UN expediente de prueba en la Empresa de prueba (solo datos ficticios).\n"
                 + "- Entra en Bases de Datos > Expedientes > Expedientes (si no está abierta la lista) y pulsa Alta.\n"
                 + "- Descripción Expediente: " + desc + "\n"
                 + "- Ref. Propia (si existe un campo para ella; si no, sigue sin ella): " + ref + "\n"
@@ -473,7 +484,11 @@ public final class App {
                 Termina con líneas «APRENDIDO: …» (una por cosa, con el nombre exacto del control y cómo se llega).
                 """ : "\nSi aprendes algo útil de la pantalla (dónde está algo, un aviso, un truco), añade al final una línea «APRENDIDO: …» por cosa.");
         List<String> b = new java.util.ArrayList<>(List.of(tarea, "--como", "expedientes"));
-        if (a.contains("--explorar") && !a.contains("--pasos")) {
+        if (a.contains("--solo-explorar") && !a.contains("--tope-tokens")) {
+            b.add("--tope-tokens");
+            b.add("900000");
+        }
+        if ((a.contains("--explorar") || a.contains("--solo-explorar")) && !a.contains("--pasos")) {
             b.add("--pasos");
             b.add("100");
         }
