@@ -47,6 +47,7 @@ public final class App {
             case "pantalla" -> 240;
             case "guion", "sesion", "explorar", "aprender" -> 420;
             case "agente", "expediente-prueba" -> 900;
+            case "receta" -> 600;
             case "alta" -> 1200;
             case "probar-windows", "arranque", "secretos", "secreto", "guardar-clave", "ayuda" -> 0;
             default -> 300;
@@ -453,6 +454,10 @@ public final class App {
      *   asistente expediente-prueba --cliente "texto" [--contrario "texto"] [--descripcion MICRO] [--ref "PRUEBA-1 (AND)"]
      */
     private static void expedientePrueba(List<String> a) throws IOException {
+        // MN puede estar cerrado: se abre y se entra solo (en la empresa y el ejercicio de prueba, con la IA de guardia).
+        var mapaMn = es.amagna.asistente.guion.Mapa.leer(Path.of("mapas", "mn.json"));
+        var vn = new VentanasNativas(false);
+        dejarMnListo(mapaMn, vn, new Controles(vn), a);
         String ventanasAhora = new VentanasNativas(true).abiertas();
         if (!ventanasAhora.contains("Empresa de prueba")) {
             System.out.println("PARADO: MN no está en «Empresa de prueba». No se toca nada.\n" + ventanasAhora);
@@ -551,6 +556,7 @@ public final class App {
         }
         var rec = es.amagna.asistente.cerebro.Receta.leer(Path.of("recetas", a.get(0) + ".json"));
         var ventanas = new VentanasNativas(false);
+        dejarMnListo(es.amagna.asistente.guion.Mapa.leer(Path.of("mapas", "mn.json")), ventanas, new Controles(ventanas), a);
         var ag = new Agente(new ClaudeApi("sin-uso"), new ManosRobot(false), ventanas, MODELO_POR_DEFECTO, "", 1, 1, System.out::println)
                 .conControles(new Controles(ventanas));
         int seg = a.contains("--segundos-por-paso") ? Integer.parseInt(a.get(a.indexOf("--segundos-por-paso") + 1)) : 25;
@@ -623,20 +629,10 @@ public final class App {
         };
     }
 
-    /**
-     * Llega él solo hasta una pantalla y la enseña: abre el programa si está cerrado, entra por el menú, y si hace
-     * falta pulsa algo más (el botón de crear de un listado, para llegar a la ficha en blanco).
-     */
-    private static void pantalla(List<String> a) throws IOException {
-        if (a.isEmpty() || !a.contains("--ruta")) {
-            throw new IllegalArgumentException("Uso: asistente pantalla <mapa.json> --ruta \"Bases de Datos > Clientes\" [--luego \"boton:Crear\"] [--a fichero.txt]");
-        }
-        es.amagna.asistente.guion.Mapa mapa = es.amagna.asistente.guion.Mapa.leer(Path.of(a.get(0)));
-        double espera = a.contains("--esperar") ? Double.parseDouble(a.get(a.indexOf("--esperar") + 1)) : 60;
-        VentanasNativas ventanas = new VentanasNativas(false);
-        Controles ctrl = new Controles(ventanas);
-
-        // 1. Que el programa esté vivo y responda. Si está cerrado, lo abre.
+    /** Que MN esté abierto, dentro de la empresa y el ejercicio de prueba, y sin diálogos de entrada. Si no, para. */
+    private static void dejarMnListo(es.amagna.asistente.guion.Mapa mapa, VentanasNativas ventanas, Controles ctrl, List<String> a)
+            throws IOException {
+        // Si el programa está cerrado, lo abre y entra.
         var sesion = new es.amagna.asistente.guion.Sesion(ctrl, ventanas, mapa, "", System.out::println).conEntradaDelMapa();
         boolean ejercicioAbierto = ventanas.handleDe(Controles.DIALOGO_EJERCICIO) != null;
         // La IA de guardia: solo entra si el guion se atasca con algo que no estaba previsto.
@@ -670,6 +666,22 @@ public final class App {
             System.out.println("Comprobado que estamos en «" + mapa.debeDecir() + "».");
         }
         System.out.println("Programa listo (" + estado.comoEsta() + ").");
+    }
+
+    /**
+     * Llega él solo hasta una pantalla y la enseña: abre el programa si está cerrado, entra por el menú, y si hace
+     * falta pulsa algo más (el botón de crear de un listado, para llegar a la ficha en blanco).
+     */
+    private static void pantalla(List<String> a) throws IOException {
+        if (a.isEmpty() || !a.contains("--ruta")) {
+            throw new IllegalArgumentException("Uso: asistente pantalla <mapa.json> --ruta \"Bases de Datos > Clientes\" [--luego \"boton:Crear\"] [--a fichero.txt]");
+        }
+        es.amagna.asistente.guion.Mapa mapa = es.amagna.asistente.guion.Mapa.leer(Path.of(a.get(0)));
+        double espera = a.contains("--esperar") ? Double.parseDouble(a.get(a.indexOf("--esperar") + 1)) : 60;
+        VentanasNativas ventanas = new VentanasNativas(false);
+        Controles ctrl = new Controles(ventanas);
+
+        dejarMnListo(mapa, ventanas, ctrl, a);
 
         // 2. Entrar por el menú.
         List<String> ruta = Arrays.asList(a.get(a.indexOf("--ruta") + 1).split("\\s*>\\s*"));
