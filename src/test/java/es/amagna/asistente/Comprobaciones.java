@@ -42,6 +42,7 @@ public final class Comprobaciones {
         estados();
         campoInterior();
         auditor();
+        anclas();
         alta();
         System.out.println("\nTODO BIEN: " + bien + " comprobaciones.");
     }
@@ -1328,6 +1329,78 @@ public final class Comprobaciones {
                 "controles: de dos campos con el mismo nombre se elige el de dentro (el exterior sale vacío)");
         ok(es.amagna.asistente.manos.Controles.indiceMasInterior(List.of(new int[] {1, 1, 10, 10}, new int[] {1, 1, 10, 10})) == 0,
                 "controles: a igual tamaño, el primero");
+    }
+
+    /** Una ventana de mentira: fondo gris con ruido fijo y un «botón» con letras dibujadas en (bx, by). */
+    static java.awt.image.BufferedImage ventanaFalsa(int ancho, int alto, int bx, int by, boolean dosBotones) {
+        var im = new java.awt.image.BufferedImage(ancho, alto, java.awt.image.BufferedImage.TYPE_INT_RGB);
+        java.util.Random r = new java.util.Random(7);
+        for (int y = 0; y < alto; y++) {
+            for (int x = 0; x < ancho; x++) {
+                int g = 200 + r.nextInt(6);
+                im.setRGB(x, y, g << 16 | g << 8 | g);
+            }
+        }
+        pintarBoton(im, bx, by);
+        if (dosBotones) {
+            pintarBoton(im, bx + 300, by + 100);
+        }
+        return im;
+    }
+
+    static void pintarBoton(java.awt.image.BufferedImage im, int bx, int by) {
+        var g = im.createGraphics();
+        g.setColor(new java.awt.Color(30, 60, 160));
+        g.fillRect(bx, by, 70, 26);
+        g.setColor(java.awt.Color.WHITE);
+        g.fillRect(bx + 8, by + 6, 10, 14);
+        g.fillRect(bx + 28, by + 10, 30, 4);
+        g.dispose();
+    }
+
+    static void anclas() {
+        var ventana = ventanaFalsa(800, 600, 200, 150, false);
+        int cx = 235;
+        int cy = 163;
+        var recorte = es.amagna.asistente.manos.Ancla.recortar(ventana, cx, cy);
+        int[] dentro = es.amagna.asistente.manos.Ancla.puntoEnRecorte(ventana, cx, cy);
+        var igual = es.amagna.asistente.manos.Ancla.buscar(ventana, recorte, cx - dentro[0], cy - dentro[1]);
+        ok(igual != null && igual.x() + dentro[0] == cx && igual.y() + dentro[1] == cy,
+                "anclas: el mismo dibujo en el mismo sitio se encuentra exacto");
+        var movida = ventanaFalsa(800, 600, 420, 330, false);
+        var h = es.amagna.asistente.manos.Ancla.buscar(movida, recorte, cx - dentro[0], cy - dentro[1]);
+        ok(h != null && h.x() + dentro[0] == cx + 220 && h.y() + dentro[1] == cy + 180,
+                "anclas: si el botón se ha movido (lejos de lo esperado) se encuentra donde está ahora");
+        var cerca = ventanaFalsa(800, 600, 215, 160, false);
+        var hc = es.amagna.asistente.manos.Ancla.buscar(cerca, recorte, cx - dentro[0], cy - dentro[1]);
+        ok(hc != null && hc.x() + dentro[0] == cx + 15 && hc.y() + dentro[1] == cy + 10,
+                "anclas: un desplazamiento pequeño también se sigue");
+        var doble = ventanaFalsa(800, 600, 200, 150, true);
+        ok(es.amagna.asistente.manos.Ancla.buscar(doble, recorte, cx - dentro[0], cy - dentro[1]) == null,
+                "anclas: dos botones iguales = ambiguo = no se fía (no adivina cuál)");
+        var sin = ventanaFalsa(800, 600, 600, 450, false);
+        var vacio = new java.awt.image.BufferedImage(800, 600, java.awt.image.BufferedImage.TYPE_INT_RGB);
+        ok(es.amagna.asistente.manos.Ancla.buscar(vacio, recorte, 0, 0) == null,
+                "anclas: si el botón ya no está no se inventa un sitio");
+        var liso = new java.awt.image.BufferedImage(60, 40, java.awt.image.BufferedImage.TYPE_INT_RGB);
+        ok(!es.amagna.asistente.manos.Ancla.hayContraste(liso) && es.amagna.asistente.manos.Ancla.buscar(ventana, liso, 0, 0) == null,
+                "anclas: un recorte liso (sin dibujo) no sirve de ancla");
+        try {
+            var dir = java.nio.file.Files.createTempDirectory("anclas");
+            var an = new es.amagna.asistente.manos.Anclas(dir);
+            an.aprender("Expediente #/#", 357, 132, recorte);
+            ok(an.leer("Expediente #/#", 357, 132) == null, "anclas: lo aprendido queda pendiente y todavía no vale");
+            ok(an.confirmar() == 1 && an.leer("Expediente #/#", 357, 132) != null,
+                    "anclas: al terminar bien la tarea, lo pendiente pasa a valer");
+            an.aprender("Otra", 1, 2, recorte);
+            an.descartar();
+            an.confirmar();
+            ok(an.leer("Otra", 1, 2) == null, "anclas: si la tarea falla, lo pendiente se olvida");
+            an.olvidar("Expediente #/#", 357, 132);
+            ok(an.leer("Expediente #/#", 357, 132) == null, "anclas: un ancla que ya no casa se puede olvidar para reaprenderla");
+        } catch (java.io.IOException e) {
+            ok(false, "anclas: " + e);
+        }
     }
 
     static void auditor() {

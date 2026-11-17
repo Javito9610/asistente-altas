@@ -621,7 +621,22 @@ public final class App {
             System.exit(0);
         }
         long t0 = System.currentTimeMillis();
+        // Los botones se reconocen por su dibujo (se aprende solo, y solo vale si la tarea acaba bien y verificada).
+        if (!a.contains("--sin-anclas")) {
+            es.amagna.asistente.manos.Anclas.activar(Path.of("anclas"));
+        }
         var r = ej.ejecutar(a.get(0), params);
+        var anclas = es.amagna.asistente.manos.Anclas.actual();
+        if (anclas != null) {
+            if (r.bien()) {
+                int nuevas = anclas.confirmar();
+                if (nuevas > 0) {
+                    System.out.println("  Anclas aprendidas: " + nuevas + " (carpeta anclas\\).");
+                }
+            } else {
+                anclas.descartar();
+            }
+        }
         if (r.bien()) {
             diario.hecha(clave, a.get(0), r.numero());
         }

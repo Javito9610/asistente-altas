@@ -326,7 +326,14 @@ public final class Receta {
                         return "no se ve la ventana «" + real + "»";
                     }
                     int[] o = manos.escala().aImagen(r[0], r[1]);
-                    in.put("coordinate", List.of((long) (o[0] + p.rel()[0]), (long) (o[1] + p.rel()[1])));
+                    int cx = o[0] + p.rel()[0];
+                    int cy = o[1] + p.rel()[1];
+                    int[] visto = porImagen(manos, h, r, p, cx, cy);
+                    if (visto != null) {
+                        cx = visto[0];
+                        cy = visto[1];
+                    }
+                    in.put("coordinate", List.of((long) cx, (long) cy));
                 }
             }
         }
@@ -342,6 +349,45 @@ public final class Receta {
             return null;
         } catch (RuntimeException e) {
             return e.getMessage();
+        }
+    }
+
+    /**
+     * El clic por su dibujo. Si hay un recorte aprendido de este sitio, se busca en la ventana tal como está ahora y
+     * se devuelve donde está (en coordenadas de la imagen del agente). Si no hay recorte, se aprende uno (queda
+     * pendiente hasta que la tarea termine bien). Si no se encuentra o algo no cuadra, null: se usa la posición
+     * de siempre, que es lo que se hacía antes. Nunca lanza.
+     */
+    private static int[] porImagen(Manos manos, com.sun.jna.Pointer h, int[] r, Paso p, int cx, int cy) {
+        es.amagna.asistente.manos.Anclas anclas = es.amagna.asistente.manos.Anclas.actual();
+        if (anclas == null) {
+            return null;
+        }
+        try {
+            var cap = es.amagna.asistente.manos.Captura.deVentana(h);
+            if (!cap.valido() || cap.enBlanco() || cap.ancho() != r[2] || cap.alto() != r[3]) {
+                return null; // el dibujo no corresponde al rectángulo (escala rara): no se fía
+            }
+            int[] esperado = manos.escala().aPantalla(cx, cy);
+            int ex = esperado[0] - r[0];
+            int ey = esperado[1] - r[1];
+            int rx = p.rel()[0];
+            int ry = p.rel()[1];
+            var recorte = anclas.leer(p.ventana(), rx, ry);
+            if (recorte == null) {
+                anclas.aprender(p.ventana(), rx, ry, es.amagna.asistente.manos.Ancla.recortar(cap.imagen(), ex, ey));
+                return null;
+            }
+            int[] dentro = es.amagna.asistente.manos.Ancla.puntoEnRecorte(cap.imagen(), ex, ey);
+            var hallazgo = es.amagna.asistente.manos.Ancla.buscar(cap.imagen(), recorte, ex - dentro[0], ey - dentro[1]);
+            if (hallazgo == null) {
+                return null;
+            }
+            int vx = hallazgo.x() + dentro[0];
+            int vy = hallazgo.y() + dentro[1];
+            return manos.escala().aImagen(r[0] + vx, r[1] + vy);
+        } catch (RuntimeException e) {
+            return null;
         }
     }
 }
