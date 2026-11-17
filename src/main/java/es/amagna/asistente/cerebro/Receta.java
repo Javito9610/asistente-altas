@@ -45,11 +45,27 @@ public final class Receta {
     }
 
     private final String nombre;
+    private final String tarea;
     private final List<Paso> pasos;
 
-    public Receta(String nombre, List<Paso> pasos) {
+    public Receta(String nombre, String tarea, List<Paso> pasos) {
         this.nombre = nombre;
+        this.tarea = tarea == null ? "" : tarea;
         this.pasos = pasos;
+    }
+
+    public Receta(String nombre, List<Paso> pasos) {
+        this(nombre, "", pasos);
+    }
+
+    /** Lo que había que hacer, con {parámetros}: es lo que se le cuenta a la IA cuando hay que rematar. */
+    public String tarea() {
+        return tarea;
+    }
+
+    /** Solo los n primeros pasos. */
+    public List<Paso> primeros(int n) {
+        return new ArrayList<>(pasos.subList(0, Math.max(0, Math.min(n, pasos.size()))));
     }
 
     public String nombre() {
@@ -113,6 +129,10 @@ public final class Receta {
 
         /** Guarda la receta. params: nombre → valor que tenía esta vez (se sustituye por {nombre} donde aparezca). */
         public Receta aReceta(String nombre, Map<String, String> params) {
+            return aReceta(nombre, "", params);
+        }
+
+        public Receta aReceta(String nombre, String tarea, Map<String, String> params) {
             List<Paso> fin = new ArrayList<>();
             List<Map.Entry<String, String>> orden = new ArrayList<>(params.entrySet());
             orden.sort((a, b) -> b.getValue().length() - a.getValue().length());
@@ -130,7 +150,13 @@ public final class Receta {
                 }
                 fin.add(new Paso(p.accion(), in, p.ventana(), p.rel()));
             }
-            return new Receta(nombre, fin);
+            String t = tarea == null ? "" : tarea;
+            for (var e : orden) {
+                if (!e.getValue().isBlank()) {
+                    t = t.replace(e.getValue(), "{" + e.getKey() + "}");
+                }
+            }
+            return new Receta(nombre, t, fin);
         }
     }
 
@@ -149,7 +175,7 @@ public final class Receta {
             }
             lista.add(m);
         }
-        Files.writeString(fichero, Json.escribir(Json.obj("nombre", nombre, "pasos", lista)), StandardCharsets.UTF_8);
+        Files.writeString(fichero, Json.escribir(Json.obj("nombre", nombre, "tarea", tarea, "pasos", lista)), StandardCharsets.UTF_8);
     }
 
     @SuppressWarnings("unchecked")
@@ -165,23 +191,29 @@ public final class Receta {
             pasos.add(new Paso((String) m.get("accion"), new LinkedHashMap<>((Map<String, Object>) m.get("in")),
                     (String) m.get("ventana"), rel));
         }
-        return new Receta(String.valueOf(raiz.getOrDefault("nombre", "receta")), pasos);
+        return new Receta(String.valueOf(raiz.getOrDefault("nombre", "receta")), String.valueOf(raiz.getOrDefault("tarea", "")), pasos);
     }
 
     // ---------- reproducir ----------
 
     /** El título real, ahora, de la ventana que se parece a la grabada (mismo título con otros números). */
     static String tituloReal(Ventanas ventanas, String normalizado) {
-        if (normalizado == null) {
+        if (normalizado == null || normalizado.isBlank()) {
             return null;
         }
+        String aproximado = null;
         Matcher m = TITULO.matcher(ventanas.abiertas());
         while (m.find()) {
-            if (norm(m.group(1)).equals(normalizado)) {
+            String n = norm(m.group(1));
+            if (n.equals(normalizado)) {
                 return m.group(1);
             }
+            // «MNprogram» a secas vale para «MNprogram - Abogados - Empresa de prueba…»: el título largo lo contiene.
+            if (aproximado == null && normalizado.length() >= 5 && n.contains(normalizado)) {
+                aproximado = m.group(1);
+            }
         }
-        return null;
+        return aproximado;
     }
 
     public static String sustituir(String s, Map<String, String> params) {

@@ -423,7 +423,20 @@ public final class App {
             String nombreReceta = a.get(a.indexOf("--grabar") + 1);
             if (r.terminado() && grabadora.cuantos() > 0) {
                 Path f = Path.of("recetas", nombreReceta + ".json");
-                grabadora.aReceta(nombreReceta, parametros(a)).guardar(f);
+                var recetaNueva = grabadora.aReceta(nombreReceta, tarea, parametros(a));
+                if (a.contains("--empalmar")) {
+                    // «nombre:N»: se queda con los N primeros pasos de la receta vieja y se le pega lo que acaba de hacer la IA.
+                    String[] e = a.get(a.indexOf("--empalmar") + 1).split(":");
+                    Path vieja = Path.of("recetas", e[0] + ".json");
+                    var v = es.amagna.asistente.cerebro.Receta.leer(vieja);
+                    var unidos = new java.util.ArrayList<>(v.primeros(Integer.parseInt(e[1])));
+                    unidos.addAll(recetaNueva.pasos());
+                    Files.copy(vieja, Path.of("recetas", e[0] + ".json.bak"), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    recetaNueva = new es.amagna.asistente.cerebro.Receta(e[0], v.tarea().isBlank() ? tarea : v.tarea(), unidos);
+                    nombreReceta = e[0];
+                    f = Path.of("recetas", e[0] + ".json");
+                }
+                recetaNueva.guardar(f);
                 registro.accept("RECETA «" + nombreReceta + "» grabada: " + grabadora.cuantos() + " pasos en " + f.toAbsolutePath()
                         + ". Para repetirla sin IA: asistente receta " + nombreReceta + " " + parametros(a).keySet().stream()
                         .map(k -> "--param " + k + "=...").collect(java.util.stream.Collectors.joining(" ")));
@@ -565,6 +578,24 @@ public final class App {
         var r = rec.reproducir(ag, parametros(a), seg, System.out::println);
         System.out.println((r.bien() ? "HECHO: " : "FALLÓ: ") + r.mensaje() + String.format(" (%d/%d pasos, %.0f s)", r.pasosHechos(), r.pasosTotal(),
                 (System.currentTimeMillis() - t0) / 1000.0));
+        if (!r.bien() && !a.contains("--sin-ia") && Clave.hay() && !rec.tarea().isBlank()) {
+            // El empujón: la receta se ha perdido (otra pantalla, otro sitio, algo nuevo). Entra la IA, mira dónde está
+            // y remata la tarea; lo que haga se pega a lo que la receta sí había hecho y la receta queda reparada.
+            String tarea = es.amagna.asistente.cerebro.Receta.sustituir(rec.tarea(), parametros(a))
+                    + "\n\nUNA RECETA GRABADA SE HA PERDIDO. Hizo " + r.pasosHechos() + " de " + r.pasosTotal() + " pasos y falló en: "
+                    + r.mensaje() + "\nLa pantalla puede estar en cualquier punto (otra ventana abierta, un aviso, MN en otra pantalla). "
+                    + "Mira primero con ventanas_abiertas dónde estás, deja la pantalla limpia si hace falta (Cancelar sin guardar lo que "
+                    + "sobre) y completa la tarea desde ahí hasta el final, sin repetir lo que ya esté hecho.";
+            System.out.println("La IA da el empujón…");
+            List<String> b = new java.util.ArrayList<>(List.of(tarea, "--como", "expedientes", "--sin-aviso",
+                    "--grabar", rec.nombre() + "-remate", "--empalmar", rec.nombre() + ":" + r.pasosHechos()));
+            for (var e : parametros(a).entrySet()) {
+                b.add("--param");
+                b.add(e.getKey() + "=" + e.getValue());
+            }
+            agente(b);
+            return;
+        }
         System.exit(r.bien() ? 0 : 1);
     }
 
