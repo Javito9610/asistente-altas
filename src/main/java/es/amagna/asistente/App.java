@@ -574,6 +574,9 @@ public final class App {
                     return "no se ha podido abrir MN: " + e.getMessage();
                 }
             }
+            if ("auditar".equals(paso.accion())) {
+                return auditarPantalla(paso, ps, ventanas, ctrl, a);
+            }
             // El cerrojo: nada se toca si MN no está en la empresa de prueba.
             if (!ventanas.abiertas().contains("Empresa de prueba")) {
                 return "PARADO: MN no está en «Empresa de prueba»; no se toca nada.";
@@ -609,10 +612,58 @@ public final class App {
             }
         };
         var ej = new es.amagna.asistente.estados.Ejecutor(mapa, observa, hace, rescate, null, System.out::println);
+        // El diario: una tarea con clave que ya se hizo NO se repite (dos expedientes iguales es el peor error posible).
+        String clave = a.contains("--clave") ? a.get(a.indexOf("--clave") + 1) : "";
+        var diario = new es.amagna.asistente.estados.Diario(Path.of("registro", "tareas-hechas.tsv"));
+        if (diario.yaHecha(clave) && !a.contains("--repetir")) {
+            System.out.println("YA HECHA: la tarea con clave «" + clave + "» está en el diario (registro\\tareas-hechas.tsv). No se repite. "
+                    + "Si de verdad hay que repetirla: --repetir.");
+            System.exit(0);
+        }
         long t0 = System.currentTimeMillis();
         var r = ej.ejecutar(a.get(0), params);
+        if (r.bien()) {
+            diario.hecha(clave, a.get(0), r.numero());
+        }
         System.out.println(r.mensaje() + String.format(" · %.0f s · %d empujones de la IA", (System.currentTimeMillis() - t0) / 1000.0, r.rescates()));
         System.exit(r.bien() ? 0 : 1);
+    }
+
+    /** El auditor mira la ventana con los ojos y la compara con lo esperado. null = bien; si no, el motivo. */
+    @SuppressWarnings("unchecked")
+    private static String auditarPantalla(es.amagna.asistente.cerebro.Receta.Paso paso, java.util.Map<String, String> ps,
+            VentanasNativas ventanas, Controles ctrl, List<String> a) {
+        if (a.contains("--sin-auditor")) {
+            System.out.println("  AUDITORÍA SALTADA (--sin-auditor): este paso queda sin segunda opinión.");
+            return null;
+        }
+        if (!Clave.hay()) {
+            System.out.println("  AUDITORÍA SALTADA: no hay clave de Claude. Este paso queda sin segunda opinión.");
+            return null;
+        }
+        var esperado = new java.util.LinkedHashMap<String, String>();
+        for (var e : ((java.util.Map<String, Object>) paso.in().get("esperado")).entrySet()) {
+            String v = es.amagna.asistente.cerebro.Receta.sustituir(String.valueOf(e.getValue()), ps);
+            if (v.matches("(?s).*\\{[a-z_]+}.*")) {
+                continue; // dato opcional que esta vez no se ha dado
+            }
+            esperado.put(e.getKey(), v);
+        }
+        String titulo = es.amagna.asistente.estados.Ejecutor.tituloReal(ventanas.abiertas(), String.valueOf(paso.in().get("ventana")));
+        if (titulo == null) {
+            return "el auditor no encuentra la ventana «" + paso.in().get("ventana") + "»";
+        }
+        var d = ctrl.dibujar(titulo);
+        if (d.imagen() == null || d.enBlanco()) {
+            return "el auditor no ha podido ver la ventana: " + d.problema();
+        }
+        String modelo = a.contains("--modelo-auditor") ? a.get(a.indexOf("--modelo-auditor") + 1)
+                : es.amagna.asistente.cerebro.Auditor.MODELO_POR_DEFECTO;
+        var v = es.amagna.asistente.cerebro.Auditor.auditar(new ClaudeApi(Clave.leer()), modelo,
+                d.pngQueCabe(es.amagna.asistente.manos.Escala.ANCHO_MAX, es.amagna.asistente.manos.Escala.ALTO_MAX), esperado,
+                "la ventana «" + titulo + "» del programa");
+        System.out.println("  " + v.resumen());
+        return v.ok() ? null : v.resumen();
     }
 
     /** Los «--param nombre=valor» de la línea de órdenes. */

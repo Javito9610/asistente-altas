@@ -118,6 +118,17 @@ public final class Ejecutor {
         return new Resultado(true, "HECHO: «" + tarea + "»" + (numero.isBlank() ? "" : " (expediente " + numero + ")"), numero, rescates);
     }
 
+    /** El título real (con sus números) de la ventana que se parece al título dado (el número no importa). */
+    public static String tituloReal(String abiertas, String titulo) {
+        String n = Receta.norm(titulo);
+        for (Reconocedor.Ventana w : Reconocedor.leer(abiertas)) {
+            if (Receta.norm(w.titulo()).equals(n)) {
+                return w.titulo();
+            }
+        }
+        return null;
+    }
+
     /** El estado, esperando a que un «Cargando…» se quite. */
     String estado() {
         String e = Reconocedor.estado(mapa, observa.ventanas(), observa::texto);

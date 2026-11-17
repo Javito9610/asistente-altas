@@ -41,6 +41,7 @@ public final class Comprobaciones {
         receta();
         estados();
         campoInterior();
+        auditor();
         alta();
         System.out.println("\nTODO BIEN: " + bien + " comprobaciones.");
     }
@@ -1312,6 +1313,45 @@ public final class Comprobaciones {
                 "controles: de dos campos con el mismo nombre se elige el de dentro (el exterior sale vacío)");
         ok(es.amagna.asistente.manos.Controles.indiceMasInterior(List.of(new int[] {1, 1, 10, 10}, new int[] {1, 1, 10, 10})) == 0,
                 "controles: a igual tamaño, el primero");
+    }
+
+    static void auditor() {
+        try {
+            auditor2();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    static void auditor2() throws Exception {
+        var esp = new java.util.LinkedHashMap<String, String>();
+        esp.put("Descripción Expediente", "MICRO");
+        esp.put("Etapa", "PEND. ENVIAR");
+        var A = es.amagna.asistente.cerebro.Auditor.class;
+        var bien = es.amagna.asistente.cerebro.Auditor.deJson(
+                "{\"ok\": true, \"vio\": {\"Descripción Expediente\": \"MICRO\", \"Etapa\": \"PEND. ENVIAR\"}, \"diferencias\": [], \"no_se_ve\": [], \"otros\": []}", esp);
+        ok(bien.ok(), "auditor: todo visto y coincide = OK");
+        var mal = es.amagna.asistente.cerebro.Auditor.deJson(
+                "{\"ok\": false, \"vio\": {\"Descripción Expediente\": \"MICR\", \"Etapa\": \"PEND. ENVIAR\"}, \"diferencias\": [\"Descripción Expediente: esperado «MICRO», se ve «MICR»\"], \"no_se_ve\": [], \"otros\": []}", esp);
+        ok(!mal.ok() && mal.resumen().contains("MICR"), "auditor: una letra distinta no es OK y dice cuál");
+        var mentira = es.amagna.asistente.cerebro.Auditor.deJson(
+                "{\"ok\": true, \"vio\": {\"Descripción Expediente\": \"MICRO\"}, \"diferencias\": [], \"no_se_ve\": [], \"otros\": []}", esp);
+        ok(!mentira.ok() && mentira.noSeVe().contains("Etapa"), "auditor: si dice «ok» pero no ha visto un campo esperado, NO vale");
+        ok(!es.amagna.asistente.cerebro.Auditor.deJson("no sé", esp).ok()
+                        && !es.amagna.asistente.cerebro.Auditor.deJson("{roto", esp).ok(),
+                "auditor: un veredicto ilegible no es OK");
+        var raro = es.amagna.asistente.cerebro.Auditor.deJson(
+                "{\"ok\": true, \"vio\": {\"Descripción Expediente\": \"MICRO\", \"Etapa\": \"PEND. ENVIAR\"}, \"diferencias\": [], \"no_se_ve\": [], \"otros\": [\"hay un aviso rojo encima\"]}", esp);
+        ok(!raro.ok(), "auditor: algo raro en la ventana (un aviso) tampoco es OK");
+        // diario
+        java.nio.file.Path d = java.nio.file.Files.createTempFile("diario", ".tsv");
+        java.nio.file.Files.delete(d);
+        var diario = new es.amagna.asistente.estados.Diario(d);
+        ok(!diario.yaHecha("73918462G|SOC|MICRO"), "diario: sin apuntar, no está hecha");
+        diario.hecha("73918462G|SOC|MICRO", "crear-expediente", "36/2026");
+        ok(diario.yaHecha("73918462G|SOC|MICRO") && !diario.yaHecha("73918462G|OTRA|MICRO") && !diario.yaHecha(""),
+                "diario: una tarea hecha no se repite; otra clave distinta sí; sin clave no hay protección");
+        java.nio.file.Files.deleteIfExists(d);
     }
 
     static void receta() {
