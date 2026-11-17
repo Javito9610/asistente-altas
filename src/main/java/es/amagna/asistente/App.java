@@ -523,7 +523,13 @@ public final class App {
                 + "- Tipo de Expediente: Expediente Extrajudicial · Estado: Abierto · Etapa: PEND. ENVIAR · Usuario: Lia Silva (si no hay campo, sigue sin él)\n"
                 + "- Cliente (busca por): " + cliente + "\n"
                 + (contrario.isBlank() ? "- Contrario: no hay, déjalo vacío.\n" : "- Contrario (busca por): " + contrario + "\n")
-                + "- Sin adjuntos en esta prueba.\n"
+                + (a.contains("--adjunto")
+                        ? "- Adjunto: pestaña «Adjuntos» > «Añadir Adjunto» (despliega un menú que solo se ve en captura) > «Importar» > en el diálogo de Windows «Abrir» "
+                        + "teclea la ruta completa " + a.get(a.indexOf("--adjunto") + 1) + " (compruébala con leer_campo) e Intro > en el diálogo «Documento» pulsa Aceptar. "
+                        + "Comprueba que aparece en la lista de adjuntos ANTES de Guardar. Si MN no deja adjuntar antes de guardar, dilo (PARADO) y no sigas.\n"
+                        + "- Contrario: pulsa el campo «Contrario» con el ratón; en la ventana «Contrarios» escribe el criterio en la caja, Intro "
+                        + "(si sale el aviso «Seleccione una ficha», Aceptar), clic en la fila y «Seleccionar». UIA lee el contrario en el campo interior, no en el exterior.\n"
+                        : "- Sin adjuntos en esta prueba.\n")
                 + "Comprueba todo con UIA antes de Guardar, guarda, y cierra la ventana del expediente."
                 + (a.contains("--explorar") ? """
 
