@@ -2,7 +2,7 @@
 cd /d C:\Proyectos\asistente-altas
 echo ===== %DATE% %TIME% ===== > grabar-contrario.log
 call asistente.cmd compilar >> grabar-contrario.log 2>&1
-call asistente.cmd expediente-prueba --cliente "LUCIA FERNANDEZ PRUEBA" --contrario "ALEJANDRO" --adjunto "C:\Proyectos\asistente-altas\pruebas\adjunto-prueba.txt" --descripcion MICRO --grabar contrario-adjunto --sin-aviso 1>> grabar-contrario.log 2>&1
+call asistente.cmd expediente-prueba --cliente "LUCIA FERNANDEZ PRUEBA" --contrario "33857008-L" --adjunto "C:\Proyectos\asistente-altas\pruebas\adjunto-prueba.txt" --descripcion MICRO --grabar contrario-adjunto --sin-aviso 1>> grabar-contrario.log 2>&1
 echo ===== FIN (codigo %ERRORLEVEL%) ===== >> grabar-contrario.log
 echo.
 echo ---------- RESUMEN ----------
