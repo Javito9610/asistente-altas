@@ -40,6 +40,7 @@ public final class Comprobaciones {
         plan();
         receta();
         estados();
+        campoInterior();
         alta();
         System.out.println("\nTODO BIEN: " + bien + " comprobaciones.");
     }
@@ -1283,6 +1284,15 @@ public final class Comprobaciones {
         var r3 = correrFalso(mapa, w3, true);
         ok(!r3.bien() && w3.rescates == 0 && w3.guardados == 0 && r3.mensaje().contains("NO se repite"),
                 "estados: si falla el Guardar no se repite la tarea (podría duplicar), se para y avisa");
+    }
+
+    static void campoInterior() {
+        // MN: «Descripción Expediente» sale dos veces, un campo exterior grande y vacío y, dentro, el cuadro de verdad.
+        List<int[]> r = List.of(new int[] {100, 200, 400, 30}, new int[] {104, 203, 380, 24});
+        ok(es.amagna.asistente.manos.Controles.indiceMasInterior(r) == 1,
+                "controles: de dos campos con el mismo nombre se elige el de dentro (el exterior sale vacío)");
+        ok(es.amagna.asistente.manos.Controles.indiceMasInterior(List.of(new int[] {1, 1, 10, 10}, new int[] {1, 1, 10, 10})) == 0,
+                "controles: a igual tamaño, el primero");
     }
 
     static void receta() {

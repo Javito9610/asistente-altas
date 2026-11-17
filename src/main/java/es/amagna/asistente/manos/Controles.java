@@ -734,18 +734,44 @@ public final class Controles {
     }
 
     /** El control que está pegado a una etiqueta: a su derecha en la misma línea, o justo debajo. Como en los formularios. */
+    /** De varios controles con el mismo nombre, el más interior: el de menor área (a igual área, el primero). */
+    static Candidato masInterior(List<Candidato> iguales) {
+        if (iguales.isEmpty()) {
+            return null;
+        }
+        return iguales.get(indiceMasInterior(iguales.stream().map(Candidato::recuadro).toList()));
+    }
+
+    /** El índice del recuadro de menor área ({x, y, ancho, alto}); a igual área, el primero. */
+    public static int indiceMasInterior(List<int[]> recuadros) {
+        int mejor = 0;
+        for (int i = 1; i < recuadros.size(); i++) {
+            if ((long) recuadros.get(i)[2] * recuadros.get(i)[3] < (long) recuadros.get(mejor)[2] * recuadros.get(mejor)[3]) {
+                mejor = i;
+            }
+        }
+        return mejor;
+    }
+
     private Encontrado porAnclaje(List<Candidato> todos, String tipo, String anclaje, String apodo) {
         String buscado = llano(anclaje);
         List<String> tiposBuenos = tipo != null ? List.of(tipo) : List.of("campo", "desplegable", "casilla", "lista");
 
         // Antes de buscar la etiqueta: si hay un control DEL TIPO QUE SE PIDE que ya se llama así, ese es. Los
         // programas modernos le ponen el nombre al propio cuadro, no solo a la etiqueta de al lado.
+        // MN repite el nombre: un campo exterior y, dentro, el cuadro de verdad (el exterior sale vacío y no deja
+        // escribir). Entre los que se llaman igual se elige el más interior (el de menos área): es el que tiene el valor.
+        List<Candidato> igualesDeNombre = new ArrayList<>();
         for (Candidato c : todos) {
             if (tiposBuenos.contains(c.tipo()) && llano(c.nombre()).equals(buscado)
                     && c.recuadro() != null && c.recuadro()[2] > 0) {
-                guardado = c.e();
-                return new Encontrado(guardado, c.comoSeLlama() + " (se llama así él mismo)");
+                igualesDeNombre.add(c);
             }
+        }
+        Candidato interior = masInterior(igualesDeNombre);
+        if (interior != null) {
+            guardado = interior.e();
+            return new Encontrado(guardado, interior.comoSeLlama() + " (se llama así él mismo)");
         }
 
         // La etiqueta puede ser de cualquier tipo MENOS un cuadro de los que buscamos (si no, se tomaría por etiqueta
