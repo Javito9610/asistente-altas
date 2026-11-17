@@ -37,6 +37,7 @@ public final class Comprobaciones {
         zips();
         lectura();
         percepcion();
+        plan();
         alta();
         System.out.println("\nTODO BIEN: " + bien + " comprobaciones.");
     }
@@ -1148,6 +1149,48 @@ public final class Comprobaciones {
      * Leer los papeles: que se le enseñen los documentos como lo que son, que se entienda lo que contesta y, sobre
      * todo, que un alta con dudas o sin NIF NO siga.
      */
+
+    static void plan() {
+        ok(es.amagna.asistente.altas.Plan.refPropia("ANDREA EXPEDIENTES 31 AGOSTO.zip").equals("(AND)")
+                        && es.amagna.asistente.altas.Plan.refPropia("AINHOA_GRANDE_31_5SEPT.zip").equals("(AIN)")
+                        && es.amagna.asistente.altas.Plan.refPropia("DAVID CHAMORRO-Semana 31.zip").equals("(CHA)")
+                        && es.amagna.asistente.altas.Plan.refPropia("otro.zip").isEmpty(),
+                "Ref. Propia sale de quién manda el bloque");
+        ok(es.amagna.asistente.altas.Plan.descripcionValida(" revolving (t)  + diligencias ").equals("REVOLVING (T) + DILIGENCIAS")
+                        && es.amagna.asistente.altas.Plan.descripcionValida("LINEA").isEmpty()
+                        && es.amagna.asistente.altas.Plan.descripcionValida(null).isEmpty(),
+                "solo valen las cuatro descripciones; «LINEA» no se inventa");
+        Map<String, Object> cli = new java.util.LinkedHashMap<>();
+        cli.put("nombre", "ANA");
+        List<Object> fich = new java.util.ArrayList<>(List.of(
+                Json.obj("ruta", "c/dni.pdf", "que_es", "identidad"),
+                Json.obj("ruta", "c/notas.txt", "que_es", "notas"),
+                Json.obj("ruta", "c/just.jpg", "que_es", "justificante"),
+                Json.obj("ruta", "c/hoja.pdf", "que_es", "hoja_encargo"),
+                Json.obj("ruta", "c/A/c1.pdf", "que_es", "contrato")));
+        List<Object> exps = new java.util.ArrayList<>(List.of(
+                Json.obj("entidad", "ARENA FINANCE SPAIN, S.L.", "marca", "Smartcrédito", "descripcion", "MICRO",
+                        "documentos", List.of("c/A/c1.pdf")),
+                Json.obj("entidad", "Arena Finance Spain S.L.", "descripcion", "MICRO", "documentos", List.of("c/A/c2.pdf")),
+                Json.obj("entidad", "CAIXABANK PAYMENTS", "descripcion", "REVOLVING (T)", "documentos", List.of("c/B/t1.pdf")),
+                Json.obj("entidad", "CAIXABANK PAYMENTS", "descripcion", "REVOLVING (T)", "documentos", List.of("c/B/t2.pdf")),
+                Json.obj("entidad", "DINEO", "descripcion", "LINEA", "documentos", List.of("c/D/d.pdf"))));
+        var p = es.amagna.asistente.altas.Plan.de(new es.amagna.asistente.altas.Lectura.Resultado(cli, exps, fich,
+                new java.util.ArrayList<>(), ""), "ANDREA 7-14.zip");
+        ok(p.expedientes().size() == 4, "dos marcas de la misma sociedad = un expediente; dos tarjetas revolving = dos");
+        var arena = p.expedientes().get(0);
+        ok(arena.contratos().equals(List.of("c/A/c1.pdf", "c/A/c2.pdf")) && arena.marca().equals("Smartcrédito")
+                        && arena.refPropia().equals("(AND)"),
+                "los dos contratos de la sociedad van en el mismo expediente, con su Ref. Propia");
+        ok(arena.adjuntos().containsAll(List.of("c/dni.pdf", "c/notas.txt", "c/hoja.pdf", "c/A/c1.pdf", "c/A/c2.pdf"))
+                        && !arena.adjuntos().contains("c/just.jpg"),
+                "al expediente: contratos, DNI, notas y autorización; el justificante solo a la ficha");
+        ok(p.adjuntosFicha().equals(List.of("c/dni.pdf", "c/notas.txt", "c/just.jpg", "c/hoja.pdf")),
+                "a la ficha: identidad, notas, justificante y hoja de encargo");
+        ok(p.expedientes().get(3).descripcion().isEmpty() && !p.expedientes().get(3).avisos().isEmpty(),
+                "una descripción inventada se queda vacía y avisa");
+    }
+
     static void lectura() {
         ok(Lectura.comoSeManda("pdf").equals("application/pdf")
                         && Lectura.comoSeManda("jpg").equals("image/jpeg")
