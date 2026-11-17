@@ -1177,6 +1177,8 @@ public final class Comprobaciones {
         String falla; // acción que falla una vez
         boolean fallaGuardar;
         boolean auditaMal;
+        String fallaSiempre;
+        String cliente = "1";
 
         MundoFalso(String e) {
             estado = e;
@@ -1198,6 +1200,9 @@ public final class Comprobaciones {
             if (w.falla != null && w.falla.equals(p.accion())) {
                 w.falla = null;
                 return "no ha reaccionado";
+            }
+            if (w.fallaSiempre != null && w.fallaSiempre.equals(p.accion())) {
+                return "no ha reaccionado nunca";
             }
             if (w.auditaMal && p.accion().equals("auditar")) {
                 return "AUDITORÍA NO OK (no coincide: Cliente)";
@@ -1247,7 +1252,7 @@ public final class Comprobaciones {
             }
         };
         return new es.amagna.asistente.estados.Ejecutor(mapa, observa, hace, rescate, reloj, x -> { })
-                .ejecutar("crear-expediente", java.util.Map.of("descripcion", "MICRO", "cliente", "1"));
+                .ejecutar("crear-expediente", java.util.Map.of("descripcion", "MICRO", "cliente", w.cliente));
     }
 
     static void estados() {
@@ -1295,6 +1300,16 @@ public final class Comprobaciones {
         var wc = new MundoFalso("atencion-otra");
         var rc = correrFalso(mapa, wc, true);
         ok(rc.bien() && wc.rescates == 1 && wc.guardados == 1, "estados: ese aviso desconocido lo resuelve la IA y la tarea sigue");
+        var wm = new MundoFalso("lista");
+        wm.cliente = "LucÃ\u00ada";
+        var rm = correrFalso(mapa, wm, true);
+        ok(!rm.bien() && wm.guardados == 0 && wm.rescates == 0 && rm.mensaje().contains("codificación rota"),
+                "estados: un parámetro con la codificación rota (LucÃ­a) se rechaza antes de tocar nada");
+        var wf = new MundoFalso("lista");
+        wf.fallaSiempre = "double_click";
+        var rf = correrFalso(mapa, wf, true);
+        ok(!rf.bien() && wf.rescates == 1 && wf.guardados == 0,
+                "estados: si falla igual después de que la IA limpie, no se la llama otra vez (es el dato o el mapa)");
         String conDialogo = "- «Expediente 37/2026» (GestorConsultas) — diálogos abiertos dentro: «Atención»  [BLOQUEADA: tiene un diálogo encima]\n"
                 + "- «Expedientes» (GestorConsultas) [BLOQUEADA: tiene un diálogo encima]\n"
                 + "- «MNprogram - Abogados - Empresa de prueba» (MNprogram)\n";

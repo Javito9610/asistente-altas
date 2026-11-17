@@ -96,6 +96,13 @@ public final class Ejecutor {
         if (ordenes == null) {
             return new Resultado(false, "No hay ninguna tarea «" + tarea + "». Las que hay: " + String.join(", ", mapa.tareas().keySet()), "", 0);
         }
+        for (var e : params.entrySet()) {
+            if (e.getValue() != null && e.getValue().matches("(?s).*(Ã.|Â.|\\uFFFD|\\?\\?).*")) {
+                return new Resultado(false, "PARADO: el parámetro «" + e.getKey() + "» llega con la codificación rota («" + e.getValue()
+                        + "»): el .cmd se guardó en otra codificación. Usa solo letras sin tilde en los .cmd. No se ha tocado nada.", "", 0);
+            }
+        }
+        String ultimoFallo = null;
         while (true) {
             try {
                 for (Mapa.Orden o : ordenes) {
@@ -124,6 +131,12 @@ public final class Ejecutor {
                 if (rescate == null || rescates >= MAX_RESCATES) {
                     return new Resultado(false, "PARADO: " + f.getMessage(), numero, rescates);
                 }
+                if (f.getMessage().equals(ultimoFallo)) {
+                    // Falló igual después de que la IA dejara la pantalla limpia: no es un atasco puntual, es el dato o el mapa.
+                    return new Resultado(false, "PARADO: " + f.getMessage() + " Falla igual tras limpiar la pantalla: revisa los datos "
+                            + "(parámetros) o el mapa; repetir no lo arregla.", numero, rescates);
+                }
+                ultimoFallo = f.getMessage();
                 rescates++;
                 registro.accept("  La IA da el empujón (" + rescates + " de " + MAX_RESCATES + ")…");
                 rescate.intentar(tarea, f.getMessage() + " Estado actual: " + estado() + ". Ventanas:\n" + observa.ventanas());
