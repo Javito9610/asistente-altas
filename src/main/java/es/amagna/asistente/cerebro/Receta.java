@@ -1,0 +1,281 @@
+package es.amagna.asistente.cerebro;
+
+import es.amagna.asistente.Json;
+import es.amagna.asistente.manos.Manos;
+import es.amagna.asistente.manos.Ventanas;
+import es.amagna.asistente.manos.Win32;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Una receta: lo que el agente hizo la primera vez, guardado para que la próxima la reproduzca el asistente SIN IA.
+ *
+ * - Solo se graban las acciones que cambian cosas (clics, teclas, texto, UIA que pulsa o escribe); las capturas y
+ *   las lecturas no.
+ * - Los clics van **relativos a la ventana en la que se hicieron** (y con su título, con los números cambiados por #),
+ *   no a la pantalla: la receta sigue valiendo aunque la ventana salga en otro sitio.
+ * - Los datos variables (cliente, descripción…) se guardan como {parámetros}.
+ * - Al reproducir, cada paso tiene su tiempo máximo. Si un paso falla, se para y se dice cuál: ahí entra la IA.
+ */
+public final class Receta {
+    /** Lo que se graba. Lo demás (capturas, lecturas) no cambia nada y no hace falta repetirlo. */
+    static final Set<String> SE_GRABA = Set.of("left_click", "double_click", "right_click", "triple_click", "type", "key",
+            "scroll", "wait", "pulsar_control", "escribir_en", "esperar_a", "activar_ventana", "cerrar_ventana");
+    static final Set<String> CON_CLIC = Set.of("left_click", "double_click", "right_click", "triple_click");
+    private static final Pattern TITULO = Pattern.compile("«([^»]+)»");
+
+    public record Paso(String accion, Map<String, Object> in, String ventana, int[] rel) {
+    }
+
+    public record Resultado(boolean bien, int pasosHechos, int pasosTotal, String mensaje) {
+    }
+
+    private final String nombre;
+    private final List<Paso> pasos;
+
+    public Receta(String nombre, List<Paso> pasos) {
+        this.nombre = nombre;
+        this.pasos = pasos;
+    }
+
+    public String nombre() {
+        return nombre;
+    }
+
+    public List<Paso> pasos() {
+        return pasos;
+    }
+
+    /** Los números de un título pasan a «#»: «Expediente 34/2026» y «Expediente 35/2026» son la misma ventana. */
+    public static String norm(String titulo) {
+        return titulo == null ? "" : titulo.replaceAll("\\d+", "#").strip();
+    }
+
+    // ---------- grabar ----------
+
+    /** Acompaña al agente y va apuntando. */
+    public static final class Grabadora {
+        private final List<Paso> pasos = new ArrayList<>();
+
+        /** ANTES de ejecutar (después la ventana puede haber cambiado). Devuelve null si esa acción no se graba. */
+        @SuppressWarnings("unchecked")
+        public Paso preparar(String accion, Map<String, Object> in, Manos manos) {
+            if (!SE_GRABA.contains(accion)) {
+                return null;
+            }
+            Map<String, Object> copia = new LinkedHashMap<>(in);
+            String ventana = null;
+            int[] rel = null;
+            if (CON_CLIC.contains(accion) || "scroll".equals(accion)) {
+                try {
+                    var h = Win32.User32.I.GetForegroundWindow();
+                    int[] r = h == null ? null : Win32.rectangulo(h);
+                    if (r != null && in.get("coordinate") instanceof List<?> c) {
+                        int[] o = manos.escala().aImagen(r[0], r[1]);
+                        ventana = norm(Win32.titulo(h));
+                        rel = new int[] {(int) Math.round(((Number) c.get(0)).doubleValue()) - o[0],
+                                (int) Math.round(((Number) c.get(1)).doubleValue()) - o[1]};
+                    }
+                } catch (RuntimeException ignorada) {
+                    // sin ventana, se graba con coordenadas de pantalla
+                }
+            } else if (in.get("ventana") != null) {
+                ventana = norm(String.valueOf(in.get("ventana")));
+            } else if (in.get("titulo") != null) {
+                ventana = norm(String.valueOf(in.get("titulo")));
+            }
+            return new Paso(accion, copia, ventana, rel);
+        }
+
+        public void anadir(Paso p) {
+            if (p != null) {
+                pasos.add(p);
+            }
+        }
+
+        public int cuantos() {
+            return pasos.size();
+        }
+
+        /** Guarda la receta. params: nombre → valor que tenía esta vez (se sustituye por {nombre} donde aparezca). */
+        public Receta aReceta(String nombre, Map<String, String> params) {
+            List<Paso> fin = new ArrayList<>();
+            List<Map.Entry<String, String>> orden = new ArrayList<>(params.entrySet());
+            orden.sort((a, b) -> b.getValue().length() - a.getValue().length());
+            for (Paso p : pasos) {
+                Map<String, Object> in = new LinkedHashMap<>(p.in());
+                for (String campo : List.of("text", "texto")) {
+                    if (in.get(campo) instanceof String s) {
+                        for (var e : orden) {
+                            if (!e.getValue().isBlank()) {
+                                s = s.replace(e.getValue(), "{" + e.getKey() + "}");
+                            }
+                        }
+                        in.put(campo, s);
+                    }
+                }
+                fin.add(new Paso(p.accion(), in, p.ventana(), p.rel()));
+            }
+            return new Receta(nombre, fin);
+        }
+    }
+
+    public void guardar(Path fichero) throws IOException {
+        Files.createDirectories(fichero.toAbsolutePath().getParent());
+        List<Object> lista = new ArrayList<>();
+        for (Paso p : pasos) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("accion", p.accion());
+            m.put("in", p.in());
+            if (p.ventana() != null) {
+                m.put("ventana", p.ventana());
+            }
+            if (p.rel() != null) {
+                m.put("rel", List.of((long) p.rel()[0], (long) p.rel()[1]));
+            }
+            lista.add(m);
+        }
+        Files.writeString(fichero, Json.escribir(Json.obj("nombre", nombre, "pasos", lista)), StandardCharsets.UTF_8);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static Receta leer(Path fichero) throws IOException {
+        Map<String, Object> raiz = Json.objeto(Files.readString(fichero, StandardCharsets.UTF_8));
+        List<Paso> pasos = new ArrayList<>();
+        for (Object o : (List<Object>) raiz.getOrDefault("pasos", List.of())) {
+            Map<String, Object> m = (Map<String, Object>) o;
+            int[] rel = null;
+            if (m.get("rel") instanceof List<?> l) {
+                rel = new int[] {((Number) l.get(0)).intValue(), ((Number) l.get(1)).intValue()};
+            }
+            pasos.add(new Paso((String) m.get("accion"), new LinkedHashMap<>((Map<String, Object>) m.get("in")),
+                    (String) m.get("ventana"), rel));
+        }
+        return new Receta(String.valueOf(raiz.getOrDefault("nombre", "receta")), pasos);
+    }
+
+    // ---------- reproducir ----------
+
+    /** El título real, ahora, de la ventana que se parece a la grabada (mismo título con otros números). */
+    static String tituloReal(Ventanas ventanas, String normalizado) {
+        if (normalizado == null) {
+            return null;
+        }
+        Matcher m = TITULO.matcher(ventanas.abiertas());
+        while (m.find()) {
+            if (norm(m.group(1)).equals(normalizado)) {
+                return m.group(1);
+            }
+        }
+        return null;
+    }
+
+    public static String sustituir(String s, Map<String, String> params) {
+        for (var e : params.entrySet()) {
+            s = s.replace("{" + e.getKey() + "}", e.getValue());
+        }
+        return s;
+    }
+
+    /** Reproduce la receta con el agente como «manos». Cada paso, con su tiempo máximo; si falla uno, se para ahí. */
+    public Resultado reproducir(Agente ag, Map<String, String> params, int segundosPorPaso, Consumer<String> registro) {
+        ExecutorService pool = Executors.newSingleThreadExecutor(r -> {
+            Thread t = new Thread(r, "receta");
+            t.setDaemon(true);
+            return t;
+        });
+        try {
+            for (int i = 0; i < pasos.size(); i++) {
+                Paso p = pasos.get(i);
+                final int n = i + 1;
+                Map<String, Object> in = new LinkedHashMap<>(p.in());
+                for (String campo : List.of("text", "texto")) {
+                    if (in.get(campo) instanceof String s) {
+                        String r = sustituir(s, params);
+                        if (r.contains("{") && r.matches("(?s).*\\{[a-z_]+}.*")) {
+                            return new Resultado(false, i, pasos.size(), "Falta un parámetro en el paso " + n + ": " + r);
+                        }
+                        in.put(campo, r);
+                    }
+                }
+                registro.accept("  receta " + n + "/" + pasos.size() + " · " + p.accion());
+                Future<String> f = pool.submit(() -> hacer(ag, p, in));
+                try {
+                    String fallo = f.get(segundosPorPaso, TimeUnit.SECONDS);
+                    if (fallo != null) {
+                        return new Resultado(false, i, pasos.size(), "Paso " + n + " (" + p.accion() + "): " + fallo);
+                    }
+                } catch (java.util.concurrent.TimeoutException e) {
+                    f.cancel(true);
+                    return new Resultado(false, i, pasos.size(), "Paso " + n + " (" + p.accion() + "): tardó más de " + segundosPorPaso + " s");
+                } catch (java.util.concurrent.ExecutionException e) {
+                    return new Resultado(false, i, pasos.size(), "Paso " + n + " (" + p.accion() + "): " + e.getCause().getMessage());
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return new Resultado(false, i, pasos.size(), "interrumpida");
+                }
+            }
+            return new Resultado(true, pasos.size(), pasos.size(), "Receta «" + nombre + "» reproducida entera.");
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    /** Devuelve null si ha ido bien, o por qué no. */
+    private String hacer(Agente ag, Paso p, Map<String, Object> in) {
+        Ventanas v = ag.ventanas();
+        Manos manos = ag.manos();
+        if (p.ventana() != null && v != null) {
+            String real = tituloReal(v, p.ventana());
+            if (real == null && !"cerrar_ventana".equals(p.accion()) && !"esperar_a".equals(p.accion())) {
+                return "no está la ventana «" + p.ventana() + "»";
+            }
+            if (real != null) {
+                if (in.containsKey("ventana")) {
+                    in.put("ventana", real);
+                }
+                if (in.containsKey("titulo")) {
+                    in.put("titulo", real);
+                }
+                if (p.rel() != null) {
+                    v.activar(real);
+                    var h = ((es.amagna.asistente.manos.VentanasNativas) v).handleDe(real);
+                    int[] r = h == null ? null : Win32.rectangulo(h);
+                    if (r == null) {
+                        return "no se ve la ventana «" + real + "»";
+                    }
+                    int[] o = manos.escala().aImagen(r[0], r[1]);
+                    in.put("coordinate", List.of((long) (o[0] + p.rel()[0]), (long) (o[1] + p.rel()[1])));
+                }
+            }
+        }
+        try {
+            if (Agente.ES_DE_ORDENADOR.contains(p.accion())) {
+                ag.ejecutarAccion(p.accion(), in);
+            } else {
+                String texto = String.valueOf(ag.ejecutarPropia(p.accion(), in).get(0));
+                if (texto.toLowerCase(java.util.Locale.ROOT).contains("no se ha podido") || texto.startsWith("ERROR")
+                        || texto.toLowerCase(java.util.Locale.ROOT).contains("no está")) {
+                    return texto;
+                }
+            }
+            return null;
+        } catch (RuntimeException e) {
+            return e.getMessage();
+        }
+    }
+}

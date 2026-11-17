@@ -37,6 +37,31 @@ import java.util.function.Consumer;
  */
 public final class Agente {
     public static final String HERRAMIENTA = "computer_toolset_20260801";
+    /** Las acciones de la herramienta de ordenador (el resto son las herramientas propias). */
+    static final java.util.Set<String> ES_DE_ORDENADOR = java.util.Set.of("screenshot", "zoom", "left_click", "right_click",
+            "middle_click", "double_click", "triple_click", "left_click_drag", "mouse_move", "left_mouse_down", "left_mouse_up",
+            "cursor_position", "scroll", "type", "key", "hold_key", "wait");
+    private Receta.Grabadora grabadora;
+
+    public Agente grabando(Receta.Grabadora g) {
+        this.grabadora = g;
+        return this;
+    }
+
+    /** Una herramienta propia puede contestar «no se ha podido…» sin lanzar error: eso no se graba como paso bueno. */
+    public static boolean pareceFallo(String t) {
+        String m = t == null ? "" : t.toLowerCase(java.util.Locale.ROOT);
+        return m.startsWith("error") || m.contains("no se ha podido") || m.contains("no se ha encontrado")
+                || m.contains("no está") || m.contains("no permitido") || m.contains("no se deja");
+    }
+
+    Manos manos() {
+        return manos;
+    }
+
+    Ventanas ventanas() {
+        return ventanas;
+    }
     /** Se recortan las capturas viejas por tandas: al pasar de MAX se dejan las últimas MIN. Así el principio de la
      *  conversación cambia pocas veces (la caché aguanta y el pensamiento de Claude sigue siendo válido). */
     private static final int CAPTURAS_MAX = 6;
@@ -315,7 +340,11 @@ public final class Agente {
                         continue;
                     }
                     try {
+                        Receta.Paso paraGrabar = grabadora == null ? null : grabadora.preparar(accion, in, manos);
                         List<Object> salida = ordenador ? ejecutarAccion(accion, in) : ejecutarPropia(accion, in);
+                        if (grabadora != null && !pareceFallo(texto(salida))) {
+                            grabadora.anadir(paraGrabar);
+                        }
                         final int nPaso = paso;
                         final List<Object> vista = salida;
                         anotar(x -> {

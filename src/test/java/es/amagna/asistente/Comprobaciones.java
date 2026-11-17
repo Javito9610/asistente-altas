@@ -38,6 +38,7 @@ public final class Comprobaciones {
         lectura();
         percepcion();
         plan();
+        receta();
         alta();
         System.out.println("\nTODO BIEN: " + bien + " comprobaciones.");
     }
@@ -1149,6 +1150,44 @@ public final class Comprobaciones {
      * Leer los papeles: que se le enseñen los documentos como lo que son, que se entienda lo que contesta y, sobre
      * todo, que un alta con dudas o sin NIF NO siga.
      */
+
+    static void receta() {
+        try {
+            receta2();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    static void receta2() throws Exception {
+        var R = es.amagna.asistente.cerebro.Receta.class;
+        ok(es.amagna.asistente.cerebro.Receta.norm("Expediente 34/2026").equals(es.amagna.asistente.cerebro.Receta.norm("Expediente 35/2026"))
+                        && !es.amagna.asistente.cerebro.Receta.norm("Clientes").equals(es.amagna.asistente.cerebro.Receta.norm("Contrarios")),
+                "receta: «Expediente 34/2026» y «35/2026» son la misma ventana; Clientes y Contrarios no");
+        var g = new es.amagna.asistente.cerebro.Receta.Grabadora();
+        g.anadir(g.preparar("type", Json.obj("text", "Lucía\n"), null));
+        g.anadir(g.preparar("screenshot", Json.obj(), null));
+        g.anadir(g.preparar("pulsar_control", Json.obj("ventana", "Expediente 34/2026", "control", "boton:Guardar"), null));
+        g.anadir(g.preparar("escribir_en", Json.obj("ventana", "Expediente 34/2026", "control", "campo junto a Descripción", "texto", "MICRO"), null));
+        ok(g.cuantos() == 3, "receta: la captura no se graba, lo que cambia cosas sí (3 de 4)");
+        var rec = g.aReceta("prueba", new java.util.LinkedHashMap<>(java.util.Map.of("cliente", "Lucía", "descripcion", "MICRO")));
+        ok(rec.pasos().get(0).in().get("text").equals("{cliente}\n") && rec.pasos().get(2).in().get("texto").equals("{descripcion}"),
+                "receta: los datos variables se guardan como {parámetros}");
+        ok("Expediente #/#".equals(rec.pasos().get(1).ventana()), "receta: la ventana se guarda sin números");
+        java.nio.file.Path f = java.nio.file.Files.createTempFile("receta", ".json");
+        rec.guardar(f);
+        var otra = es.amagna.asistente.cerebro.Receta.leer(f);
+        java.nio.file.Files.deleteIfExists(f);
+        ok(otra.pasos().size() == 3 && otra.pasos().get(0).accion().equals("type")
+                        && otra.pasos().get(1).ventana().equals("Expediente #/#")
+                        && otra.pasos().get(2).in().get("texto").equals("{descripcion}"),
+                "receta: se guarda y se lee igual");
+        ok(es.amagna.asistente.cerebro.Receta.sustituir("{cliente} y {ref}", java.util.Map.of("cliente", "ANA", "ref", "X (AND)")).equals("ANA y X (AND)"),
+                "receta: se rellenan los parámetros al reproducir");
+        ok(es.amagna.asistente.cerebro.Agente.pareceFallo("No se ha podido pulsar") && es.amagna.asistente.cerebro.Agente.pareceFallo("Error: x")
+                        && !es.amagna.asistente.cerebro.Agente.pareceFallo("Pulsado boton «Guardar»."),
+                "receta: una respuesta «no se ha podido…» no se graba como paso bueno");
+    }
 
     static void plan() {
         ok(es.amagna.asistente.altas.Plan.refPropia("ANDREA EXPEDIENTES 31 AGOSTO.zip").equals("(AND)")

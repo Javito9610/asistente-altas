@@ -102,6 +102,7 @@ public final class App {
                 case "controles" -> controles(Arrays.asList(args).subList(1, args.length));
                 case "probar-windows" -> PruebasWindows.main(new String[0]);
                 case "expediente-prueba" -> expedientePrueba(Arrays.asList(args).subList(1, args.length));
+                case "receta" -> receta(Arrays.asList(args).subList(1, args.length));
                 case "agente" -> agente(Arrays.asList(args).subList(1, args.length));
                 case "guion" -> guion(Arrays.asList(args).subList(1, args.length));
                 case "aprender" -> aprender(Arrays.asList(args).subList(1, args.length));
@@ -399,9 +400,11 @@ public final class App {
                 + "   · modelo " + modelo + " · tope " + pasos + " pasos y " + tope + " tokens");
         long t0 = System.currentTimeMillis();
         VentanasNativas ventanas = new VentanasNativas(vista);
+        var grabadora = a.contains("--grabar") ? new es.amagna.asistente.cerebro.Receta.Grabadora() : null;
         Agente ag = new Agente(new ClaudeApi(Clave.leer()), new ManosRobot(vista), ventanas, modelo, quienes, pasos, tope, registro)
                 .conControles(new Controles(ventanas))
-                .conExpediente(!a.contains("--sin-expediente"));
+                .conExpediente(!a.contains("--sin-expediente"))
+                .grabando(grabadora);
         if (esp != null && !esp.puede().isEmpty()) {
             ag.soloPuede(esp.puede());
         }
@@ -413,6 +416,18 @@ public final class App {
         for (String linea : r.mensaje().split("\\R")) {
             if (linea.strip().startsWith("APRENDIDO:")) {
                 nuevo.append("- ").append(linea.strip().substring("APRENDIDO:".length()).strip()).append('\n');
+            }
+        }
+        if (grabadora != null) {
+            String nombreReceta = a.get(a.indexOf("--grabar") + 1);
+            if (r.terminado() && grabadora.cuantos() > 0) {
+                Path f = Path.of("recetas", nombreReceta + ".json");
+                grabadora.aReceta(nombreReceta, parametros(a)).guardar(f);
+                registro.accept("RECETA «" + nombreReceta + "» grabada: " + grabadora.cuantos() + " pasos en " + f.toAbsolutePath()
+                        + ". Para repetirla sin IA: asistente receta " + nombreReceta + " " + parametros(a).keySet().stream()
+                        .map(k -> "--param " + k + "=...").collect(java.util.stream.Collectors.joining(" ")));
+            } else {
+                registro.accept("RECETA «" + nombreReceta + "» NO grabada: la tarea no terminó bien.");
             }
         }
         if (nuevo.length() > 0 && esp != null) {
@@ -492,6 +507,16 @@ public final class App {
             b.add("--pasos");
             b.add("100");
         }
+        if (a.contains("--grabar")) {
+            b.add("--grabar");
+            b.add(a.get(a.indexOf("--grabar") + 1));
+            for (var e : java.util.Map.of("cliente", cliente, "contrario", contrario, "descripcion", desc, "ref", ref).entrySet()) {
+                if (!e.getValue().isBlank()) {
+                    b.add("--param");
+                    b.add(e.getKey() + "=" + e.getValue());
+                }
+            }
+        }
         for (String x : List.of("--pasos", "--modelo", "--tope-tokens", "--sin-aviso", "--tope-segundos")) {
             int i = a.indexOf(x);
             if (i >= 0) {
@@ -502,6 +527,39 @@ public final class App {
             }
         }
         agente(b);
+    }
+
+    /** Los «--param nombre=valor» de la línea de órdenes. */
+    static java.util.Map<String, String> parametros(List<String> a) {
+        var m = new java.util.LinkedHashMap<String, String>();
+        for (int i = 0; i + 1 < a.size(); i++) {
+            if (a.get(i).equals("--param")) {
+                String kv = a.get(i + 1);
+                int ig = kv.indexOf('=');
+                if (ig > 0) {
+                    m.put(kv.substring(0, ig), kv.substring(ig + 1));
+                }
+            }
+        }
+        return m;
+    }
+
+    /** Reproduce una receta grabada, sin IA: asistente receta <nombre> --param k=v … [--segundos-por-paso N] */
+    private static void receta(List<String> a) throws IOException {
+        if (a.isEmpty()) {
+            throw new IllegalArgumentException("Uso: asistente receta <nombre> [--param k=v ...] [--segundos-por-paso N]");
+        }
+        var rec = es.amagna.asistente.cerebro.Receta.leer(Path.of("recetas", a.get(0) + ".json"));
+        var ventanas = new VentanasNativas(false);
+        var ag = new Agente(new ClaudeApi("sin-uso"), new ManosRobot(false), ventanas, MODELO_POR_DEFECTO, "", 1, 1, System.out::println)
+                .conControles(new Controles(ventanas));
+        int seg = a.contains("--segundos-por-paso") ? Integer.parseInt(a.get(a.indexOf("--segundos-por-paso") + 1)) : 25;
+        System.out.println("Receta «" + rec.nombre() + "»: " + rec.pasos().size() + " pasos, sin IA.");
+        long t0 = System.currentTimeMillis();
+        var r = rec.reproducir(ag, parametros(a), seg, System.out::println);
+        System.out.println((r.bien() ? "HECHO: " : "FALLÓ: ") + r.mensaje() + String.format(" (%d/%d pasos, %.0f s)", r.pasosHechos(), r.pasosTotal(),
+                (System.currentTimeMillis() - t0) / 1000.0));
+        System.exit(r.bien() ? 0 : 1);
     }
 
     /** El guion: hacer una tarea de forma determinista con el mapa del programa, sin gastar un token. */
