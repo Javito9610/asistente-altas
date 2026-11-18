@@ -1192,6 +1192,10 @@ public final class Comprobaciones {
     }
 
     static es.amagna.asistente.estados.Ejecutor.Resultado correrFalso(es.amagna.asistente.estados.Mapa mapa, MundoFalso w, boolean conIa) {
+        return ejecutorFalso(mapa, w, conIa).ejecutar("crear-expediente", parametrosFalsos(w));
+    }
+
+    static es.amagna.asistente.estados.Ejecutor ejecutorFalso(es.amagna.asistente.estados.Mapa mapa, MundoFalso w, boolean conIa) {
         long[] t = {0};
         es.amagna.asistente.estados.Ejecutor.Reloj reloj = new es.amagna.asistente.estados.Ejecutor.Reloj() {
             public long ahora() {
@@ -1272,8 +1276,7 @@ public final class Comprobaciones {
                 return w.estado.equals("atencion") ? "¿Deseas salir sin guardar?" : "¿Actualizar el número a la serie?";
             }
         };
-        return new es.amagna.asistente.estados.Ejecutor(mapa, observa, hace, rescate, reloj, x -> { })
-                .ejecutar("crear-expediente", parametrosFalsos(w));
+        return new es.amagna.asistente.estados.Ejecutor(mapa, observa, hace, rescate, reloj, x -> { });
     }
 
     static java.util.Map<String, String> parametrosFalsos(MundoFalso w) {
@@ -1395,6 +1398,13 @@ public final class Comprobaciones {
         var r3 = correrFalso(mapa, w3, true);
         ok(!r3.bien() && w3.rescates == 0 && w3.guardados == 0 && r3.mensaje().contains("NO se repite"),
                 "estados: si falla el Guardar no se repite la tarea (podría duplicar), se para y avisa");
+        var w4 = new MundoFalso("inicio");
+        var ej4 = ejecutorFalso(mapa, w4, true);
+        var r4a = ej4.ejecutar("crear-expediente", parametrosFalsos(w4));
+        w4.falla = "pulsar_hasta"; // la 2.ª tarea del MISMO Ejecutor falla antes de guardar
+        var r4b = ej4.ejecutar("crear-expediente", parametrosFalsos(w4));
+        ok(r4a.bien() && r4b.bien() && w4.guardados == 2 && !r4b.mensaje().contains("NO se repite"),
+                "estados: lo ya guardado en una tarea no contamina la siguiente del mismo Ejecutor (se limpia y reintenta)");
     }
 
     static void campoInterior() {

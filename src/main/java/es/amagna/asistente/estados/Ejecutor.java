@@ -106,6 +106,10 @@ public final class Ejecutor {
                         + "»): el .cmd se guardó en otra codificación. Usa solo letras sin tilde en los .cmd. No se ha tocado nada.", "", 0);
             }
         }
+        // Un Ejecutor puede encadenar tareas: lo irreversible y los empujones son de ESTA tarea, no de la anterior.
+        comprometido = false;
+        numero = "";
+        rescates = 0;
         String ultimoFallo = null;
         int limpiezasMapa = 0;
         List<String> incidencias = new java.util.ArrayList<>();

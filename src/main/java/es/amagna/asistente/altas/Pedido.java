@@ -82,9 +82,9 @@ public final class Pedido {
                 ficheros = new ArrayList<>(ficheros.subList(0, sitio));
             }
             avisos.removeIf(a -> a.startsWith("La autorización es la página 2 de la hoja de encargo"));
-            // Miguel pidió el usuario «Lia Silva». El formulario de expediente no tiene ese campo (explorado el 18/11) y los
-            // expedientes del asistente quedan sin usuario: se deja dicho en cada informe para que no se pierda.
-            avisos.add("Usuario: el expediente queda sin usuario asignado (Miguel pidió «Lia Silva»; el formulario de MN no deja asignarlo): que se asigne a mano.");
+            // Miguel (18/11): sube pbancario2 y Lía, que revisa la subida, cambia el usuario a «Lia». El asistente no asigna usuario
+            // (el formulario no tiene ese campo); se deja dicho en cada informe.
+            avisos.add("Usuario: el expediente queda a nombre de la cuenta del asistente (pbancario2); Lía lo cambia a su usuario al revisar la subida.");
             pedidos.add(new PedidoExpediente(nif + "|" + clave(e.entidad()) + "|" + e.descripcion(), e.entidad(), p, ficheros, avisos,
                     conAutorizacion ? hoja : ""));
         }
