@@ -584,7 +584,7 @@ public final class App {
             System.exit(2);
         }
         String cliente = a.contains("--cliente") ? a.get(a.indexOf("--cliente") + 1) : "";
-        if (cliente.isBlank() && !a.contains("--solo-explorar") && !a.contains("--solo-contrario") && !a.contains("--solo-cliente")) {
+        if (cliente.isBlank() && !a.contains("--solo-explorar") && !a.contains("--solo-contrario") && !a.contains("--solo-cliente") && !a.contains("--solo-usuario")) {
             throw new IllegalArgumentException("Falta --cliente \"texto con el que buscar al cliente de prueba\"");
         }
         String contrario = a.contains("--contrario") ? a.get(a.indexOf("--contrario") + 1) : "";
@@ -594,7 +594,27 @@ public final class App {
         if (es.amagna.asistente.altas.Plan.descripcionValida(desc).isEmpty()) {
             throw new IllegalArgumentException("Descripción no válida: " + desc);
         }
-        String tarea = a.contains("--solo-cliente")
+        String tarea = a.contains("--solo-usuario")
+                ? """
+                Estás en la Empresa de prueba. NO guardes ni cambies NADA: esto es solo mirar. Javi (el dueño del proyecto) ha
+                autorizado expresamente abrir el botón «Configuración» DEL FORMULARIO DEL EXPEDIENTE (abajo a la derecha, junto a
+                «Alerta Ficha»). NO es la «Configuración» general del programa MN: esa NO se abre. Y dentro de ella no cambies,
+                actives, desactives ni borres nada: solo lees y sales con Cancelar/Cerrar.
+                Objetivo: averiguar cómo se asigna el USUARIO (responsable) de un expediente en MN. Miguel pidió que los
+                expedientes creados queden asignados al usuario «Lia Silva».
+                1) En la lista «Expedientes», abre con doble clic uno de los expedientes de prueba MÁS RECIENTES (los de abajo,
+                   descripción MICRO o PRESTAMO (T), cliente LUCIA FERNANDEZ PRUEBA). Estos los creó el asistente con el usuario
+                   de MN «pbancario2». Ve a la pestaña «Historial» y lee la columna «Usuario» de la primera línea (la creación):
+                   ¿qué usuario figura? Eso dice a quién asigna MN por defecto un expediente.
+                2) En ese mismo formulario abre el botón «Configuración» del formulario del expediente y describe todo lo que
+                   hay: pestañas, campos, desplegables, listas, botones, y en especial dónde se elige un usuario o responsable
+                   (nombre exacto del control, cómo se llega, qué valor trae y qué usuarios ofrece, incluyendo si aparece
+                   «Lia Silva»). NO cambies nada. Cierra con Cancelar/Cerrar y, si pregunta si guardar, di que NO.
+                3) Mira también si en la lista «Expedientes» hay alguna columna «Usuario» o filtro por usuario.
+                Al terminar cierra el formulario SIN guardar (Cancelar y «Sí» para salir) y comprueba con ventanas_abiertas que no
+                queda nada abierto. Si algo no está claro en 2 intentos, para y dilo. Termina con líneas «APRENDIDO: …», una por cosa.
+                """
+                : a.contains("--solo-cliente")
                 ? """
                 Estás en la Empresa de prueba. NO guardes nada: vas a explorar y al final CANCELAS (sin guardar, «Sí» para salir).
                 Pulsa «Alta» en la lista «Expedientes» para abrir un formulario de expediente nuevo y explora, SIN GUARDAR:
@@ -665,11 +685,11 @@ public final class App {
                 Termina con líneas «APRENDIDO: …» (una por cosa, con el nombre exacto del control y cómo se llega).
                 """ : "\nSi aprendes algo útil de la pantalla (dónde está algo, un aviso, un truco), añade al final una línea «APRENDIDO: …» por cosa.");
         List<String> b = new java.util.ArrayList<>(List.of(tarea, "--como", "expedientes"));
-        if ((a.contains("--solo-explorar") || a.contains("--solo-contrario") || a.contains("--solo-cliente")) && !a.contains("--tope-tokens")) {
+        if ((a.contains("--solo-explorar") || a.contains("--solo-contrario") || a.contains("--solo-cliente") || a.contains("--solo-usuario")) && !a.contains("--tope-tokens")) {
             b.add("--tope-tokens");
             b.add("900000");
         }
-        if ((a.contains("--explorar") || a.contains("--solo-explorar") || a.contains("--solo-contrario") || a.contains("--solo-cliente")) && !a.contains("--pasos")) {
+        if ((a.contains("--explorar") || a.contains("--solo-explorar") || a.contains("--solo-contrario") || a.contains("--solo-cliente") || a.contains("--solo-usuario")) && !a.contains("--pasos")) {
             b.add("--pasos");
             b.add("100");
         }
