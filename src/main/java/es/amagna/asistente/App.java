@@ -596,8 +596,13 @@ public final class App {
         }
         String tarea = a.contains("--solo-usuario")
                 ? """
-                Estás en la Empresa de prueba. NO guardes ni cambies NADA: esto es solo mirar menús. Javi (el dueño del proyecto)
-                quiere saber si MN permite asignar el USUARIO (responsable) de un expediente desde la pantalla. Ya se sabe que
+                Estás en la Empresa de prueba. NO guardes ni cambies NADA hasta saber dónde se cambia el usuario. Miguel (el jefe)
+                confirmó que tras subir un expediente con la cuenta pbancario2 hay que CAMBIAR su usuario a «Lia Silva»: falta saber
+                DÓNDE se hace en MN (Javi, el dueño del proyecto, quiere saber si MN permite asignar el USUARIO de un expediente).
+                ORDEN: mira primero lo más probable (1: clic derecho en la fila; 2: menú «Opciones»), y en cuanto encuentres algo que
+                parezca cambiar/asignar usuario, NO lo ejecutes: descríbelo con el nombre exacto, ciérralo con Escape y escribe ya
+                las líneas APRENDIDO. Gasta pocas capturas: lista los menús con ventanas_abiertas/UIA cuando se pueda.
+                Ya se sabe que
                 NO está en el formulario del expediente ni en su «Configuración». Ya se sabe que la lista «Expedientes» tiene una
                 columna «Usuario» (vacía en los expedientes 49–56 que creó el asistente) y un criterio «Usuario» en el desplegable
                 de la caja de búsqueda. Falta mirar, en la LISTA «Expedientes» (sin abrir formularios):
@@ -686,7 +691,7 @@ public final class App {
         List<String> b = new java.util.ArrayList<>(List.of(tarea, "--como", "expedientes"));
         if ((a.contains("--solo-explorar") || a.contains("--solo-contrario") || a.contains("--solo-cliente") || a.contains("--solo-usuario")) && !a.contains("--tope-tokens")) {
             b.add("--tope-tokens");
-            b.add("900000");
+            b.add(a.contains("--solo-usuario") ? "1800000" : "900000");
         }
         if ((a.contains("--explorar") || a.contains("--solo-explorar") || a.contains("--solo-contrario") || a.contains("--solo-cliente") || a.contains("--solo-usuario")) && !a.contains("--pasos")) {
             b.add("--pasos");
