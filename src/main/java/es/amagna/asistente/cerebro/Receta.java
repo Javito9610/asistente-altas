@@ -321,6 +321,9 @@ public final class Receta {
                 if (p.rel() != null) {
                     v.activar(real);
                     var h = ((es.amagna.asistente.manos.VentanasNativas) v).handleDe(real);
+                    if (Win32.desmaximizar(h)) {
+                        System.out.println("  ventana «" + real + "» maximizada: devuelta a su tamaño normal (las posiciones de la receta son de ese tamaño)");
+                    }
                     int[] r = h == null ? null : Win32.rectangulo(h);
                     if (r == null) {
                         return "no se ve la ventana «" + real + "»";

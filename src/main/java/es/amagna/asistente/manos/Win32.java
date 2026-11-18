@@ -35,6 +35,8 @@ public final class Win32 {
 
         boolean IsIconic(Pointer hwnd);
 
+        boolean IsZoomed(Pointer hwnd);
+
         boolean IsWindowEnabled(Pointer hwnd);
 
         boolean EnumWindows(EnumProc proc, Pointer datos);
@@ -169,6 +171,32 @@ public final class Win32 {
     static final int GA_ROOT = 2;
     static final int GA_ROOTOWNER = 3;
     static final int SW_RESTORE = 9;
+
+    /**
+     * Si la ventana está maximizada, la devuelve a su tamaño normal. Las posiciones relativas de las recetas se
+     * grabaron con ese tamaño; MN recuerda el último estado de cada formulario y, si alguien lo maximiza una vez,
+     * los abre siempre maximizados y todos los clics caen fuera de sitio. Devuelve true si la ha restaurado.
+     */
+    public static boolean desmaximizar(Pointer h) {
+        if (h == null || !User32.I.IsZoomed(h)) {
+            return false;
+        }
+        User32.I.ShowWindow(h, SW_RESTORE);
+        for (int i = 0; i < 30 && User32.I.IsZoomed(h); i++) {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        try {
+            Thread.sleep(400); // que la ventana termine de redibujarse
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        return !User32.I.IsZoomed(h);
+    }
     public static final int SW_MINIMIZE = 6;
     static final int WM_CLOSE = 0x0010;
     static final int WM_COMMAND = 0x0111;
