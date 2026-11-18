@@ -57,6 +57,7 @@ public final class Pedido {
                 p.put("descripcion", e.descripcion());
             }
             p.put("cliente", nombre);
+            p.put("cliente_nif", nif);
             p.put("cliente_nombre", nombre);
             String cif = cifPorEntidad.getOrDefault(clave(e.entidad()), "");
             if (cif.isEmpty()) {

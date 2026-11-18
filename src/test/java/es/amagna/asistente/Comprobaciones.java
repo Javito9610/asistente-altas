@@ -1456,6 +1456,7 @@ public final class Comprobaciones {
         ok(k.params().get("cliente").equals("LUCÍA FERNÁNDEZ PRUEBA") && k.params().get("contrario").equals("B12345678")
                         && k.clave().equals("73918462G|KVIKUFINANCESPAINSLU|MICRO"),
                 "pedidos: cliente en mayúsculas, CIF sin espacios, y clave NIF|entidad|descripción contra duplicados");
+        ok("73918462G".equals(k.params().get("cliente_nif")), "el pedido lleva el NIF del cliente para buscarlo por NIF en MN");
         var s = r.pedidos().get(1);
         ok(!s.params().containsKey("contrario") && s.avisos().stream().anyMatch(a -> a.contains("sin contrario")),
                 "pedidos: sin CIF en los papeles no se busca el contrario por nombre: expediente sin contrario y aviso");
