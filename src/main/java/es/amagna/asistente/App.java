@@ -604,13 +604,24 @@ public final class App {
                 que existan; el resto, vacío).
                 Ficheros ficticios (en el PC): C:\\Proyectos\\asistente-altas\\pruebas\\ficha\\dni-prueba.txt, hoja-encargo-prueba.txt
                 y justificante-prueba.txt (misma carpeta).
-                Pasos: 1) Mira primero cómo se BUSCA un cliente por NIF en la lista de clientes (Bases de Datos > Clientes) y comprueba
-                que 99887766P NO existe. 2) Pulsa «Alta» en esa lista (la ficha «Alta Cliente»), rellena y mira bien cada campo con UIA
-                (el Móvil ya dio problemas: en una prueba se quedó vacío; averigua por qué y cómo se escribe de forma fiable, p. ej.
-                clic, ctrl+a, teclear, y comprobar). 3) Busca cómo se adjuntan documentos a la ficha del cliente (pestaña o botón de
-                adjuntos) y adjunta los tres ficheros; verifica que aparecen. 4) Guarda y comprueba que la ficha existe buscándola
-                por NIF. Todo lo que no sea guardar la ficha de OLIVIA, NO lo hagas (no toques otros clientes, ni «Configuración»,
-                ni Baja/Eliminar). Cierra lo que abras. Si algo no está claro en 2 intentos, para y dilo.
+                YA SE SABE (no lo repitas): la lista «Clientes» (Bases de Datos > Clientes) abre con el criterio «NIF/CIF»; se busca con
+                clic en la caja (≈186,68), ctrl+a, NIF, Intro; sin resultados dice «Núm. Clientes: 0». 99887766P NO existe. OJO: un
+                Intro con una fila seleccionada abre «Editar Cliente»; si pasa, Cancelar sin guardar. «Alta» (#btnAlta) abre «Alta Cliente»;
+                su árbol UIA NO responde (no llames a ver_controles ahí: pierde 30 s): usa captura, ratón y teclado. Campos (clic,
+                ctrl+a, teclear): Nombre (445,126) [va TODO el nombre: «OLIVIA TESTEO PRUEBA»], NIF (735,126), Teléfono (349,169),
+                Dirección (445,213), CP (735,213) [con Tab rellena Población/Provincia/País]. Móvil (541,169) y Correo (830,169) abren
+                un diálogo propio: se escribe ahí y se ACEPTA (Móvil: botón ≈597,387; Correo: ≈597,401 y luego «Salir» de la lista de
+                direcciones ≈871,449); solo así el valor llega a la ficha. Adjuntos: pestaña «Adjuntos» (≈332,303) → «Añadir Adjunto»
+                (≈290,333) → «Importar» → «Abrir»: se teclea la ruta completa e Intro. Después MN pide «Establece el nombre de la
+                carpeta donde se almacenarán todos los adjuntos y subcarpetas de esta ficha». «Cancelar» de la ficha pregunta guardar Sí/No.
+                LO QUE FALTA: 1) SOLO LECTURA: en la lista «Clientes» abre (doble clic) un cliente EXISTENTE que tenga adjuntos (mira
+                varios si hace falta; cancela sin guardar) y mira en su pestaña «Adjuntos» CÓMO SE LLAMA su carpeta (¿nombre del cliente,
+                NIF, número de ficha…?). Apunta 3 ejemplos exactos. Si no se ve ninguna convención, dilo. 2) Con esa convención, crea
+                la ficha de OLIVIA (nombre de carpeta: el que corresponda a la misma convención con sus datos), adjunta los tres
+                ficheros (dni-prueba.txt, hoja-encargo-prueba.txt, justificante-prueba.txt), verifica que salen en la lista de adjuntos,
+                GUARDA y comprueba que existe buscándola por NIF. Si no hay convención, NO inventes: para y dilo (no guardes).
+                Todo lo que no sea guardar la ficha de OLIVIA, NO lo hagas (no modifiques otros clientes, ni «Configuración», ni
+                Baja/Eliminar). Cierra lo que abras. Si algo no está claro en 2 intentos, para y dilo.
                 Termina con líneas «APRENDIDO: …», una por cosa: orden exacto de pasos, nombres exactos de controles, diálogos,
                 avisos, qué lee UIA y qué no.
                 """
