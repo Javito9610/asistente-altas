@@ -563,7 +563,7 @@ public final class App {
             System.exit(2);
         }
         String cliente = a.contains("--cliente") ? a.get(a.indexOf("--cliente") + 1) : "";
-        if (cliente.isBlank() && !a.contains("--solo-explorar") && !a.contains("--solo-contrario")) {
+        if (cliente.isBlank() && !a.contains("--solo-explorar") && !a.contains("--solo-contrario") && !a.contains("--solo-cliente")) {
             throw new IllegalArgumentException("Falta --cliente \"texto con el que buscar al cliente de prueba\"");
         }
         String contrario = a.contains("--contrario") ? a.get(a.indexOf("--contrario") + 1) : "";
@@ -573,7 +573,26 @@ public final class App {
         if (es.amagna.asistente.altas.Plan.descripcionValida(desc).isEmpty()) {
             throw new IllegalArgumentException("Descripción no válida: " + desc);
         }
-        String tarea = a.contains("--solo-contrario")
+        String tarea = a.contains("--solo-cliente")
+                ? """
+                Estás en la Empresa de prueba. NO guardes nada: vas a explorar y al final CANCELAS (sin guardar, «Sí» para salir).
+                Pulsa «Alta» en la lista «Expedientes» para abrir un formulario de expediente nuevo y explora, SIN GUARDAR:
+                1) CLIENTE POR NIF: el selector «Clientes» (doble clic en el campo Cliente). Tiene una caja de búsqueda y un
+                   desplegable de criterio (por defecto «Nombre»; en «Contrarios» había uno con la opción NIF). Cambia el criterio a
+                   NIF/DNI, busca 73918462G (la clienta de prueba LUCIA FERNANDEZ PRUEBA) y comprueba qué pasa con un único
+                   resultado (¿se asigna solo y se cierra, como en Contrarios, o hay que elegir la fila y «Seleccionar»?).
+                   Apunta el orden exacto de pasos, qué se lee por UIA y qué no, y qué aviso sale si no hay resultados.
+                   Comprueba que el cliente queda asignado en el formulario (UIA, campo interior).
+                2) USUARIO: busca en TODAS las pestañas y zonas del formulario de expediente dónde se asigna el usuario o
+                   responsable del expediente (Miguel pidió asignarlo a «Lia Silva»). Mira los campos, desplegables y
+                   pestañas (no abras Configuración ni Gestionar Campos). Apunta cómo se llama el campo, dónde está, cómo se
+                   cambia (desplegable, selector…), qué valor trae por defecto y qué usuarios hay (sin cambiar nada de
+                   los usuarios). Si «Lia Silva» está, asígnala en este formulario sin guardar y comprueba que queda.
+                3) REF. PROPIA: dónde está el campo (no hace falta escribir nada).
+                Al terminar CANCELA el formulario (Cancelar y «Sí» para salir sin guardar) y comprueba con ventanas_abiertas que no
+                queda nada abierto. Si algo no está claro en 2 intentos, para y dilo. Termina con líneas «APRENDIDO: …», una por cosa.
+                """
+                : a.contains("--solo-contrario")
                 ? """
                 Estás en la Empresa de prueba. NO crees expedientes nuevos. Abre desde la lista «Expedientes» el expediente
                 de prueba MÁS RECIENTE (la última fila; doble clic) y explora, en ESE expediente, dos cosas:
@@ -625,11 +644,11 @@ public final class App {
                 Termina con líneas «APRENDIDO: …» (una por cosa, con el nombre exacto del control y cómo se llega).
                 """ : "\nSi aprendes algo útil de la pantalla (dónde está algo, un aviso, un truco), añade al final una línea «APRENDIDO: …» por cosa.");
         List<String> b = new java.util.ArrayList<>(List.of(tarea, "--como", "expedientes"));
-        if ((a.contains("--solo-explorar") || a.contains("--solo-contrario")) && !a.contains("--tope-tokens")) {
+        if ((a.contains("--solo-explorar") || a.contains("--solo-contrario") || a.contains("--solo-cliente")) && !a.contains("--tope-tokens")) {
             b.add("--tope-tokens");
             b.add("900000");
         }
-        if ((a.contains("--explorar") || a.contains("--solo-explorar") || a.contains("--solo-contrario")) && !a.contains("--pasos")) {
+        if ((a.contains("--explorar") || a.contains("--solo-explorar") || a.contains("--solo-contrario") || a.contains("--solo-cliente")) && !a.contains("--pasos")) {
             b.add("--pasos");
             b.add("100");
         }
