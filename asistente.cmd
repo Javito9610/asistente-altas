@@ -1,6 +1,7 @@
 @echo off
 rem Asistente Altas: compila si hace falta y ejecuta. Necesita el JDK 21 (java y javac en el PATH o JAVA_HOME).
-rem La primera vez descarga JNA (la libreria con la que Java habla con Windows) de Maven Central y comprueba su huella.
+rem La primera vez descarga de Maven Central, y comprueba su huella, JNA (con la que Java habla con Windows)
+rem y PDFBox (para cortar la pagina 2 de la hoja de encargo).
 setlocal
 "%SystemRoot%\System32\chcp.com" 65001 >nul
 cd /d "%~dp0"
@@ -8,8 +9,12 @@ set "JBIN="
 if defined JAVA_HOME set "JBIN=%JAVA_HOME%\bin\"
 set "JNA_VER=5.15.0"
 set "JNA_JAR=lib\jna-%JNA_VER%.jar"
-set "CP=build\main;%JNA_JAR%"
+set "PDF_VER=3.0.3"
+set "PDF_JAR=lib\pdfbox-app-%PDF_VER%.jar"
+set "CP=build\main;%JNA_JAR%;%PDF_JAR%"
+set "CPC=%JNA_JAR%;%PDF_JAR%"
 if not exist "%JNA_JAR%" call :jna || goto fallo
+if not exist "%PDF_JAR%" call :pdfbox || goto fallo
 if not exist build\main\es\amagna\asistente\App.class goto compilar
 if "%~1"=="compilar" goto compilar
 goto ejecutar
@@ -19,7 +24,7 @@ echo Compilando...
 if exist build rmdir /s /q build
 mkdir build\main build\test
 dir /s /b src\main\java\*.java > build\fuentes.txt
-"%JBIN%javac" -encoding UTF-8 -cp "%JNA_JAR%" -d build\main @build\fuentes.txt || goto fallo
+"%JBIN%javac" -encoding UTF-8 -cp "%CPC%" -d build\main @build\fuentes.txt || goto fallo
 "%SystemRoot%\System32\xcopy.exe" /e /q /y /i src\main\resources build\main >nul || goto fallo
 dir /s /b src\test\java\*.java > build\pruebas.txt
 "%JBIN%javac" -encoding UTF-8 -cp "%CP%" -d build\test @build\pruebas.txt || goto fallo
@@ -49,6 +54,27 @@ if /i not "%HUELLA%"=="%ESPERADO%" (
 )
 move /y "%JNA_JAR%.tmp" "%JNA_JAR%" >nul
 echo JNA descargada y comprobada.
+exit /b 0
+
+:pdfbox
+echo Descargando PDFBox (pdfbox-app) %PDF_VER% de Maven Central...
+if not exist lib mkdir lib
+set "URL=https://repo1.maven.org/maven2/org/apache/pdfbox/pdfbox-app/%PDF_VER%/pdfbox-app-%PDF_VER%.jar"
+"%SystemRoot%\System32\curl.exe" -fsSL -o "%PDF_JAR%.tmp" "%URL%" || exit /b 1
+"%SystemRoot%\System32\curl.exe" -fsSL -o lib\pdfbox.sha1 "%URL%.sha1" || exit /b 1
+set "ESPERADO="
+for /f "usebackq tokens=1" %%s in ("lib\pdfbox.sha1") do if not defined ESPERADO set "ESPERADO=%%s"
+set "HUELLA="
+for /f "usebackq skip=1 tokens=* delims=" %%h in (`""%SystemRoot%\System32\certutil.exe" -hashfile "%PDF_JAR%.tmp" SHA1"`) do if not defined HUELLA set "HUELLA=%%h"
+set "HUELLA=%HUELLA: =%"
+del lib\pdfbox.sha1
+if /i not "%HUELLA%"=="%ESPERADO%" (
+  del "%PDF_JAR%.tmp"
+  echo La descarga de PDFBox no coincide con su huella oficial. No se usa.
+  exit /b 1
+)
+move /y "%PDF_JAR%.tmp" "%PDF_JAR%" >nul
+echo PDFBox descargada y comprobada.
 exit /b 0
 
 :fallo

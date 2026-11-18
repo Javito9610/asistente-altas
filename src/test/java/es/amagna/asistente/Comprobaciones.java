@@ -1453,6 +1453,10 @@ public final class Comprobaciones {
                         && r.pedidos().get(2).avisos().stream().anyMatch(a -> a.contains("descripción vacía")),
                 "pedidos: sin descripción válida el expediente se crea con la descripción vacía (lo pidió Miguel) y se avisa; no se inventa una");
         var k = r.pedidos().get(0);
+        ok("c/hoja.pdf".equals(r.pedidos().get(0).autorizacion()) && !r.pedidos().get(0).ficherosDelBloque().contains("c/hoja.pdf"),
+                "pedidos: la hoja de encargo no se adjunta entera; de ella sale la autorización (página 2)");
+        ok(r.pedidos().get(0).avisos().stream().noneMatch(a -> a.contains("hay que separarla")),
+                "pedidos: el aviso de «hay que separarla» ya no sale, porque se separa");
         ok(k.params().get("cliente").equals("LUCÍA FERNÁNDEZ PRUEBA") && k.params().get("contrario").equals("B12345678")
                         && k.clave().equals("73918462G|KVIKUFINANCESPAINSLU|MICRO"),
                 "pedidos: cliente en mayúsculas, CIF sin espacios, y clave NIF|entidad|descripción contra duplicados");
@@ -1475,6 +1479,36 @@ public final class Comprobaciones {
                 "auditoría de adjuntos: si falta un adjunto esperado, NO cuadra");
         ok(es.amagna.asistente.cerebro.Auditor.comprobarAdjuntos("{Adjuntos (total)=12}", 2, List.of("")) != null,
                 "auditoría de adjuntos: 12 no vale por 2");
+        // La autorización: página 2 de una hoja de 3. Con otra cosa no se adivina.
+        class Falso implements es.amagna.asistente.altas.DivisorPdf {
+            final int paginas;
+            Falso(int paginas) {
+                this.paginas = paginas;
+            }
+            public int paginas(byte[] pdf) {
+                return paginas;
+            }
+            public byte[] pagina(byte[] pdf, int numero) {
+                return ("%PDF-pagina-" + numero).getBytes();
+            }
+        }
+        byte[] pdfFalso = "%PDF-1.4 hoja".getBytes();
+        var corte = es.amagna.asistente.altas.Autorizacion.separar(pdfFalso, new Falso(3));
+        ok(corte.pdf() != null && new String(corte.pdf()).endsWith("pagina-2"), "autorización: de una hoja de 3 páginas se queda con la 2");
+        var corte2 = es.amagna.asistente.altas.Autorizacion.separar(pdfFalso, new Falso(2));
+        ok(corte2.pdf() == null && corte2.aviso().contains("2 páginas") && corte2.aviso().contains("no adivino"),
+                "autorización: una hoja de 2 páginas NO se corta (no se adivina) y se avisa");
+        var corte3 = es.amagna.asistente.altas.Autorizacion.separar("no soy un pdf".getBytes(), new Falso(3));
+        ok(corte3.pdf() == null && corte3.aviso().contains("no es un PDF"), "autorización: un fichero que no es PDF no se corta");
+        var corte4 = es.amagna.asistente.altas.Autorizacion.separar(pdfFalso, new es.amagna.asistente.altas.DivisorPdf() {
+            public int paginas(byte[] pdf) throws java.io.IOException {
+                throw new java.io.IOException("PDF cifrado");
+            }
+            public byte[] pagina(byte[] pdf, int numero) {
+                return new byte[0];
+            }
+        });
+        ok(corte4.pdf() == null && corte4.aviso().contains("PDF cifrado"), "autorización: si el PDF no se puede leer, no se adjunta nada y se dice por qué");
         ok(es.amagna.asistente.altas.Pedido.nombreSeguro("a:b*c?.pdf").equals("a_b_c_.pdf"), "pedidos: nombres de fichero que Windows acepta");
         Map<String, Object> sinNif = new java.util.LinkedHashMap<>(cli);
         sinNif.put("nif", "");

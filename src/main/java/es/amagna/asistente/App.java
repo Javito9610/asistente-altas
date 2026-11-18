@@ -259,11 +259,32 @@ public final class App {
                 }
                 rutas.add(f.toString());
             }
+            var avisosDelPedido = new ArrayList<>(p.avisos());
+            if (!p.autorizacion().isEmpty()) {
+                // La autorización es la página 2 de la hoja de encargo: se corta y se adjunta SOLO esa página.
+                var hojaDoc = es.amagna.asistente.altas.Pedido.buscar(List.of(p.autorizacion()), bloque).get(p.autorizacion());
+                if (hojaDoc == null) {
+                    avisosDelPedido.add("La hoja de encargo «" + p.autorizacion() + "» no está en el bloque: sin autorización que adjuntar.");
+                } else if (corredor == null) {
+                    avisosDelPedido.add("(Solo informe) se adjuntará la página 2 de la hoja de encargo «" + hojaDoc.nombre() + "» como autorización.");
+                } else {
+                    var cortada = es.amagna.asistente.altas.Autorizacion.separar(hojaDoc.datos(),
+                            new es.amagna.asistente.altas.DivisorPdfBox());
+                    if (cortada.pdf() == null) {
+                        avisosDelPedido.add(cortada.aviso());
+                    } else {
+                        Path f = trabajo.resolve(p.clave().hashCode() + "-" + (++n) + "-autorizacion-hoja-de-encargo-pag2.pdf");
+                        Files.createDirectories(trabajo);
+                        Files.write(f, cortada.pdf());
+                        rutas.add(f.toString());
+                    }
+                }
+            }
             var params = es.amagna.asistente.altas.Pedido.conAdjuntos(p, rutas);
             informe.append("  EXPEDIENTE ").append(p.entidad()).append(" · ").append(params.get("descripcion"))
                     .append(" · contrario ").append(params.getOrDefault("contrario", "(ninguno)"))
                     .append(" · ").append(rutas.size()).append(" adjuntos\n");
-            for (String av : p.avisos()) {
+            for (String av : avisosDelPedido) {
                 informe.append("      aviso: ").append(av).append('\n');
             }
             for (String f : faltan) {

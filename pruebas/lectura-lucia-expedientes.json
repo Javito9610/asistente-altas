@@ -38,6 +38,11 @@
       "ruta": "Lucia Fernandez Prueba/justificante.txt",
       "que_es": "justificante",
       "por_que": "Justificante de pago de 1,00 EUR, concepto «pago de prueba». Los datos del titular coinciden con los del documento de identidad."
+    },
+    {
+      "ruta": "Lucia Fernandez Prueba/hoja-de-encargo.pdf",
+      "que_es": "hoja_encargo",
+      "por_que": "Hoja de encargo de prueba de 3 páginas; la página 2 es la autorización."
     }
   ],
   "dudas": []

@@ -24,8 +24,9 @@ public final class Pedido {
     public static final int MAX_ADJUNTOS = 8;
 
     /** Lo que hay que hacer para un expediente. {@code clave} = NIF|entidad|descripción, para no repetirlo. */
+    /** autorizacion: la ruta de la hoja de encargo en el bloque (de ella sale la página 2), o "" si no hay. */
     public record PedidoExpediente(String clave, String entidad, Map<String, String> params, List<String> ficherosDelBloque,
-            List<String> avisos) {
+            List<String> avisos, String autorizacion) {
     }
 
     public record Resultado(List<PedidoExpediente> pedidos, List<String> noSeCrean) {
@@ -40,6 +41,12 @@ public final class Pedido {
         if (nif.isEmpty() || nombre.isBlank()) {
             noSeCrean.add("Faltan el NIF o el nombre del cliente: no se crea ningún expediente.");
             return new Resultado(pedidos, noSeCrean);
+        }
+        String hoja = "";
+        for (Object o : l.ficheros()) {
+            if (o instanceof Map<?, ?> f && "hoja_encargo".equals(txt(f.get("que_es"))) && hoja.isEmpty()) {
+                hoja = txt(f.get("ruta"));
+            }
         }
         Map<String, String> cifPorEntidad = new LinkedHashMap<>();
         for (Object o : l.expedientes()) {
@@ -65,13 +72,18 @@ public final class Pedido {
             } else {
                 p.put("contrario", cif);
             }
+            // La hoja entera no se adjunta al expediente: va SOLO su página 2 (la autorización), que se corta al sacar los documentos.
             List<String> ficheros = new ArrayList<>(e.adjuntos());
-            if (ficheros.size() > MAX_ADJUNTOS) {
-                avisos.add("Hay " + ficheros.size() + " documentos y solo caben " + MAX_ADJUNTOS + " por expediente: sobran "
-                        + (ficheros.size() - MAX_ADJUNTOS) + " (que los suba una persona).");
-                ficheros = new ArrayList<>(ficheros.subList(0, MAX_ADJUNTOS));
+            boolean conAutorizacion = !hoja.isEmpty() && ficheros.remove(hoja);
+            int sitio = conAutorizacion ? MAX_ADJUNTOS - 1 : MAX_ADJUNTOS;
+            if (ficheros.size() > sitio) {
+                avisos.add("Hay " + (ficheros.size() + (conAutorizacion ? 1 : 0)) + " documentos y solo caben " + MAX_ADJUNTOS
+                        + " por expediente: sobran " + (ficheros.size() - sitio) + " (que los suba una persona).");
+                ficheros = new ArrayList<>(ficheros.subList(0, sitio));
             }
-            pedidos.add(new PedidoExpediente(nif + "|" + clave(e.entidad()) + "|" + e.descripcion(), e.entidad(), p, ficheros, avisos));
+            avisos.removeIf(a -> a.startsWith("La autorización es la página 2 de la hoja de encargo"));
+            pedidos.add(new PedidoExpediente(nif + "|" + clave(e.entidad()) + "|" + e.descripcion(), e.entidad(), p, ficheros, avisos,
+                    conAutorizacion ? hoja : ""));
         }
         return new Resultado(pedidos, noSeCrean);
     }
