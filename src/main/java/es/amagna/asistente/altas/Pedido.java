@@ -82,13 +82,30 @@ public final class Pedido {
         for (int i = 0; i < rutasReales.size() && i < MAX_ADJUNTOS; i++) {
             m.put(i == 0 ? "adjunto" : "adjunto" + (i + 1), rutasReales.get(i));
         }
+        List<String> inicios = new ArrayList<>();
         for (int i = 0; i < rutasReales.size() && i < MAX_ADJUNTOS; i++) {
             String f = rutasReales.get(i).replace('/', '\\');
             String n = f.substring(f.lastIndexOf('\\') + 1);
             int punto = n.lastIndexOf('.');
-            m.put(i == 0 ? "adjunto_nombre" : "adjunto" + (i + 1) + "_nombre", punto > 0 ? n.substring(0, punto) : n);
+            String nombre = punto > 0 ? n.substring(0, punto) : n;
+            if (i == 0) {
+                m.put("adjunto_nombre", nombre);
+            }
+            inicios.add("«" + nombre.substring(0, Math.min(12, nombre.length())) + "»");
+        }
+        if (!inicios.isEmpty()) {
+            m.put("adjuntos_resumen", resumenDeAdjuntos(inicios));
         }
         return m;
+    }
+
+    /**
+     * Lo que debe verse en la lista de adjuntos. La columna corta los nombres largos, así que se pide el NÚMERO de
+     * adjuntos y que cada nombre EMPIECE por lo que se lee (los nombres llevan el id del documento al principio).
+     */
+    public static String resumenDeAdjuntos(List<String> inicios) {
+        return inicios.size() + (inicios.size() == 1 ? " adjunto" : " adjuntos")
+                + "; los nombres salen cortados por el ancho de la columna: basta con que cada uno EMPIECE por " + String.join(", ", inicios);
     }
 
     /** Un nombre de fichero que Windows acepta. */

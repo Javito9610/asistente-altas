@@ -1463,7 +1463,7 @@ public final class Comprobaciones {
         var m = es.amagna.asistente.altas.Pedido.conAdjuntos(k, List.of("C:\\t\\1-dni.pdf", "C:\\t\\2-contrato.pdf"));
         ok(m.get("adjunto").endsWith("1-dni.pdf") && m.get("adjunto2").endsWith("2-contrato.pdf") && m.get("adjunto_nombre").equals("1-dni"),
                 "pedidos: los adjuntos van en adjunto, adjunto2…");
-        ok("2-contrato".equals(m.get("adjunto2_nombre")), "pedidos: cada adjunto lleva su nombre para comprobarlo leyendo la ventana");
+        ok(m.get("adjuntos_resumen").startsWith("2 adjuntos") && m.get("adjuntos_resumen").contains("«2-contrato»"), "pedidos: la lista de adjuntos se audita por número y por cómo empieza cada nombre (la columna los corta)");
         ok(es.amagna.asistente.altas.Pedido.nombreSeguro("a:b*c?.pdf").equals("a_b_c_.pdf"), "pedidos: nombres de fichero que Windows acepta");
         Map<String, Object> sinNif = new java.util.LinkedHashMap<>(cli);
         sinNif.put("nif", "");

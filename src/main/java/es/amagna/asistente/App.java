@@ -723,9 +723,6 @@ public final class App {
             if ("auditar".equals(paso.accion())) {
                 return auditarPantalla(paso, ps, ventanas, ctrl, a);
             }
-            if ("comprobar_texto".equals(paso.accion())) {
-                return comprobarTexto(paso, ps, ventanas, ctrl);
-            }
             // El cerrojo: nada se toca si MN no está en la empresa de prueba.
             if (!ventanas.abiertas().contains("Empresa de prueba")) {
                 return "PARADO: MN no está en «Empresa de prueba»; no se toca nada.";
@@ -797,39 +794,6 @@ public final class App {
 
     /** El auditor mira la ventana con los ojos y la compara con lo esperado. null = bien; si no, el motivo. */
     @SuppressWarnings("unchecked")
-    /**
-     * Comprueba que un texto está en la ventana LEYENDO sus controles (UIA), no mirando la imagen: una columna estrecha
-     * corta «justificante» en «ju…» en la captura pero el control guarda el nombre entero. Gana a la vista en todo lo
-     * que se pueda leer; la imagen queda para lo que UIA no da. Devuelve null si está, o por qué no.
-     */
-    static String comprobarTexto(es.amagna.asistente.cerebro.Receta.Paso paso, java.util.Map<String, String> ps,
-            VentanasNativas ventanas, Controles ctrl) {
-        String buscado = es.amagna.asistente.cerebro.Receta.sustituir(String.valueOf(paso.in().get("texto")), ps);
-        String titulo = es.amagna.asistente.estados.Ejecutor.tituloReal(ventanas.abiertas(), String.valueOf(paso.in().get("ventana")));
-        if (titulo == null) {
-            return "no encuentro la ventana «" + paso.in().get("ventana") + "» para comprobar «" + buscado + "»";
-        }
-        String volcado = ctrl.arbol(titulo, 14, 5000);
-        if (llano(volcado).contains(llano(buscado))) {
-            System.out.println("  Comprobado leyendo la ventana: «" + buscado + "» está.");
-            return null;
-        }
-        StringBuilder cerca = new StringBuilder();
-        String clave = String.valueOf(paso.in().getOrDefault("pista", "adjunto"));
-        int n = 0;
-        for (String linea : volcado.split("\\R")) {
-            if (llano(linea).contains(llano(clave)) && n++ < 8) {
-                cerca.append("\n    ").append(linea.strip().length() > 200 ? linea.strip().substring(0, 200) : linea.strip());
-            }
-        }
-        return "no leo «" + buscado + "» en «" + titulo + "». Líneas parecidas que sí leo:" + (n == 0 ? " ninguna" : cerca);
-    }
-
-    private static String llano(String t) {
-        return java.text.Normalizer.normalize(t == null ? "" : t, java.text.Normalizer.Form.NFD)
-                .replaceAll("\\p{M}", "").toLowerCase(java.util.Locale.ROOT);
-    }
-
     private static String auditarPantalla(es.amagna.asistente.cerebro.Receta.Paso paso, java.util.Map<String, String> ps,
             VentanasNativas ventanas, Controles ctrl, List<String> a) {
         if (a.contains("--sin-auditor")) {
