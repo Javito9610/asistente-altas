@@ -8,4 +8,7 @@ echo.
 echo ---------- RESUMEN ----------
 %SystemRoot%\System32\findstr.exe /B /C:"AUDITOR" /C:"YA HECHA" /C:"HECHO" /C:"PARADO" /C:"FALLO" /C:"TIEMPO" /C:"  fuera" /C:"  inicio" /C:"  lista" /C:"  formulario" /C:"=====" tarea-completa.log
 echo.
+echo.
+echo ==================== TERMINADO: MIRA ARRIBA EL RESUMEN ====================
+echo 
 pause

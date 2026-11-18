@@ -51,6 +51,52 @@ public final class Auditor {
             "ok" solo es true si TODOS los campos esperados se ven y coinciden y no hay nada raro.""";
 
     /**
+     * Lectura PURA de la lista de adjuntos: el modelo solo transcribe lo que ve (total y nombres tal como salen,
+     * cortados o no) y no juzga nada. El juicio lo hace el código con comprobarAdjuntos. Mezclar las dos cosas en un
+     * veredicto hacía que el modelo diera por «diferencia» un nombre cortado por la columna.
+     * Devuelve el texto «Total Adjuntos=N, Nombre Adjunto=…» listo para comprobarAdjuntos.
+     */
+    @SuppressWarnings("unchecked")
+    public static String transcribirAdjuntos(Cerebro cerebro, String modelo, byte[] png) {
+        Map<String, Object> r = cerebro.pensar(Json.obj(
+                "model", modelo,
+                "max_tokens", 600,
+                "system", "Transcribes lo que ves, sin juzgar. Contesta SOLO un objeto JSON, sin texto antes ni después.",
+                "messages", List.of(Json.obj("role", "user", "content", List.of(
+                        Json.obj("type", "image", "source", Json.obj("type", "base64", "media_type", "image/png",
+                                "data", Base64.getEncoder().encodeToString(png))),
+                        Json.obj("type", "text", "text", "En la pestaña «Adjuntos» de esta ventana hay una lista de documentos y debajo "
+                                + "un «Total Adjuntos: N». Transcribe el número N y el texto de la columna «Nombre Adjunto» de CADA fila, "
+                                + "tal como se lee, aunque termine en «...». No corrijas ni completes. Formato: "
+                                + "{\"total\": N, \"nombres\": [\"...\", \"...\"]}. Si no se ve la lista: {\"total\": null, \"nombres\": []}"))))));
+        StringBuilder texto = new StringBuilder();
+        for (Object o : (List<Object>) r.getOrDefault("content", List.of())) {
+            if (o instanceof Map<?, ?> b && "text".equals(b.get("type"))) {
+                texto.append(b.get("text"));
+            }
+        }
+        String t = texto.toString();
+        int a = t.indexOf('{');
+        int z = t.lastIndexOf('}');
+        if (a < 0 || z <= a) {
+            return "";
+        }
+        try {
+            Map<String, Object> m = Json.objeto(t.substring(a, z + 1));
+            StringBuilder b = new StringBuilder();
+            if (m.get("total") != null) {
+                b.append("Total Adjuntos=").append(String.valueOf(m.get("total")).replaceAll("\\.0$", ""));
+            }
+            for (Object n : (List<Object>) m.getOrDefault("nombres", List.of())) {
+                b.append(", Nombre Adjunto=").append(n);
+            }
+            return b.toString();
+        } catch (RuntimeException e) {
+            return "";
+        }
+    }
+
+    /**
      * Comprueba la lista de adjuntos EN CÓDIGO sobre lo que el auditor dice que vio: el total y que cada nombre
      * empieza por lo esperado (la columna corta los nombres largos, así que se compara el principio). Dejar esto al
      * «ok» del modelo no valía: veía bien los adjuntos pero los apuntaba con otro nombre de campo y lo daba por no visto.

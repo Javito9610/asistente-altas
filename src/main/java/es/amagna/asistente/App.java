@@ -757,7 +757,9 @@ public final class App {
                 }
             }
         };
-        var ej = new es.amagna.asistente.estados.Ejecutor(mapa, observa, hace, rescate, null, System.out::println);
+        java.util.function.Consumer<String> conHora = linea -> System.out.println(
+                "[" + java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")) + "] " + linea.stripLeading());
+        var ej = new es.amagna.asistente.estados.Ejecutor(mapa, observa, hace, rescate, null, conHora);
         var diario = new es.amagna.asistente.estados.Diario(Path.of("registro", "tareas-hechas.tsv"));
         return (tarea, params, clave, repetir) -> {
             // El diario: una tarea con clave que ya se hizo NO se repite (dos expedientes iguales es el peor error posible).
@@ -827,15 +829,15 @@ public final class App {
         boolean conAdjuntos = total.matches("\\d+") && !inicios.isBlank();
         var v = es.amagna.asistente.cerebro.Auditor.auditar(new ClaudeApi(Clave.leer()), modelo,
                 d.pngQueCabe(es.amagna.asistente.manos.Escala.ANCHO_MAX, es.amagna.asistente.manos.Escala.ALTO_MAX), esperado,
-                "la ventana «" + titulo + "» del programa" + (conAdjuntos
-                        ? ". Además, en «vio» apunta «Total Adjuntos» con el número y, uno por uno, «Nombre Adjunto» tal como se lee en la lista de la pestaña Adjuntos"
-                        : ""));
+                "la ventana «" + titulo + "» del programa");
         System.out.println("  " + v.resumen());
         if (!v.ok()) {
             return v.resumen();
         }
         if (conAdjuntos) {
-            String mal = es.amagna.asistente.cerebro.Auditor.comprobarAdjuntos(v.vio(), Integer.parseInt(total), List.of(inicios.split("\\|")));
+            String leido = es.amagna.asistente.cerebro.Auditor.transcribirAdjuntos(new ClaudeApi(Clave.leer()), modelo,
+                    d.pngQueCabe(es.amagna.asistente.manos.Escala.ANCHO_MAX, es.amagna.asistente.manos.Escala.ALTO_MAX));
+            String mal = es.amagna.asistente.cerebro.Auditor.comprobarAdjuntos(leido, Integer.parseInt(total), List.of(inicios.split("\\|")));
             if (mal != null) {
                 return "AUDITORÍA NO OK (adjuntos: " + mal + ")";
             }

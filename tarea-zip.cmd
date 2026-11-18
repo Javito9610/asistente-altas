@@ -7,4 +7,7 @@ echo ===== FIN (codigo %ERRORLEVEL%) ===== >> tarea-zip.log
 echo.
 %SystemRoot%\System32\findstr.exe /B /C:"---------- INFORME" /C:"  EXPEDIENTE" /C:"      " /C:"  NO SE CREA" /C:"Hechos" /C:"=====" tarea-zip.log
 echo.
+echo.
+echo ==================== TERMINADO: MIRA ARRIBA EL RESUMEN ====================
+echo 
 pause
