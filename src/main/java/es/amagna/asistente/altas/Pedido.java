@@ -91,21 +91,13 @@ public final class Pedido {
             if (i == 0) {
                 m.put("adjunto_nombre", nombre);
             }
-            inicios.add("«" + nombre.substring(0, Math.min(12, nombre.length())) + "»");
+            inicios.add(nombre.substring(0, Math.min(12, nombre.length())));
         }
         if (!inicios.isEmpty()) {
-            m.put("adjuntos_resumen", resumenDeAdjuntos(inicios));
+            m.put("adjuntos_total", String.valueOf(inicios.size()));
+            m.put("adjuntos_inicios", String.join("|", inicios));
         }
         return m;
-    }
-
-    /**
-     * Lo que debe verse en la lista de adjuntos. La columna corta los nombres largos, así que se pide el NÚMERO de
-     * adjuntos y que cada nombre EMPIECE por lo que se lee (los nombres llevan el id del documento al principio).
-     */
-    public static String resumenDeAdjuntos(List<String> inicios) {
-        return inicios.size() + (inicios.size() == 1 ? " adjunto" : " adjuntos")
-                + "; los nombres salen cortados por el ancho de la columna: basta con que cada uno EMPIECE por " + String.join(", ", inicios);
     }
 
     /** Un nombre de fichero que Windows acepta. */

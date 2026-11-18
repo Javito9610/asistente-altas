@@ -822,11 +822,26 @@ public final class App {
         }
         String modelo = a.contains("--modelo-auditor") ? a.get(a.indexOf("--modelo-auditor") + 1)
                 : es.amagna.asistente.cerebro.Auditor.MODELO_POR_DEFECTO;
+        String total = es.amagna.asistente.cerebro.Receta.sustituir(String.valueOf(paso.in().getOrDefault("adjuntos_total", "")), ps);
+        String inicios = es.amagna.asistente.cerebro.Receta.sustituir(String.valueOf(paso.in().getOrDefault("adjuntos_inicios", "")), ps);
+        boolean conAdjuntos = total.matches("\\d+") && !inicios.isBlank();
         var v = es.amagna.asistente.cerebro.Auditor.auditar(new ClaudeApi(Clave.leer()), modelo,
                 d.pngQueCabe(es.amagna.asistente.manos.Escala.ANCHO_MAX, es.amagna.asistente.manos.Escala.ALTO_MAX), esperado,
-                "la ventana «" + titulo + "» del programa");
+                "la ventana «" + titulo + "» del programa" + (conAdjuntos
+                        ? ". Además, en «vio» apunta «Total Adjuntos» con el número y, uno por uno, «Nombre Adjunto» tal como se lee en la lista de la pestaña Adjuntos"
+                        : ""));
         System.out.println("  " + v.resumen());
-        return v.ok() ? null : v.resumen();
+        if (!v.ok()) {
+            return v.resumen();
+        }
+        if (conAdjuntos) {
+            String mal = es.amagna.asistente.cerebro.Auditor.comprobarAdjuntos(v.vio(), Integer.parseInt(total), List.of(inicios.split("\\|")));
+            if (mal != null) {
+                return "AUDITORÍA NO OK (adjuntos: " + mal + ")";
+            }
+            System.out.println("  Adjuntos comprobados: " + total + " y empiezan por " + inicios.replace("|", ", ") + ".");
+        }
+        return null;
     }
 
     /** Los «--param nombre=valor» de la línea de órdenes. */

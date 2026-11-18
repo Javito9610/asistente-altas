@@ -217,8 +217,8 @@
           "Etapa": "PEND. ENVIAR",
           "Estado Expediente": "Abierto",
           "Cliente": "{cliente_nombre}",
-          "Contrario": "{contrario_nombre}",
-          "Lista de adjuntos (pestaña Adjuntos)": "{adjuntos_resumen}"}}}
+          "Contrario": "{contrario_nombre}"},
+        "adjuntos_total": "{adjuntos_total}", "adjuntos_inicios": "{adjuntos_inicios}"}}
      ]},
 
     {"nombre": "guardar", "de": "formulario-expediente", "a": "lista-expedientes", "segundos": 45, "toca": true,

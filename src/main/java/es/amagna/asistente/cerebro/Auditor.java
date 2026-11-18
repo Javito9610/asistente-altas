@@ -50,6 +50,31 @@ public final class Auditor {
             "no_se_ve": ["campo"], "otros": []}
             "ok" solo es true si TODOS los campos esperados se ven y coinciden y no hay nada raro.""";
 
+    /**
+     * Comprueba la lista de adjuntos EN CÓDIGO sobre lo que el auditor dice que vio: el total y que cada nombre
+     * empieza por lo esperado (la columna corta los nombres largos, así que se compara el principio). Dejar esto al
+     * «ok» del modelo no valía: veía bien los adjuntos pero los apuntaba con otro nombre de campo y lo daba por no visto.
+     * Devuelve null si cuadra, o por qué no.
+     */
+    public static String comprobarAdjuntos(String vio, int total, List<String> inicios) {
+        String v = vio == null ? "" : vio;
+        if (!java.util.regex.Pattern.compile("(?is)total[^=,}]*=\\s*" + total + "(?!\\d)").matcher(v).find()) {
+            return "el total de adjuntos debía ser " + total + " y el auditor vio: " + v;
+        }
+        String llano = llano(v);
+        for (String i : inicios) {
+            if (!llano.contains(llano(i))) {
+                return "no se ve ningún adjunto que empiece por «" + i + "» (el auditor vio: " + v + ")";
+            }
+        }
+        return null;
+    }
+
+    private static String llano(String t) {
+        return java.text.Normalizer.normalize(t == null ? "" : t, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "").toLowerCase(java.util.Locale.ROOT);
+    }
+
     private Auditor() {
     }
 

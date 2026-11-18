@@ -7,4 +7,5 @@ contrario=33857008-L
 contrario_nombre=ALEJANDRO PÉREZ MACÍAS
 adjunto=C:\Proyectos\asistente-altas\pruebas\adjunto-prueba.txt
 adjunto_nombre=adjunto-prueba
-adjuntos_resumen=1 adjunto; los nombres salen cortados por el ancho de la columna: basta con que cada uno EMPIECE por «adjunto-prueba»
+adjuntos_total=1
+adjuntos_inicios=adjunto-prue

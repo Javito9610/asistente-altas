@@ -89,6 +89,18 @@ public final class Controles {
             raiz = Uia.deVentana(hwnd);
         }
         if (raiz == null) {
+            // Un aviso de Windows (MessageBox) guarda su texto en controles normales: se lee sin UIA.
+            StringBuilder nativo = new StringBuilder();
+            for (Pointer h : Win32.hijos(hwnd)) {
+                String t = Win32.titulo(h);
+                if (t != null && !t.isBlank()) {
+                    nativo.append("- ").append(Win32.clase(h).toLowerCase(java.util.Locale.ROOT).contains("button") ? "boton" : "texto")
+                            .append(" «").append(t.strip()).append("»\n");
+                }
+            }
+            if (nativo.length() > 0) {
+                return ("Controles de «" + Win32.titulo(hwnd) + "» (leídos sin UIA):\n" + nativo).strip();
+            }
             return sinUia();
         }
         StringBuilder b = new StringBuilder("Controles de «" + Win32.titulo(hwnd) + "»:\n");

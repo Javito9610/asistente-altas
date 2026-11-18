@@ -1463,7 +1463,18 @@ public final class Comprobaciones {
         var m = es.amagna.asistente.altas.Pedido.conAdjuntos(k, List.of("C:\\t\\1-dni.pdf", "C:\\t\\2-contrato.pdf"));
         ok(m.get("adjunto").endsWith("1-dni.pdf") && m.get("adjunto2").endsWith("2-contrato.pdf") && m.get("adjunto_nombre").equals("1-dni"),
                 "pedidos: los adjuntos van en adjunto, adjunto2…");
-        ok(m.get("adjuntos_resumen").startsWith("2 adjuntos") && m.get("adjuntos_resumen").contains("«2-contrato»"), "pedidos: la lista de adjuntos se audita por número y por cómo empieza cada nombre (la columna los corta)");
+        ok("2".equals(m.get("adjuntos_total")) && "1-dni|2-contrato".equals(m.get("adjuntos_inicios")), "pedidos: total de adjuntos y cómo empieza cada nombre (la columna los corta)");
+        String vio1 = "{Descripción Expediente=MICRO, Adjuntos (total)=2, Adjunto 1 (nombre)=-303157930-2-id..., Adjunto 2 (nombre)=-303157930-1-ju...}";
+        ok(es.amagna.asistente.cerebro.Auditor.comprobarAdjuntos(vio1, 2, List.of("-303157930-1", "-303157930-2")) == null,
+                "auditoría de adjuntos: lo que vio el auditor el 18/11 (otro nombre de campo, nombres cortados) cuadra");
+        ok(es.amagna.asistente.cerebro.Auditor.comprobarAdjuntos("{Total Adjuntos=1, Nombre Adjunto=-695595127-1-id... (cortado)}", 1, List.of("-695595127-1")) == null,
+                "auditoría de adjuntos: un adjunto cortado cuadra");
+        ok(es.amagna.asistente.cerebro.Auditor.comprobarAdjuntos(vio1, 3, List.of("-303157930-1")) != null,
+                "auditoría de adjuntos: si hay menos de los esperados, NO cuadra");
+        ok(es.amagna.asistente.cerebro.Auditor.comprobarAdjuntos(vio1, 2, List.of("-303157930-1", "-999999999-1")) != null,
+                "auditoría de adjuntos: si falta un adjunto esperado, NO cuadra");
+        ok(es.amagna.asistente.cerebro.Auditor.comprobarAdjuntos("{Adjuntos (total)=12}", 2, List.of("")) != null,
+                "auditoría de adjuntos: 12 no vale por 2");
         ok(es.amagna.asistente.altas.Pedido.nombreSeguro("a:b*c?.pdf").equals("a_b_c_.pdf"), "pedidos: nombres de fichero que Windows acepta");
         Map<String, Object> sinNif = new java.util.LinkedHashMap<>(cli);
         sinNif.put("nif", "");
