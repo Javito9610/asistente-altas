@@ -28,7 +28,7 @@ public final class Auditor {
             if (!noSeVe.isEmpty()) {
                 p.add("no se ve: " + String.join("; ", noSeVe));
             }
-            return "AUDITORÍA NO OK (" + String.join(" · ", p) + ")";
+            return "AUDITORÍA NO OK (" + String.join(" · ", p) + ")" + (vio == null || vio.isBlank() || vio.equals("{}") ? "" : " [el auditor vio: " + vio + "]");
         }
     }
 

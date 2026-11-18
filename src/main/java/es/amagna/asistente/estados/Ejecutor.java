@@ -212,12 +212,28 @@ public final class Ejecutor {
     }
 
     /** El estado, esperando a que un «Cargando…» se quite. */
+    private String ultimoAtencion = "";
+
     String estado() {
         String e = Reconocedor.estado(mapa, observa.ventanas(), observa::texto);
         long fin = reloj.ahora() + 25_000;
         while ("cargando".equals(e) && reloj.ahora() < fin) {
             reloj.dormir(500);
             e = Reconocedor.estado(mapa, observa.ventanas(), observa::texto);
+        }
+        if ("atencion".equals(e)) {
+            // Un aviso «Atención» que el mapa no distingue: se deja escrito lo que se lee para no adivinar por qué.
+            String leido;
+            try {
+                leido = observa.texto("Atención");
+            } catch (RuntimeException x) {
+                leido = "(error al leer: " + x.getMessage() + ")";
+            }
+            String resumen = leido == null ? "" : leido.replaceAll("\\s+", " ").strip();
+            if (!resumen.equals(ultimoAtencion)) {
+                ultimoAtencion = resumen;
+                registro.accept("  Aviso «Atención» sin reconocer. Se lee: " + (resumen.length() > 500 ? resumen.substring(0, 500) + "…" : resumen));
+            }
         }
         anotarNumero(e);
         return e;
