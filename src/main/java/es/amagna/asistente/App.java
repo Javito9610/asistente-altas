@@ -584,7 +584,7 @@ public final class App {
             System.exit(2);
         }
         String cliente = a.contains("--cliente") ? a.get(a.indexOf("--cliente") + 1) : "";
-        if (cliente.isBlank() && !a.contains("--solo-explorar") && !a.contains("--solo-contrario") && !a.contains("--solo-cliente") && !a.contains("--solo-usuario")) {
+        if (cliente.isBlank() && !a.contains("--solo-explorar") && !a.contains("--solo-contrario") && !a.contains("--solo-cliente") && !a.contains("--solo-usuario") && !a.contains("--solo-ficha")) {
             throw new IllegalArgumentException("Falta --cliente \"texto con el que buscar al cliente de prueba\"");
         }
         String contrario = a.contains("--contrario") ? a.get(a.indexOf("--contrario") + 1) : "";
@@ -594,7 +594,27 @@ public final class App {
         if (es.amagna.asistente.altas.Plan.descripcionValida(desc).isEmpty()) {
             throw new IllegalArgumentException("Descripción no válida: " + desc);
         }
-        String tarea = a.contains("--solo-usuario")
+        String tarea = a.contains("--solo-ficha")
+                ? """
+                Estás en la Empresa de prueba y vas a CREAR UNA FICHA DE CLIENTE NUEVA con datos 100 % ficticios, para aprender el
+                camino exacto. Es lo único que se guarda. Miguel (el jefe) quiere que el asistente: busque al cliente por NIF y,
+                solo si NO existe, cree la ficha; y adjunte a la ficha el DNI, la hoja de encargo y el justificante.
+                Datos de la ficha: Nombre OLIVIA · Apellidos TESTEO PRUEBA · NIF 99887766P · Teléfono/Móvil 600 11 22 33 ·
+                Correo olivia.testeo.prueba@ejemplo-invalido.test · Domicilio Calle de Proba 9, 15001 A Coruña (rellena solo los campos
+                que existan; el resto, vacío).
+                Ficheros ficticios (en el PC): C:\\Proyectos\\asistente-altas\\pruebas\\ficha\\dni-prueba.txt, hoja-encargo-prueba.txt
+                y justificante-prueba.txt (misma carpeta).
+                Pasos: 1) Mira primero cómo se BUSCA un cliente por NIF en la lista de clientes (Bases de Datos > Clientes) y comprueba
+                que 99887766P NO existe. 2) Pulsa «Alta» en esa lista (la ficha «Alta Cliente»), rellena y mira bien cada campo con UIA
+                (el Móvil ya dio problemas: en una prueba se quedó vacío; averigua por qué y cómo se escribe de forma fiable, p. ej.
+                clic, ctrl+a, teclear, y comprobar). 3) Busca cómo se adjuntan documentos a la ficha del cliente (pestaña o botón de
+                adjuntos) y adjunta los tres ficheros; verifica que aparecen. 4) Guarda y comprueba que la ficha existe buscándola
+                por NIF. Todo lo que no sea guardar la ficha de OLIVIA, NO lo hagas (no toques otros clientes, ni «Configuración»,
+                ni Baja/Eliminar). Cierra lo que abras. Si algo no está claro en 2 intentos, para y dilo.
+                Termina con líneas «APRENDIDO: …», una por cosa: orden exacto de pasos, nombres exactos de controles, diálogos,
+                avisos, qué lee UIA y qué no.
+                """
+                : a.contains("--solo-usuario")
                 ? """
                 Estás en la Empresa de prueba. NO guardes ni cambies NADA hasta saber dónde se cambia el usuario. Miguel (el jefe)
                 confirmó que tras subir un expediente con la cuenta pbancario2 hay que CAMBIAR su usuario a «Lia Silva»: falta saber
@@ -689,11 +709,11 @@ public final class App {
                 Termina con líneas «APRENDIDO: …» (una por cosa, con el nombre exacto del control y cómo se llega).
                 """ : "\nSi aprendes algo útil de la pantalla (dónde está algo, un aviso, un truco), añade al final una línea «APRENDIDO: …» por cosa.");
         List<String> b = new java.util.ArrayList<>(List.of(tarea, "--como", "expedientes"));
-        if ((a.contains("--solo-explorar") || a.contains("--solo-contrario") || a.contains("--solo-cliente") || a.contains("--solo-usuario")) && !a.contains("--tope-tokens")) {
+        if ((a.contains("--solo-explorar") || a.contains("--solo-contrario") || a.contains("--solo-cliente") || a.contains("--solo-usuario") || a.contains("--solo-ficha")) && !a.contains("--tope-tokens")) {
             b.add("--tope-tokens");
-            b.add(a.contains("--solo-usuario") ? "1800000" : "900000");
+            b.add(a.contains("--solo-ficha") ? "2500000" : a.contains("--solo-usuario") ? "1800000" : "900000");
         }
-        if ((a.contains("--explorar") || a.contains("--solo-explorar") || a.contains("--solo-contrario") || a.contains("--solo-cliente") || a.contains("--solo-usuario")) && !a.contains("--pasos")) {
+        if ((a.contains("--explorar") || a.contains("--solo-explorar") || a.contains("--solo-contrario") || a.contains("--solo-cliente") || a.contains("--solo-usuario") || a.contains("--solo-ficha")) && !a.contains("--pasos")) {
             b.add("--pasos");
             b.add("100");
         }
