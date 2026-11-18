@@ -49,6 +49,7 @@
 
     {"nombre": "rellenar-datos", "de": "formulario-expediente", "a": "formulario-expediente", "segundos": 15,
      "pasos": [
+       {"accion": "esperar_a", "in": {"que": "pantalla quieta", "segundos": 10, "_opcional": true}},
        {"accion": "escribir_en", "ventana": "Expediente 1/2026",
         "in": {"ventana": "Expediente 1/2026", "control": "campo junto a Descripción Expediente", "texto": "{descripcion}", "_si": "descripcion"}},
        {"accion": "left_click", "ventana": "Expediente 1/2026", "rel": [357, 132], "in": {}},

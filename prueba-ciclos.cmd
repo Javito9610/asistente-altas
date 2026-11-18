@@ -12,7 +12,7 @@ set /a MAL=0
 echo ===== INICIO %DATE% %TIME% (%CICLOS% ciclos) ===== > registro\ciclos.log
 call asistente.cmd compilar >> registro\ciclos.log 2>&1
 for /l %%i in (1,1,%CICLOS%) do (
-  echo ##### CICLO %%i de %CICLOS% - %TIME% ##### >> registro\ciclos.log
+  echo ##### CICLO %%i de %CICLOS% - !TIME! ##### >> registro\ciclos.log
   echo Ciclo %%i de %CICLOS% en marcha...
   call asistente.cmd expedientes pruebas\lectura-lucia-expedientes.json pruebas\zips\lucia-prueba.zip --hacer --repetir >> registro\ciclos.log 2>&1
   if !ERRORLEVEL!==0 (
