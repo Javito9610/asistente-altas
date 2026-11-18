@@ -274,7 +274,13 @@ public final class Ejecutor {
             if (si != null && (params.get(String.valueOf(si)) == null || params.get(String.valueOf(si)).isBlank())) {
                 continue;
             }
+            long desde = reloj.ahora();
             String err = hace.paso(p, params);
+            long ms = reloj.ahora() - desde;
+            if (ms >= 4000 && !p.accion().equals("wait")) {
+                // Para saber DÓNDE se va el tiempo antes de recortar nada: solo los pasos que tardan.
+                registro.accept("  · «" + p.accion() + "» tardó " + (ms / 1000) + " s" + (p.ventana() == null ? "" : " (" + p.ventana() + ")"));
+            }
             if (err != null && (p.accion().equals("comprobar") || p.accion().equals("auditar") || err.startsWith("falta un parámetro"))) {
                 throw new Verificacion("«" + t.nombre() + "», paso «" + p.accion() + "»: " + err);
             }
