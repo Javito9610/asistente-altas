@@ -43,6 +43,7 @@ public final class Comprobaciones {
         campoInterior();
         auditor();
         anclas();
+        pedidos();
         alta();
         System.out.println("\nTODO BIEN: " + bien + " comprobaciones.");
     }
@@ -1430,6 +1431,41 @@ public final class Comprobaciones {
         g.fillRect(bx + 8, by + 6, 10, 14);
         g.fillRect(bx + 28, by + 10, 30, 4);
         g.dispose();
+    }
+
+    static void pedidos() {
+        Map<String, Object> cli = new java.util.LinkedHashMap<>();
+        cli.put("nombre", "Lucía");
+        cli.put("apellidos", "Fernández  Prueba");
+        cli.put("nif", "73.918.462-g");
+        List<Object> fich = new java.util.ArrayList<>(List.of(
+                Json.obj("ruta", "c/dni.pdf", "que_es", "identidad"),
+                Json.obj("ruta", "c/hoja.pdf", "que_es", "hoja_encargo")));
+        List<Object> exps = new java.util.ArrayList<>(List.of(
+                Json.obj("entidad", "KVIKU FINANCE SPAIN, S.L.U.", "cif_entidad", "b 12345678", "descripcion", "MICRO",
+                        "documentos", List.of("c/K/c1.pdf")),
+                Json.obj("entidad", "SIN CIF S.A.", "descripcion", "PRESTAMO (T)", "documentos", List.of("c/S/c1.pdf")),
+                Json.obj("entidad", "SIN DESCRIPCION S.L.", "cif_entidad", "B99999999", "descripcion", "LINEA", "documentos", List.of())));
+        var l = new es.amagna.asistente.altas.Lectura.Resultado(cli, exps, fich, List.of(), "");
+        var plan = es.amagna.asistente.altas.Plan.de(l, "ANDREA semana 3.zip");
+        var r = es.amagna.asistente.altas.Pedido.de(l, plan);
+        ok(r.pedidos().size() == 2 && r.noSeCrean().size() == 1 && r.noSeCrean().get(0).contains("SIN DESCRIPCION"),
+                "pedidos: sin descripción válida no se crea el expediente (y se dice); los demás sí");
+        var k = r.pedidos().get(0);
+        ok(k.params().get("cliente").equals("LUCÍA FERNÁNDEZ PRUEBA") && k.params().get("contrario").equals("B12345678")
+                        && k.clave().equals("73918462G|KVIKUFINANCESPAINSLU|MICRO"),
+                "pedidos: cliente en mayúsculas, CIF sin espacios, y clave NIF|entidad|descripción contra duplicados");
+        var s = r.pedidos().get(1);
+        ok(!s.params().containsKey("contrario") && s.avisos().stream().anyMatch(a -> a.contains("sin contrario")),
+                "pedidos: sin CIF en los papeles no se busca el contrario por nombre: expediente sin contrario y aviso");
+        var m = es.amagna.asistente.altas.Pedido.conAdjuntos(k, List.of("C:\\t\\1-dni.pdf", "C:\\t\\2-contrato.pdf"));
+        ok(m.get("adjunto").endsWith("1-dni.pdf") && m.get("adjunto2").endsWith("2-contrato.pdf") && m.get("adjunto_nombre").equals("1-dni"),
+                "pedidos: los adjuntos van en adjunto, adjunto2…");
+        ok(es.amagna.asistente.altas.Pedido.nombreSeguro("a:b*c?.pdf").equals("a_b_c_.pdf"), "pedidos: nombres de fichero que Windows acepta");
+        Map<String, Object> sinNif = new java.util.LinkedHashMap<>(cli);
+        sinNif.put("nif", "");
+        var l2 = new es.amagna.asistente.altas.Lectura.Resultado(sinNif, exps, fich, List.of(), "");
+        ok(es.amagna.asistente.altas.Pedido.de(l2, plan).pedidos().isEmpty(), "pedidos: sin NIF del cliente no se crea nada");
     }
 
     static void anclas() {

@@ -60,6 +60,8 @@ Un cliente puede traer varias reclamaciones, una por entidad y producto. De cada
   Club Card» son marcas o comercios; el prestamista es la sociedad que firma el contrato. Si el recibo lo emite otra
   sociedad (una gestora de cobro) distinta del prestamista del contrato, vale la del contrato. La marca comercial, si
   la hay, va en `marca`.
+- `cif_entidad` — el CIF de esa sociedad prestamista tal como figura en el contrato (sin espacios; con guion si lo lleva). Vacío si
+  no consta en los papeles: no lo deduzcas ni lo recuerdes de memoria.
 - `tipo` — qué se reclama, con las palabras del papel (usura, revolving, gastos hipotecarios, tarjeta…).
 - `contrato` — el número o referencia del contrato.
 - `fecha_contrato` — `dd/mm/aaaa`.
@@ -151,7 +153,7 @@ Solo un objeto JSON, sin texto antes ni después, sin ```. Los campos que no con
     "domicilio": "", "fecha_nacimiento": ""
   },
   "expedientes": [
-    {"entidad": "", "tipo": "", "contrato": "", "fecha_contrato": "", "importe_contrato": "",
+    {"entidad": "", "cif_entidad": "", "tipo": "", "contrato": "", "fecha_contrato": "", "importe_contrato": "",
      "cuantia_reclamada": "", "tae": "", "descripcion": "", "marca": "", "documentos": ["ruta/del/documento.pdf"]}
   ],
   "ficheros": [

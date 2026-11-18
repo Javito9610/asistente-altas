@@ -17,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -49,6 +50,7 @@ public final class App {
             case "agente", "expediente-prueba" -> 900;
             case "receta" -> 600;
             case "tarea" -> 900;
+            case "expedientes" -> args.contains("--hacer") ? 3600 : 120;
             case "alta" -> 1200;
             case "probar-windows", "arranque", "secretos", "secreto", "guardar-clave", "ayuda" -> 0;
             default -> 300;
@@ -96,6 +98,7 @@ public final class App {
                 case "probar-manos" -> probarManos();
                 case "guardar-clave" -> guardarClave();
                 case "ventanas" -> System.out.println(new VentanasNativas(false).abiertas());
+                case "expedientes" -> expedientes(Arrays.asList(args).subList(1, args.length));
                 case "zips" -> zips(Arrays.asList(args).subList(1, args.length));
                 case "leer" -> leer(Arrays.asList(args).subList(1, args.length));
                 case "alta" -> alta(Arrays.asList(args).subList(1, args.length));
@@ -203,6 +206,87 @@ public final class App {
         System.out.printf("Pantalla (lógica): %d × %d · escala de Windows: %.0f %%%n", e.anchoLogico(), e.altoLogico(), m.escalaWindows() * 100);
         System.out.printf("Lo que verá Claude: %d × %d (factor %.3f)%n", e.anchoImagen(), e.altoImagen(), e.factor());
         System.out.println("Guardada en captura.png. Ábrela: tiene que verse nítida y entera.");
+    }
+
+    /**
+     * De un bloque leído (lectura.json) a sus expedientes en MN, uno por sociedad prestamista. Sin --hacer solo cuenta
+     * lo que haría (no toca MN, no gasta IA). Con --hacer los crea en la Empresa de prueba y da el informe.
+     *   asistente expedientes <lectura.json> <bloque.zip> [--carpeta ruta] [--hacer] [--sin-ia] [--repetir]
+     */
+    private static void expedientes(List<String> a) throws IOException {
+        if (a.size() < 2 || a.get(0).startsWith("--") || a.get(1).startsWith("--")) {
+            throw new IllegalArgumentException("Uso: asistente expedientes <lectura.json> <bloque.zip> [--hacer]");
+        }
+        Alta.Decision d = Alta.deTexto(Files.readString(Path.of(a.get(0)), StandardCharsets.UTF_8));
+        if (!d.seguir()) {
+            System.out.println(d.mensaje());
+            System.exit(1);
+        }
+        Path zip = Path.of(a.get(1));
+        if (!Files.isRegularFile(zip)) {
+            zip = Zips.carpeta(a).resolve(a.get(1));
+        }
+        Zips.Bloque bloque = Zips.abrir(zip);
+        if (!bloque.vale()) {
+            throw new IllegalStateException("Ese bloque no se puede abrir. " + bloque.problema());
+        }
+        String nombreZip = zip.getFileName().toString();
+        var plan = es.amagna.asistente.altas.Plan.de(d.lectura(), nombreZip);
+        var res = es.amagna.asistente.altas.Pedido.de(d.lectura(), plan);
+        Path trabajo = Path.of("trabajo", nombreZip.replaceAll("(?i)\\.zip$", "").replaceAll("[^A-Za-z0-9._-]+", "_")).toAbsolutePath();
+        var informe = new StringBuilder();
+        for (String n : res.noSeCrean()) {
+            informe.append("  NO SE CREA: ").append(n).append('\n');
+        }
+        var corredor = a.contains("--hacer") ? corredorDeTareas(a) : null;
+        int hechos = 0;
+        int fallos = 0;
+        for (var p : res.pedidos()) {
+            var rutas = new ArrayList<String>();
+            var faltan = new ArrayList<String>();
+            var docs = es.amagna.asistente.altas.Pedido.buscar(p.ficherosDelBloque(), bloque);
+            int n = 0;
+            for (String ruta : p.ficherosDelBloque()) {
+                var doc = docs.get(ruta);
+                if (doc == null) {
+                    faltan.add(ruta);
+                    continue;
+                }
+                Path f = trabajo.resolve(p.clave().hashCode() + "-" + (++n) + "-" + es.amagna.asistente.altas.Pedido.nombreSeguro(doc.nombre()));
+                if (corredor != null) {
+                    Files.createDirectories(trabajo);
+                    Files.write(f, doc.datos());
+                }
+                rutas.add(f.toString());
+            }
+            var params = es.amagna.asistente.altas.Pedido.conAdjuntos(p, rutas);
+            informe.append("  EXPEDIENTE ").append(p.entidad()).append(" · ").append(params.get("descripcion"))
+                    .append(" · contrario ").append(params.getOrDefault("contrario", "(ninguno)"))
+                    .append(" · ").append(rutas.size()).append(" adjuntos\n");
+            for (String av : p.avisos()) {
+                informe.append("      aviso: ").append(av).append('\n');
+            }
+            for (String f : faltan) {
+                informe.append("      aviso: el documento «").append(f).append("» no está en el bloque.\n");
+            }
+            if (corredor != null) {
+                var r = corredor.correr("crear-expediente", params, p.clave(), a.contains("--repetir"));
+                informe.append("      → ").append(r.mensaje()).append('\n');
+                if (r.bien()) {
+                    hechos++;
+                } else {
+                    fallos++;
+                }
+            }
+        }
+        System.out.println("\n---------- INFORME " + nombreZip + " ----------");
+        System.out.print(informe);
+        if (corredor == null) {
+            System.out.println("(Solo informe: no se ha tocado MN. Para crearlos: --hacer)");
+        } else {
+            System.out.println("Hechos: " + hechos + " · parados: " + fallos + " · no se crean: " + res.noSeCrean().size());
+        }
+        System.exit(fallos == 0 ? 0 : 1);
     }
 
     /** Los .zip de la bandeja. --carpeta cambia la ruta solo esta vez. --ver enseña uno; si solo hay uno, también. */
@@ -580,13 +664,34 @@ public final class App {
         if (a.isEmpty()) {
             throw new IllegalArgumentException("Uso: asistente tarea <nombre> [--param k=v ...] [--mapa estados/mn.json] [--sin-ia]");
         }
+        var corredor = corredorDeTareas(a);
+        String clave = a.contains("--clave") ? a.get(a.indexOf("--clave") + 1) : "";
+        long t0 = System.currentTimeMillis();
+        var r = corredor.correr(a.get(0), parametros(a), clave, a.contains("--repetir"));
+        System.out.println(r.mensaje() + String.format(" · %.0f s · %d empujones de la IA", (System.currentTimeMillis() - t0) / 1000.0, r.rescates()));
+        System.exit(r.bien() ? 0 : 1);
+    }
+
+    private static boolean yaHecha(es.amagna.asistente.estados.Diario d, String clave) {
+        try {
+            return d.yaHecha(clave);
+        } catch (IOException e) {
+            throw new IllegalStateException("No se puede leer el diario de tareas: " + e.getMessage(), e);
+        }
+    }
+
+    /** Lo que hace falta para correr tareas del mapa una detrás de otra con las mismas opciones. */
+    interface CorredorDeTareas {
+        es.amagna.asistente.estados.Ejecutor.Resultado correr(String tarea, java.util.Map<String, String> params, String clave, boolean repetir);
+    }
+
+    private static CorredorDeTareas corredorDeTareas(List<String> a) throws IOException {
         var mapa = es.amagna.asistente.estados.Mapa.leer(Path.of(a.contains("--mapa") ? a.get(a.indexOf("--mapa") + 1) : "estados/mn.json"));
         var mapaMn = es.amagna.asistente.guion.Mapa.leer(Path.of("mapas", "mn.json"));
         var ventanas = new VentanasNativas(false);
         var ctrl = new Controles(ventanas);
         var motor = new Agente(new ClaudeApi("sin-uso"), new ManosRobot(false), ventanas, MODELO_POR_DEFECTO, "", 1, 1, System.out::println)
                 .conControles(ctrl);
-        var params = parametros(a);
         es.amagna.asistente.estados.Ejecutor.Hace hace = (paso, ps) -> {
             if ("abrir_mn".equals(paso.accion())) {
                 try {
@@ -634,36 +739,38 @@ public final class App {
             }
         };
         var ej = new es.amagna.asistente.estados.Ejecutor(mapa, observa, hace, rescate, null, System.out::println);
-        // El diario: una tarea con clave que ya se hizo NO se repite (dos expedientes iguales es el peor error posible).
-        String clave = a.contains("--clave") ? a.get(a.indexOf("--clave") + 1) : "";
         var diario = new es.amagna.asistente.estados.Diario(Path.of("registro", "tareas-hechas.tsv"));
-        if (diario.yaHecha(clave) && !a.contains("--repetir")) {
-            System.out.println("YA HECHA: la tarea con clave «" + clave + "» está en el diario (registro\\tareas-hechas.tsv). No se repite. "
-                    + "Si de verdad hay que repetirla: --repetir.");
-            System.exit(0);
-        }
-        long t0 = System.currentTimeMillis();
-        // Los botones se reconocen por su dibujo (se aprende solo, y solo vale si la tarea acaba bien y verificada).
-        if (!a.contains("--sin-anclas")) {
-            es.amagna.asistente.manos.Anclas.activar(Path.of("anclas"));
-        }
-        var r = ej.ejecutar(a.get(0), params);
-        var anclas = es.amagna.asistente.manos.Anclas.actual();
-        if (anclas != null) {
-            if (r.bien()) {
-                int nuevas = anclas.confirmar();
-                if (nuevas > 0) {
-                    System.out.println("  Anclas aprendidas: " + nuevas + " (carpeta anclas\\).");
-                }
-            } else {
-                anclas.descartar();
+        return (tarea, params, clave, repetir) -> {
+            // El diario: una tarea con clave que ya se hizo NO se repite (dos expedientes iguales es el peor error posible).
+            if (yaHecha(diario, clave) && !repetir) {
+                return new es.amagna.asistente.estados.Ejecutor.Resultado(true, "YA HECHA: la tarea con clave «" + clave
+                        + "» está en el diario (registro\\tareas-hechas.tsv). No se repite. Si de verdad hay que repetirla: --repetir.", "", 0);
             }
-        }
-        if (r.bien()) {
-            diario.hecha(clave, a.get(0), r.numero());
-        }
-        System.out.println(r.mensaje() + String.format(" · %.0f s · %d empujones de la IA", (System.currentTimeMillis() - t0) / 1000.0, r.rescates()));
-        System.exit(r.bien() ? 0 : 1);
+            // Los botones se reconocen por su dibujo (se aprende solo, y solo vale si la tarea acaba bien y verificada).
+            if (!a.contains("--sin-anclas")) {
+                es.amagna.asistente.manos.Anclas.activar(Path.of("anclas"));
+            }
+            var r = ej.ejecutar(tarea, params);
+            var anclas = es.amagna.asistente.manos.Anclas.actual();
+            if (anclas != null) {
+                if (r.bien()) {
+                    int nuevas = anclas.confirmar();
+                    if (nuevas > 0) {
+                        System.out.println("  Anclas aprendidas: " + nuevas + " (carpeta anclas\\).");
+                    }
+                } else {
+                    anclas.descartar();
+                }
+            }
+            if (r.bien()) {
+                try {
+                    diario.hecha(clave, tarea, r.numero());
+                } catch (IOException e) {
+                    System.out.println("  OJO: no se ha podido apuntar en el diario: " + e.getMessage());
+                }
+            }
+            return r;
+        };
     }
 
     /** El auditor mira la ventana con los ojos y la compara con lo esperado. null = bien; si no, el motivo. */
