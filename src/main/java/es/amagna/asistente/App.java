@@ -596,23 +596,22 @@ public final class App {
         }
         String tarea = a.contains("--solo-usuario")
                 ? """
-                Estás en la Empresa de prueba. NO guardes ni cambies NADA: esto es solo mirar. Javi (el dueño del proyecto) ha
-                autorizado expresamente abrir el botón «Configuración» DEL FORMULARIO DEL EXPEDIENTE (abajo a la derecha, junto a
-                «Alerta Ficha»). NO es la «Configuración» general del programa MN: esa NO se abre. Y dentro de ella no cambies,
-                actives, desactives ni borres nada: solo lees y sales con Cancelar/Cerrar.
-                Objetivo: averiguar cómo se asigna el USUARIO (responsable) de un expediente en MN. Miguel pidió que los
-                expedientes creados queden asignados al usuario «Lia Silva».
-                1) En la lista «Expedientes», abre con doble clic uno de los expedientes de prueba MÁS RECIENTES (los de abajo,
-                   descripción MICRO o PRESTAMO (T), cliente LUCIA FERNANDEZ PRUEBA). Estos los creó el asistente con el usuario
-                   de MN «pbancario2». Ve a la pestaña «Historial» y lee la columna «Usuario» de la primera línea (la creación):
-                   ¿qué usuario figura? Eso dice a quién asigna MN por defecto un expediente.
-                2) En ese mismo formulario abre el botón «Configuración» del formulario del expediente y describe todo lo que
-                   hay: pestañas, campos, desplegables, listas, botones, y en especial dónde se elige un usuario o responsable
-                   (nombre exacto del control, cómo se llega, qué valor trae y qué usuarios ofrece, incluyendo si aparece
-                   «Lia Silva»). NO cambies nada. Cierra con Cancelar/Cerrar y, si pregunta si guardar, di que NO.
-                3) Mira también si en la lista «Expedientes» hay alguna columna «Usuario» o filtro por usuario.
-                Al terminar cierra el formulario SIN guardar (Cancelar y «Sí» para salir) y comprueba con ventanas_abiertas que no
-                queda nada abierto. Si algo no está claro en 2 intentos, para y dilo. Termina con líneas «APRENDIDO: …», una por cosa.
+                Estás en la Empresa de prueba. NO guardes ni cambies NADA: esto es solo mirar menús. Javi (el dueño del proyecto)
+                quiere saber si MN permite asignar el USUARIO (responsable) de un expediente desde la pantalla. Ya se sabe que
+                NO está en el formulario del expediente ni en su «Configuración». Ya se sabe que la lista «Expedientes» tiene una
+                columna «Usuario» (vacía en los expedientes 49–56 que creó el asistente) y un criterio «Usuario» en el desplegable
+                de la caja de búsqueda. Falta mirar, en la LISTA «Expedientes» (sin abrir formularios):
+                1) Selecciona UNA fila (un expediente de prueba reciente, p. ej. el 56, de LUCIA FERNANDEZ PRUEBA) y haz clic
+                   DERECHO sobre ella: lista los elementos del menú contextual (solo leer; sal con Escape sin pulsar nada).
+                2) Abre los menús desplegables de los botones de abajo que tienen flecha (Opciones, Atajos, Correo, WhatsApp, MN Sign,
+                   Imprimir): lista SOLO los nombres de sus opciones y cierra con Escape. Busca algo como asignar usuario, cambiar
+                   responsable, reasignar, asignar expediente.
+                3) Abre el desplegable de criterio de la caja de búsqueda y confirma que existe «Usuario»; mira si al elegirlo
+                   la caja ofrece una lista de usuarios (¿aparece «Lia Silva»?). Sin buscar nada ni cambiar nada.
+                PROHIBIDO pulsar: Baja, Dar de baja, Eliminar, Cerrar expediente, Modificar empresa, ni ninguna opción de un
+                menú. Solo lees nombres y cierras con Escape. Si pregunta algo, di que NO o Cancelar.
+                Al terminar comprueba con ventanas_abiertas que no queda ningún menú ni diálogo abierto. Si algo no está claro
+                en 2 intentos, para y dilo. Termina con líneas «APRENDIDO: …», una por cosa (nombres exactos de las opciones).
                 """
                 : a.contains("--solo-cliente")
                 ? """
