@@ -54,7 +54,7 @@
        {"accion": "left_click", "ventana": "Expediente 1/2026", "rel": [357, 132], "in": {}},
        {"accion": "wait", "in": {"duration": 1}},
        {"accion": "double_click", "ventana": "Expediente 1/2026", "rel": [357, 132], "in": {}},
-       {"accion": "wait", "in": {"duration": 1}},
+       {"accion": "esperar_a", "in": {"que": "aparezca", "ventana": "Tipo de Expediente", "segundos": 20}},
        {"accion": "left_click", "ventana": "Tipo de Expediente", "rel": [81, 89], "in": {}},
        {"accion": "left_click", "ventana": "Tipo de Expediente", "rel": [199, 308], "in": {}},
        {"accion": "wait", "in": {"duration": 2}},
@@ -69,7 +69,7 @@
     {"nombre": "elegir-cliente", "de": "formulario-expediente", "a": "formulario-expediente", "segundos": 25,
      "pasos": [
        {"accion": "double_click", "ventana": "Expediente 1/2026", "rel": [597, 88], "in": {}},
-       {"accion": "wait", "in": {"duration": 2}},
+       {"accion": "esperar_a", "in": {"que": "aparezca", "ventana": "Clientes", "segundos": 20}},
        {"accion": "left_click", "ventana": "Clientes", "rel": [264, 30], "in": {}},
        {"accion": "wait", "in": {"duration": 1}},
        {"accion": "left_click", "ventana": "Clientes", "rel": [251, 123], "in": {}},
