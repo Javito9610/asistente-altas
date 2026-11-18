@@ -275,7 +275,7 @@ public final class Ejecutor {
                 continue;
             }
             String err = hace.paso(p, params);
-            if (err != null && (p.accion().equals("comprobar") || p.accion().equals("auditar") || err.startsWith("falta un parámetro"))) {
+            if (err != null && (p.accion().equals("comprobar") || p.accion().equals("auditar") || p.accion().equals("comprobar_texto") || err.startsWith("falta un parámetro"))) {
                 throw new Verificacion("«" + t.nombre() + "», paso «" + p.accion() + "»: " + err);
             }
             if (err != null) {

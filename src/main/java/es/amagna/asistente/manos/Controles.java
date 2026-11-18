@@ -84,6 +84,11 @@ public final class Controles {
         }
         Uia.Elemento raiz = Uia.deVentana(hwnd);
         if (raiz == null) {
+            // La conexión con UIA se queda vieja tras un diálogo modal: se reinicia y se pregunta otra vez antes de rendirse.
+            Uia.reiniciar();
+            raiz = Uia.deVentana(hwnd);
+        }
+        if (raiz == null) {
             return sinUia();
         }
         StringBuilder b = new StringBuilder("Controles de «" + Win32.titulo(hwnd) + "»:\n");

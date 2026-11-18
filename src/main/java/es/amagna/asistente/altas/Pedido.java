@@ -82,11 +82,11 @@ public final class Pedido {
         for (int i = 0; i < rutasReales.size() && i < MAX_ADJUNTOS; i++) {
             m.put(i == 0 ? "adjunto" : "adjunto" + (i + 1), rutasReales.get(i));
         }
-        if (!rutasReales.isEmpty()) {
-            String f = rutasReales.get(0).replace('/', '\\');
+        for (int i = 0; i < rutasReales.size() && i < MAX_ADJUNTOS; i++) {
+            String f = rutasReales.get(i).replace('/', '\\');
             String n = f.substring(f.lastIndexOf('\\') + 1);
             int punto = n.lastIndexOf('.');
-            m.put("adjunto_nombre", punto > 0 ? n.substring(0, punto) : n);
+            m.put(i == 0 ? "adjunto_nombre" : "adjunto" + (i + 1) + "_nombre", punto > 0 ? n.substring(0, punto) : n);
         }
         return m;
     }
