@@ -50,7 +50,7 @@
     {"nombre": "rellenar-datos", "de": "formulario-expediente", "a": "formulario-expediente", "segundos": 15,
      "pasos": [
        {"accion": "escribir_en", "ventana": "Expediente 1/2026",
-        "in": {"ventana": "Expediente 1/2026", "control": "campo junto a Descripción Expediente", "texto": "{descripcion}"}},
+        "in": {"ventana": "Expediente 1/2026", "control": "campo junto a Descripción Expediente", "texto": "{descripcion}", "_si": "descripcion"}},
        {"accion": "left_click", "ventana": "Expediente 1/2026", "rel": [357, 132], "in": {}},
        {"accion": "wait", "in": {"duration": 1}},
        {"accion": "double_click", "ventana": "Expediente 1/2026", "rel": [357, 132], "in": {}},
@@ -197,7 +197,7 @@
        {"accion": "comprobar", "ventana": "Expediente 1/2026",
         "in": {"ventana": "Expediente 1/2026", "control": "campo junto a Estado Expediente", "esperado": "Abierto"}},
        {"accion": "comprobar", "ventana": "Expediente 1/2026",
-        "in": {"ventana": "Expediente 1/2026", "control": "campo junto a Descripción Expediente", "esperado": "{descripcion}"}},
+        "in": {"ventana": "Expediente 1/2026", "control": "campo junto a Descripción Expediente", "esperado": "{descripcion}", "_si": "descripcion"}},
        {"accion": "comprobar", "ventana": "Expediente 1/2026",
         "in": {"ventana": "Expediente 1/2026", "control": "campo junto a Cliente", "esperado": "{cliente_nombre}", "_si": "cliente_nombre"}},
        {"accion": "comprobar", "ventana": "Expediente 1/2026",

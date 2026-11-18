@@ -1449,8 +1449,9 @@ public final class Comprobaciones {
         var l = new es.amagna.asistente.altas.Lectura.Resultado(cli, exps, fich, List.of(), "");
         var plan = es.amagna.asistente.altas.Plan.de(l, "ANDREA semana 3.zip");
         var r = es.amagna.asistente.altas.Pedido.de(l, plan);
-        ok(r.pedidos().size() == 2 && r.noSeCrean().size() == 1 && r.noSeCrean().get(0).contains("SIN DESCRIPCION"),
-                "pedidos: sin descripción válida no se crea el expediente (y se dice); los demás sí");
+        ok(r.pedidos().size() == 3 && r.noSeCrean().isEmpty() && !r.pedidos().get(2).params().containsKey("descripcion")
+                        && r.pedidos().get(2).avisos().stream().anyMatch(a -> a.contains("descripción vacía")),
+                "pedidos: sin descripción válida el expediente se crea con la descripción vacía (lo pidió Miguel) y se avisa; no se inventa una");
         var k = r.pedidos().get(0);
         ok(k.params().get("cliente").equals("LUCÍA FERNÁNDEZ PRUEBA") && k.params().get("contrario").equals("B12345678")
                         && k.clave().equals("73918462G|KVIKUFINANCESPAINSLU|MICRO"),

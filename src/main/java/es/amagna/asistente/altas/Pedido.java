@@ -12,8 +12,8 @@ import java.util.Map;
  * De un bloque ya leído y planificado a los pedidos que entiende la tarea «crear-expediente» del mapa de estados:
  * una lista de datos (cliente, contrario, descripción, adjuntos) por cada expediente, con su clave contra duplicados.
  *
- * <p>Pura decisión, sin tocar MN ni disco: quien llama dice dónde se han dejado los ficheros ({@code rutaDe}).
- * Regla de oro: no se inventa nada. Sin descripción válida no hay expediente (y se avisa); sin CIF del contrario
+ * <p>Pura decisión, sin tocar MN ni disco. Regla de oro: no se inventa nada. Sin descripción válida el expediente se crea
+ * con la descripción vacía (lo pidió Miguel: la completa el supervisor) y se avisa; sin CIF del contrario
  * el expediente se crea sin contrario (incidencia), porque buscar un contrario por nombre es adivinar.
  */
 public final class Pedido {
@@ -48,13 +48,14 @@ public final class Pedido {
             }
         }
         for (Plan.Expediente e : plan.expedientes()) {
-            if (e.descripcion().isBlank()) {
-                noSeCrean.add("«" + e.entidad() + "»: sin descripción válida (MICRO, PRESTAMO (T), REVOLVING (T)…): no se crea, que decida una persona.");
-                continue;
-            }
             List<String> avisos = new ArrayList<>(e.avisos());
             Map<String, String> p = new LinkedHashMap<>();
-            p.put("descripcion", e.descripcion());
+            if (e.descripcion().isBlank()) {
+                // Miguel: la descripción puede ir vacía, la completa el supervisor. No se inventa una.
+                avisos.add("Sin descripción válida para «" + e.entidad() + "»: el expediente se crea con la descripción vacía, que la ponga el supervisor.");
+            } else {
+                p.put("descripcion", e.descripcion());
+            }
             p.put("cliente", nombre);
             p.put("cliente_nombre", nombre);
             String cif = cifPorEntidad.getOrDefault(clave(e.entidad()), "");
