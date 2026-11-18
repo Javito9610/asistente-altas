@@ -37,7 +37,11 @@ public final class Ejecutor {
         void dormir(long ms);
     }
 
-    public record Resultado(boolean bien, String mensaje, String numero, int rescates) {
+    /** {@code incidencias}: lo que se ha hecho a medias y una persona debe mirar (para el informe), aunque la tarea haya salido «bien». */
+    public record Resultado(boolean bien, String mensaje, String numero, int rescates, List<String> incidencias) {
+        public Resultado(boolean bien, String mensaje, String numero, int rescates) {
+            this(bien, mensaje, numero, rescates, List.of());
+        }
     }
 
     private static final Reloj REAL = new Reloj() {
@@ -104,15 +108,28 @@ public final class Ejecutor {
         }
         String ultimoFallo = null;
         int limpiezasMapa = 0;
+        List<String> incidencias = new java.util.ArrayList<>();
         while (true) {
+            // Cada intento parte de los datos originales: lo que una rama «olvida» se decide de nuevo en cada vuelta.
+            Map<String, String> datos = new java.util.LinkedHashMap<>(params);
+            incidencias.clear();
             try {
                 for (Mapa.Orden o : ordenes) {
+                    if (o.si() != null && !o.si().contains(estado())) {
+                        continue;
+                    }
+                    if (o.incidencia() != null) {
+                        incidencias.add(Receta.sustituir(o.incidencia(), datos));
+                    }
+                    if (o.olvida() != null) {
+                        o.olvida().forEach(datos::remove);
+                    }
                     if (o.ir() != null) {
-                        alcanzar(o.ir(), params);
-                    } else {
+                        alcanzar(o.ir(), datos);
+                    } else if (o.hacer() != null) {
                         Mapa.Transicion t = mapa.accion(o.hacer());
-                        alcanzar(t.de(), params);
-                        recorrer(t, params);
+                        alcanzar(t.de(), datos);
+                        recorrer(t, datos);
                     }
                 }
                 break;
@@ -158,7 +175,8 @@ public final class Ejecutor {
                 // Después del empujón se vuelve a empezar la tarea desde donde esté la pantalla: el mapa vale desde cualquier punto.
             }
         }
-        return new Resultado(true, "HECHO: «" + tarea + "»" + (numero.isBlank() ? "" : " (expediente " + numero + ")"), numero, rescates);
+        return new Resultado(true, "HECHO: «" + tarea + "»" + (numero.isBlank() ? "" : " (expediente " + numero + ")")
+                + (incidencias.isEmpty() ? "" : " CON INCIDENCIAS: " + String.join(" · ", incidencias)), numero, rescates, List.copyOf(incidencias));
     }
 
     /** Sale de lo que haya abierto sin guardar (Cancelar y «¿salir?» → Sí) hasta el estado de reposo del mapa. */

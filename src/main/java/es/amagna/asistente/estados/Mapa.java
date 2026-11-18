@@ -40,7 +40,15 @@ public final class Mapa {
         }
     }
 
-    public record Orden(String ir, String hacer) {
+    /**
+     * Una orden de una tarea. {@code si}: solo se hace si el estado actual es uno de esos (para ramas: «si el selector
+     * sigue abierto…»). {@code incidencia}: algo que hay que contar en el informe cuando se pasa por aquí.
+     * {@code olvida}: parámetros que dejan de valer desde aquí (p. ej. el contrario que no se ha podido poner).
+     */
+    public record Orden(String ir, String hacer, List<String> si, String incidencia, List<String> olvida) {
+        public Orden(String ir, String hacer) {
+            this(ir, hacer, null, null, null);
+        }
     }
 
     private final List<Estado> estados;
@@ -129,7 +137,8 @@ public final class Mapa {
             List<Orden> ord = new ArrayList<>();
             for (Object o : (List<Object>) e.getValue()) {
                 Map<String, Object> m = (Map<String, Object>) o;
-                ord.add(new Orden((String) m.get("ir"), (String) m.get("hacer")));
+                ord.add(new Orden((String) m.get("ir"), (String) m.get("hacer"), lista(m.get("si")),
+                        (String) m.get("incidencia"), lista(m.get("olvida"))));
             }
             tareas.put(e.getKey(), ord);
         }
@@ -140,6 +149,16 @@ public final class Mapa {
     }
 
     /** Un mapa mal escrito se rechaza al leerlo, no a mitad de un alta. */
+    private static List<String> lista(Object o) {
+        if (o == null) {
+            return null;
+        }
+        if (o instanceof List<?> l) {
+            return l.stream().map(String::valueOf).toList();
+        }
+        return List.of(String.valueOf(o));
+    }
+
     void validar() {
         if (!existe(reposo)) {
             throw new IllegalArgumentException("El estado de reposo «" + reposo + "» no existe");
@@ -151,6 +170,9 @@ public final class Mapa {
         }
         for (var e : tareas.entrySet()) {
             for (Orden o : e.getValue()) {
+                if (o.si() != null && !o.si().stream().allMatch(this::existe)) {
+                    throw new IllegalArgumentException("Tarea «" + e.getKey() + "»: «si» nombra un estado que no existe: " + o.si());
+                }
                 if (o.ir() != null && !existe(o.ir())) {
                     throw new IllegalArgumentException("Tarea «" + e.getKey() + "»: no existe el estado «" + o.ir() + "»");
                 }

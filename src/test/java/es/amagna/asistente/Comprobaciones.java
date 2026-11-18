@@ -1165,6 +1165,7 @@ public final class Comprobaciones {
             case "form" -> "- «Expediente 36/2026» (GestorConsultas) [delante, con el foco]\n- «Expedientes» (GestorConsultas)\n" + mn;
             case "atencion", "atencion-otra" -> "- «Atención» (MNprogram) [delante, con el foco]\n- «Expediente 36/2026» (GestorConsultas) [BLOQUEADA: tiene un diálogo encima]\n- «Expedientes» (GestorConsultas) [BLOQUEADA]\n" + mn;
             case "selector" -> "- «Clientes» (GestorConsultas) [delante, con el foco]\n- «Expediente 36/2026» (GestorConsultas) [BLOQUEADA: tiene un diálogo encima]\n- «Expedientes» (GestorConsultas) [BLOQUEADA]\n" + mn;
+            case "selector-contrario" -> "- «Contrarios» (GestorConsultas) [delante, con el foco]\n- «Expediente 36/2026» (GestorConsultas) [BLOQUEADA: tiene un diálogo encima]\n- «Expedientes» (GestorConsultas) [BLOQUEADA]\n" + mn;
             default -> throw new IllegalArgumentException(estado);
         };
     }
@@ -1179,6 +1180,7 @@ public final class Comprobaciones {
         boolean auditaMal;
         String fallaSiempre;
         boolean atascaAlFallar;
+        boolean sinContrario;
         java.util.List<String> espia;
         java.util.Map<String, String> extra = java.util.Map.of();
         String cliente = "1";
@@ -1228,7 +1230,13 @@ public final class Comprobaciones {
                         w.estado = "lista";
                     }
                 }
-                case "key" -> w.estado = w.estado.equals("selector") ? "form" : w.estado;
+                case "key" -> {
+                    if (w.estado.equals("selector") || w.estado.equals("selector-contrario")) {
+                        w.estado = "form";
+                    } else if (w.sinContrario && w.estado.equals("form") && "Return".equals(p.in().get("text"))) {
+                        w.estado = "selector-contrario"; // el NIF no sale, o sale más de uno: la ventana sigue abierta
+                    }
+                }
                 case "double_click" -> {
                     if (p.rel() != null && p.rel()[0] == 597) {
                         w.estado = "selector";
@@ -1327,6 +1335,13 @@ public final class Comprobaciones {
         var rk = correrFalso(mapa, wk, false);
         ok(rk.bien() && wk.guardados == 1 && vistos.stream().anyMatch(x -> x.startsWith("33857008-L")) && vistos.contains("C:\\x.txt"),
                 "estados: con contrario y adjunto se teclean sus datos; sin ellos esos pasos se saltan");
+        var wsc = new MundoFalso("lista");
+        wsc.sinContrario = true;
+        wsc.extra = java.util.Map.of("contrario", "99999999-X", "contrario_nombre", "NADIE");
+        var rsc = correrFalso(mapa, wsc, false);
+        ok(rsc.bien() && wsc.guardados == 1 && rsc.incidencias().size() == 1 && rsc.incidencias().get(0).contains("99999999-X")
+                        && rsc.mensaje().contains("CON INCIDENCIAS"),
+                "estados: si el contrario no sale (o salen varios) el expediente se crea SIN contrario y queda una incidencia para el informe");
         var sinExtras = new MundoFalso("lista");
         var vistos2 = new java.util.ArrayList<String>();
         sinExtras.espia = vistos2;
