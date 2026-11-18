@@ -77,6 +77,20 @@ public final class Controles {
 
     /** Igual, pero diciendo cuántos controles como mucho (una ficha de un programa de gestión tiene muchos). */
     public String arbol(String tituloVentana, int profundidad, int tope) {
+        // UIA puede quedarse dentro de Windows (formulario ocupado, árbol muy hondo): sin tope, el asistente entero se cuelga.
+        String colgado = "UIA no ha respondido en " + SEGUNDOS_ARBOL + " s al leer los controles de «" + tituloVentana
+                + "» (la ventana está ocupada o el árbol es demasiado hondo). No se sabe qué hay dentro: prueba con menos "
+                + "profundidad (3–4), espera a que la pantalla esté quieta o mira la captura y usa el teclado.";
+        String r = Uia.conTope(SEGUNDOS_ARBOL, () -> arbolSinTope(tituloVentana, profundidad, tope), colgado);
+        if (colgado.equals(r)) {
+            Uia.reiniciar();
+        }
+        return r;
+    }
+
+    private static final int SEGUNDOS_ARBOL = 30;
+
+    private String arbolSinTope(String tituloVentana, int profundidad, int tope) {
         ventanas.despertar(tituloVentana);
         Pointer hwnd = ventanas.handleDe(tituloVentana);
         if (hwnd == null) {
