@@ -1,1 +1,1 @@
-Lee el PDF resumen_clientes.pdf de tu carpeta de trabajo y dime cual es el importe medio que aparece y cual es el cliente de mayor importe.
+Busca en internet cual es la capital de Australia y dime en que pagina lo has comprobado.
