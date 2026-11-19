@@ -41,6 +41,13 @@ final class ComprobacionesJarvis {
     }
 
     static void barreras() {
+        var rec = new es.amagna.asistente.cerebro.Receta("x", "t", List.of(new es.amagna.asistente.cerebro.Receta.Paso("escribir_en",
+                new LinkedHashMap<>(Map.of("texto", "{frase} y {otra}")), null, null)));
+        ok(rec.necesarios().equals(List.of("frase", "otra")), "recetas: sabe qué datos necesita");
+        ok(es.amagna.asistente.cerebro.Receta.adaptar(List.of("frase"), new LinkedHashMap<>(Map.of("texto", "hola"))).equals(Map.of("frase", "hola")),
+                "recetas: si el dato se llama distinto pero solo hay uno, se empareja");
+        ok(es.amagna.asistente.cerebro.Receta.adaptar(List.of("frase", "otra"), Map.of("texto", "hola")).equals(Map.of("texto", "hola")),
+                "recetas: si no cuadran las cuentas, no se inventa el emparejamiento");
         es.amagna.asistente.manos.Ventanas falsas = (es.amagna.asistente.manos.Ventanas) java.lang.reflect.Proxy.newProxyInstance(
                 ComprobacionesJarvis.class.getClassLoader(), new Class<?>[] {es.amagna.asistente.manos.Ventanas.class},
                 (proxy, metodo, args) -> metodo.getName().equals("abiertas") ? "- «nota-nueva.txt: Bloc de notas» (notepad) [delante]\n- «Claude» (claude)" : null);

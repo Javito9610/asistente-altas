@@ -242,6 +242,33 @@ public final class Receta {
         return null;
     }
 
+    /** Los {parámetros} que necesita la receta, en el orden en que aparecen. */
+    public List<String> necesarios() {
+        java.util.LinkedHashSet<String> r = new java.util.LinkedHashSet<>();
+        Matcher m = Pattern.compile("\\{([a-z_0-9]+)}").matcher(Json.escribir(pasos.stream().map(p -> p.in()).toList()));
+        while (m.find()) {
+            r.add(m.group(1));
+        }
+        return new ArrayList<>(r);
+    }
+
+    /**
+     * La persona (o la IA al entender el encargo) puede llamar a un dato de otra forma que la receta («frase» / «texto»).
+     * Si faltan nombres y hay justo tantos datos como huecos, se emparejan por orden; si no, se dejan como están (y la
+     * receta dirá qué falta).
+     */
+    public static Map<String, String> adaptar(List<String> necesarios, Map<String, String> dados) {
+        if (dados.keySet().containsAll(necesarios) || necesarios.size() != dados.size()) {
+            return dados;
+        }
+        Map<String, String> r = new LinkedHashMap<>();
+        var it = dados.values().iterator();
+        for (String n : necesarios) {
+            r.put(n, it.next());
+        }
+        return r;
+    }
+
     public static String sustituir(String s, Map<String, String> params) {
         for (var e : params.entrySet()) {
             s = s.replace("{" + e.getKey() + "}", e.getValue());

@@ -821,7 +821,7 @@ public final class App {
                     var motor = new Agente(new ClaudeApi("sin-uso"), new ManosRobot(false), v, MODELO_POR_DEFECTO, "", 1, 1, registro)
                             .conControles(new Controles(v)).conVeto(barrera);
                     registro.accept("Esto ya lo sé hacer («" + slug + "», " + rec.pasos().size() + " pasos): lo repito sin IA.");
-                    var r = rec.reproducir(motor, datosEncargo, 25, registro);
+                    var r = rec.reproducir(motor, es.amagna.asistente.cerebro.Receta.adaptar(rec.necesarios(), datosEncargo), 25, registro);
                     if (r.bien()) {
                         return new es.amagna.asistente.jarvis.Servicio.Resultado(true, "Hecho de memoria, sin IA (" + r.pasosHechos()
                                 + " pasos). Échale un vistazo por si acaso.");
@@ -864,7 +864,20 @@ public final class App {
             }
         };
         var servicio = new es.amagna.asistente.jarvis.Servicio(almacen, interprete, tareas, libre, salida, autorizados, registro)
-                .conProgramadas(new es.amagna.asistente.jarvis.Programadas(datos.resolve("programadas.json")));
+                .conProgramadas(new es.amagna.asistente.jarvis.Programadas(datos.resolve("programadas.json")))
+                .conConocimiento(() -> {
+                    StringBuilder b = new StringBuilder();
+                    try (var l = Files.list(Path.of("aprendido", "libres"))) {
+                        for (Path f : l.filter(x -> x.toString().endsWith(".json")).sorted().toList()) {
+                            var rec = es.amagna.asistente.cerebro.Receta.leer(f);
+                            b.append("  · ").append(f.getFileName().toString().replace(".json", "")).append(" (datos: ")
+                                    .append(String.join(", ", rec.necesarios())).append(")\n");
+                        }
+                    } catch (IOException | RuntimeException e) {
+                        // sin carpeta o ilegible: no hay nada aprendido
+                    }
+                    return b.length() == 0 ? "" : "Tareas libres ya aprendidas:\n" + b;
+                });
         servicio.arrancar();
         boolean[] salir = {false};
         if (!a.contains("--sin-ventana")) {

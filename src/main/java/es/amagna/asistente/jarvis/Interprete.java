@@ -45,7 +45,8 @@ public final class Interprete {
                   una web…). En «texto» una descripción corta y clara de lo que se va a hacer. En «tarea» un nombre corto y
                   REUTILIZABLE en minúsculas con guiones (p. ej. «abrir-programa», «buscar-en-web»: sin datos concretos dentro) y
                   en «params» los datos que cambian de una vez a otra (p. ej. {"programa":"calc.exe"}, {"consulta":"horario tren"}).
-                  Así, la segunda vez que se pida algo igual, Jarvis lo repite solo sin gastar IA.
+                  Así, la segunda vez que se pida algo igual, Jarvis lo repite solo sin gastar IA. Si en el Contexto aparece una
+                  «tarea libre ya aprendida» que sirve para lo que piden, usa EXACTAMENTE su nombre y los nombres de sus datos.
                 - tipo «programar»: algo que se repite o se hace a una hora («cada día a las 9…», «los lunes a las 10…»). En «params»:
                   {"hora":"HH:mm","dias":"todos|lun-vie|finde|lun,mie…"} y en «texto» lo que hay que hacer, escrito como la orden que
                   daría la persona (sin la hora ni los días). Si falta la hora, tipo «preguntar».

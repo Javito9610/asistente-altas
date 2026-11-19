@@ -41,6 +41,13 @@ public final class Servicio {
     private final Consumer<String> registro;
     private volatile boolean pausado;
     private Programadas programadas;
+    private java.util.function.Supplier<String> conocimiento = () -> "";
+
+    /** Lo que Jarvis ya sabe hacer solo (tareas libres aprendidas): se le cuenta al intérprete para que las reutilice con los mismos nombres. */
+    public Servicio conConocimiento(java.util.function.Supplier<String> c) {
+        this.conocimiento = c;
+        return this;
+    }
     private final Map<String, java.util.ArrayDeque<String>> historial = new java.util.concurrent.ConcurrentHashMap<>();
 
     public Servicio conProgramadas(Programadas p) {
@@ -161,7 +168,8 @@ public final class Servicio {
             decir(origen, quien, programadas.quitar(n.substring(6)) ? "Quitado." : "No encuentro esa.");
             return;
         }
-        Entendido e = interprete.entender(texto, contexto(quien));
+        String saber = conocimiento.get();
+        Entendido e = interprete.entender(texto, (saber.isBlank() ? "" : saber + "\n") + contexto(quien));
         switch (e.tipo()) {
             case Entendido.PROGRAMAR -> {
                 String id = programadas == null ? null : programadas.anadir(origen, quien, e.params().getOrDefault("hora", ""),
