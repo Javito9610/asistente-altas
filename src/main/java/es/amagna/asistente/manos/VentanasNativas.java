@@ -210,6 +210,11 @@ public final class VentanasNativas implements Ventanas {
             }
             if (Win32.User32.I.IsIconic(h)) {
                 b.append(" [minimizada]");
+            } else {
+                int[] rc = Win32.rectangulo(h);
+                if (rc != null) {
+                    b.append(" [pos ").append(rc[0]).append(',').append(rc[1]).append(" tam ").append(rc[2]).append('x').append(rc[3]).append(']');
+                }
             }
             List<String> d = dialogos.get(h);
             if (d != null) {

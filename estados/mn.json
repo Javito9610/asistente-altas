@@ -262,7 +262,7 @@
 
     {"nombre": "cerrar-editar-cliente", "de": "editar-cliente", "a": "lista-clientes", "segundos": 15,
      "pasos": [
-       {"accion": "left_click", "ventana": "Editar Cliente", "rel": [761, 8], "in": {}},
+       {"accion": "left_click", "ventana": "Editar Cliente", "rel_der": [-22, 14], "in": {}},
        {"accion": "wait", "in": {"duration": 2}}
      ]},
 

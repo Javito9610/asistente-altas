@@ -135,8 +135,13 @@ public final class Mapa {
                 if (pm.get("rel") instanceof List<?> l) {
                     rel = new int[] {((Number) l.get(0)).intValue(), ((Number) l.get(1)).intValue()};
                 }
+                Map<String, Object> entrada = new LinkedHashMap<>((Map<String, Object>) pm.getOrDefault("in", Map.of()));
+                if (pm.get("rel_der") instanceof List<?> l) {
+                    rel = new int[] {((Number) l.get(0)).intValue(), ((Number) l.get(1)).intValue()};
+                    entrada.put("_der", true);
+                }
                 pasos.add(new Receta.Paso((String) pm.get("accion"),
-                        new LinkedHashMap<>((Map<String, Object>) pm.getOrDefault("in", Map.of())),
+                        entrada,
                         pm.get("ventana") == null ? null : Receta.norm((String) pm.get("ventana")), rel));
             }
             ts.add(new Transicion(String.valueOf(m.getOrDefault("nombre", "")), (String) m.get("de"), (String) m.get("a"),

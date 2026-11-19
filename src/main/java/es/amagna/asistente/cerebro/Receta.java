@@ -281,6 +281,7 @@ public final class Receta {
         }
         boolean opcional = Boolean.TRUE.equals(in.remove("_opcional"));
         in.remove("_si");
+        boolean desdeDerecha = Boolean.TRUE.equals(in.remove("_der"));
         ExecutorService pool = Executors.newSingleThreadExecutor(r -> {
             Thread t = new Thread(r, "paso");
             t.setDaemon(true);
@@ -331,7 +332,9 @@ public final class Receta {
                         return "no se ve la ventana «" + real + "»";
                     }
                     int[] o = manos.escala().aImagen(r[0], r[1]);
-                    int cx = o[0] + p.rel()[0];
+                    // _der: la x se mide desde el borde derecho (el aspa de cerrar está ahí, sea cual sea el ancho de la ventana)
+                    int ancho = desdeDerecha ? manos.escala().aImagen(r[0] + r[2], r[1])[0] - o[0] : 0;
+                    int cx = o[0] + ancho + p.rel()[0];
                     int cy = o[1] + p.rel()[1];
                     int[] visto = porImagen(manos, h, r, p, cx, cy);
                     if (visto != null) {
