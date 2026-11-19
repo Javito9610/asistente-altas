@@ -441,6 +441,110 @@ public final class Oficina {
         return r;
     }
 
+    // ───────────────────────────── Plantillas de Word ─────────────────────────────
+
+    /**
+     * Rellena una plantilla .docx: cada «{{campo}}» se cambia por su dato (aunque Word lo haya partido en varios trozos de texto).
+     * Se conserva el formato del resto. Devuelve el documento nuevo y, en {@code sinRellenar}, los campos que quedaron sin dato.
+     */
+    public static byte[] rellenarPlantilla(byte[] plantilla, java.util.Map<String, String> datos, List<String> sinRellenar) throws IOException {
+        ByteArrayOutputStream salida = new ByteArrayOutputStream();
+        try (java.util.zip.ZipInputStream in = new java.util.zip.ZipInputStream(new java.io.ByteArrayInputStream(plantilla));
+                ZipOutputStream out = new ZipOutputStream(salida, StandardCharsets.UTF_8)) {
+            ZipEntry e;
+            long total = 0;
+            while ((e = in.getNextEntry()) != null) {
+                byte[] b = in.readNBytes(30_000_000);
+                total += b.length;
+                if (total > 60_000_000) {
+                    throw new IllegalArgumentException("La plantilla es demasiado grande.");
+                }
+                String n = e.getName();
+                if (n.contains("..") || n.startsWith("/")) {
+                    throw new IllegalArgumentException("La plantilla no es válida.");
+                }
+                if (n.equals("word/document.xml") || n.matches("word/(header|footer)\\d*\\.xml")) {
+                    b = rellenarXml(new String(b, StandardCharsets.UTF_8), datos, sinRellenar).getBytes(StandardCharsets.UTF_8);
+                }
+                out.putNextEntry(new ZipEntry(n));
+                out.write(b);
+                out.closeEntry();
+            }
+        } catch (java.util.zip.ZipException ex) {
+            throw new IllegalArgumentException("La plantilla no es un .docx válido.");
+        }
+        return salida.toByteArray();
+    }
+
+    private static final Pattern CAMPO = Pattern.compile("\\{\\{\\s*([^{}]{1,60}?)\\s*\\}\\}");
+
+    private static String rellenarXml(String xml, java.util.Map<String, String> datos, List<String> sinRellenar) {
+        Matcher parrafos = Pattern.compile("<w:p[ >].*?</w:p>", Pattern.DOTALL).matcher(xml);
+        StringBuilder r = new StringBuilder();
+        int ultimo = 0;
+        while (parrafos.find()) {
+            r.append(xml, ultimo, parrafos.start());
+            String p = parrafos.group();
+            Matcher ts = Pattern.compile("(<w:t(?: [^>]*)?>)(.*?)(</w:t>)", Pattern.DOTALL).matcher(p);
+            List<int[]> huecos = new ArrayList<>();
+            StringBuilder texto = new StringBuilder();
+            while (ts.find()) {
+                huecos.add(new int[] {ts.start(2), ts.end(2)});
+                texto.append(ts.group(2));
+            }
+            String t = texto.toString();
+            if (huecos.isEmpty() || !t.contains("{{")) {
+                r.append(p);
+            } else {
+                String nuevo = CAMPO.matcher(desxml(t)).replaceAll(m -> {
+                    String clave = m.group(1).strip();
+                    String v = datos.get(clave);
+                    if (v == null) {
+                        v = datos.entrySet().stream().filter(x -> x.getKey().equalsIgnoreCase(clave)).map(java.util.Map.Entry::getValue).findFirst().orElse(null);
+                    }
+                    if (v == null) {
+                        if (!sinRellenar.contains(clave)) {
+                            sinRellenar.add(clave);
+                        }
+                        return Matcher.quoteReplacement(m.group());
+                    }
+                    return Matcher.quoteReplacement(v);
+                });
+                // el texto entero va al primer trozo del párrafo y los demás se vacían (así no se pierde el formato del resto)
+                StringBuilder q = new StringBuilder();
+                int desde = 0;
+                for (int i = 0; i < huecos.size(); i++) {
+                    q.append(p, desde, huecos.get(i)[0]);
+                    q.append(i == 0 ? xml(nuevo) : "");
+                    desde = huecos.get(i)[1];
+                }
+                q.append(p.substring(desde));
+                String res = q.toString();
+                r.append(res.replaceFirst("<w:t>", "<w:t xml:space=\"preserve\">"));
+            }
+            ultimo = parrafos.end();
+        }
+        r.append(xml.substring(ultimo));
+        return r.toString();
+    }
+
+    public String rellenar(String plantilla, String ruta, java.util.Map<String, Object> datos, boolean sobrescribir) throws IOException {
+        Path o = ficheros.rutaPermitida(plantilla);
+        if (!plantilla.toLowerCase(Locale.ROOT).endsWith(".docx") || !Files.isRegularFile(o)) {
+            throw new IllegalArgumentException("La plantilla debe ser un fichero .docx que exista.");
+        }
+        if (Files.size(o) > 20_000_000) {
+            throw new IllegalArgumentException("La plantilla es demasiado grande.");
+        }
+        java.util.Map<String, String> d = new java.util.LinkedHashMap<>();
+        datos.forEach((k, v) -> d.put(k, String.valueOf(v)));
+        List<String> falta = new ArrayList<>();
+        byte[] nuevo = rellenarPlantilla(Files.readAllBytes(o), d, falta);
+        String dest = ruta.toLowerCase(Locale.ROOT).endsWith(".docx") ? ruta : ruta + ".docx";
+        String r = ficheros.escribirBytes(dest, nuevo, sobrescribir);
+        return falta.isEmpty() ? r : r + " OJO: quedan campos sin rellenar porque no me diste su dato: " + String.join(", ", falta) + ".";
+    }
+
     // ───────────────────────────── Leer Word y Excel ─────────────────────────────
 
     private static String entrada(ZipFile z, String nombre) throws IOException {

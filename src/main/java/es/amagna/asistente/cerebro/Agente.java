@@ -315,6 +315,12 @@ public final class Agente {
             h.add(Json.obj("name", "enviar_fichero", "description", "Pide que un fichero (de las carpetas permitidas) se le MANDE a la persona por el mismo "
                     + "chat al terminar el encargo (por ejemplo «pásame el PDF»). Los documentos que creas ya se mandan solos.",
                     "input_schema", Json.obj("type", "object", "properties", Json.obj("ruta", Json.obj("type", "string")), "required", List.of("ruta"))));
+            h.add(Json.obj("name", "rellenar_plantilla", "description", "Rellena una plantilla Word (.docx) que tenga campos «{{nombre}}»: "
+                    + "los cambia por los datos que le des y guarda un documento nuevo (la plantilla no se toca). Si falta algún dato, "
+                    + "lo avisa en la respuesta. No inventes datos que no te hayan dado.",
+                    "input_schema", Json.obj("type", "object", "properties", Json.obj("plantilla", Json.obj("type", "string"),
+                            "ruta", Json.obj("type", "string"), "datos", Json.obj("type", "object"), "sobrescribir", Json.obj("type", "boolean")),
+                            "required", List.of("plantilla", "ruta", "datos"))));
             h.add(Json.obj("name", "leer_documento", "description", "Lee el texto de un PDF, Word (.docx) o Excel (.xlsx) sin abrir ningún programa (un PDF escaneado no tiene texto).",
                     "input_schema", Json.obj("type", "object", "properties", Json.obj("ruta", Json.obj("type", "string")), "required", List.of("ruta"))));
             h.add(Json.obj("name", "quitar_fichero", "description", "«Borra» un fichero mandándolo a _papelera (recuperable).",
@@ -531,6 +537,8 @@ public final class Agente {
                 case "mover_fichero" -> Boolean.TRUE.equals(in.get("copiar")) ? ficheros.copiar((String) in.get("origen"), (String) in.get("destino"))
                         : ficheros.mover((String) in.get("origen"), (String) in.get("destino"));
                 case "crear_documento" -> oficina.crear(String.valueOf(in.get("tipo")), String.valueOf(in.get("ruta")), in);
+                case "rellenar_plantilla" -> oficina.rellenar((String) in.get("plantilla"), (String) in.get("ruta"),
+                        in.get("datos") instanceof Map<?, ?> dm ? (Map<String, Object>) dm : Map.of(), Boolean.TRUE.equals(in.get("sobrescribir")));
                 case "enviar_fichero" -> ficheros.entregar((String) in.get("ruta"));
                 case "leer_documento" -> oficina.leerDocumento((String) in.get("ruta"));
                 default -> ficheros.aLaPapelera((String) in.get("ruta"));
@@ -546,7 +554,7 @@ public final class Agente {
             return List.of(textoBloque(web.leer(String.valueOf(in.get("url")))));
         }
         if (ficheros != null && java.util.Set.of("listar_carpeta", "leer_fichero", "buscar_ficheros", "escribir_fichero", "mover_fichero",
-                "quitar_fichero", "crear_documento", "leer_documento", "enviar_fichero").contains(accion)) {
+                "quitar_fichero", "crear_documento", "leer_documento", "enviar_fichero", "rellenar_plantilla").contains(accion)) {
             return ejecutarFicheros(accion, in);
         }
         if (ventanas == null) {

@@ -1,1 +1,1 @@
-Cuanto es 17 por 23? Contesta sin tocar nada.
+Rellena la plantilla plantilla_prueba.docx con nombre Marta Ruiz Prueba, NIF 00000000T e importe 350 euros, y guardala como carta_marta.docx. Luego leela y dime lo que pone.

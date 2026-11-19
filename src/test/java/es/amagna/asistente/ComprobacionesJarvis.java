@@ -336,6 +336,32 @@ final class ComprobacionesJarvis {
         o.crear("xlsx", d + "/a.xlsx", in);
         String xl = o.leerDocumento(d + "/a.xlsx");
         ok(xl.contains("Ana & Co\t12.5") && xl.contains("=1+1\t3"), "oficina: el Excel se escribe y se vuelve a leer (y «=» queda como texto)");
+        // Plantilla Word con el campo partido en dos trozos (lo que hace Word de verdad) y un campo sin dato.
+        String cab0 = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body>";
+        String cuerpo0 = "<w:p><w:r><w:t xml:space=\"preserve\">Cliente: {{nom</w:t></w:r><w:r><w:rPr><w:b/></w:rPr><w:t>bre}} con NIF {{ nif }} y {{falta}}</w:t></w:r></w:p></w:body></w:document>";
+        var zb = new java.io.ByteArrayOutputStream();
+        try (var z = new java.util.zip.ZipOutputStream(zb)) {
+            z.putNextEntry(new java.util.zip.ZipEntry("[Content_Types].xml"));
+            z.write("<Types/>".getBytes());
+            z.putNextEntry(new java.util.zip.ZipEntry("word/document.xml"));
+            z.write((cab0 + cuerpo0).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        }
+        Files.write(d.resolve("plantilla.docx"), zb.toByteArray());
+        java.util.Map<String, Object> datos = new java.util.HashMap<>();
+        datos.put("nombre", "ANA & HIJOS <SL>");
+        datos.put("NIF", "12345678Z");
+        String rr = o.rellenar(d + "/plantilla.docx", d + "/contrato", datos, false);
+        String lleno = o.leerDocumento(d + "/contrato.docx");
+        ok(lleno.contains("Cliente: ANA & HIJOS <SL> con NIF 12345678Z y {{falta}}") && rr.contains("sin rellenar") && rr.contains("falta"),
+                "oficina: rellena la plantilla (campo partido, mayúsculas, caracteres raros) y avisa del campo sin dato");
+        ok(o.leerDocumento(d + "/plantilla.docx").contains("{{nom"), "oficina: la plantilla original no se toca");
+        boolean noDocx = false;
+        try {
+            o.rellenar(d + "/a.xlsx", d + "/x", datos, false);
+        } catch (IllegalArgumentException e) {
+            noDocx = true;
+        }
+        ok(noDocx, "oficina: solo rellena plantillas .docx");
         java.util.Map<String, Object> c = new java.util.HashMap<>();
         c.put("titulo", "Reunión; con, Ana");
         c.put("inicio", "2026-11-25T10:30");
