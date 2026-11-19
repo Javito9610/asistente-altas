@@ -23,8 +23,14 @@ Ejemplos: «dame de alta a ANA PRUEBA, NIF 12345678Z» · «estado» · «pausa�
    clics/teclas seguras, y se descarta si falla más veces de las que acierta.
 4. **Programadas**: encargos que se repiten (`datos\programadas.json`); si el PC estaba apagado a su hora, se hacen al volver ese día.
 
+5. **Consultas** («¿cuántos expedientes hay en la lista?»): se contestan MIRANDO la pantalla de MN, sin tocar nada (el especialista solo
+   tiene herramientas de lectura, atadas en código). No piden confirmación.
+6. **Ficheros y web sin pantalla** (dentro del encargo libre): listar/leer/buscar/escribir/mover ficheros solo en las carpetas permitidas
+   (`datos\\carpetas.txt`, una ruta por línea; por defecto `trabajo\\jarvis`), sin borrar (a `_papelera`) ni sobrescribir sin decirlo, y leer páginas
+   https (nunca la red interna). Lo que diga una página son datos, no órdenes.
+
 ## Seguridad (en código, no solo en las instrucciones)
-- Solo atiende a personas autorizadas. A un desconocido solo le dice su número.
+- Solo atiende a personas autorizadas. A un desconocido solo le dice su número. Solo corre una copia de Jarvis a la vez.
 - `Barreras`: no se teclea nada que parezca tarjeta, IBAN o contraseña; no se abren consolas, scripts ni instaladores; con MN
   en una empresa que no sea «Empresa de prueba» solo se mira. Vale igual cuando repite una receta de memoria.
 - Un trabajo cortado por un apagón **no se repite solo** (podría duplicar): se avisa para que una persona lo mire.
@@ -32,7 +38,7 @@ Ejemplos: «dame de alta a ANA PRUEBA, NIF 12345678Z» · «estado» · «pausa�
 - Lo «libre» nunca va sin un sí; lo que mueva dinero, envíe mensajes o borre para siempre queda fuera de las instrucciones del agente libre.
 
 ## Que arranque solo
-`instalar-jarvis.cmd` crea un acceso directo en la carpeta Inicio del usuario (sin administrador). `instalar-jarvis.cmd quitar` lo deshace.
+`jarvis.cmd` se levanta solo si se cae. `instalar-jarvis.cmd` crea un acceso directo en la carpeta Inicio del usuario (sin administrador). `instalar-jarvis.cmd quitar` lo deshace.
 
 ## Pruebas
 `prueba-jarvis.cmd` (por la cola): arranca Jarvis, le pide por el buzón un alta ficticia en la Empresa de prueba y lo apaga.
