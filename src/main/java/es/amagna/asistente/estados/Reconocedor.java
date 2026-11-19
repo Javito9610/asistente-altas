@@ -14,7 +14,10 @@ public final class Reconocedor {
     }
 
     /** Una ventana de la lista que da {@code ventanas_abiertas}. */
-    public record Ventana(String titulo, boolean bloqueada) {
+    public record Ventana(String titulo, boolean bloqueada, String programa) {
+        public Ventana(String titulo, boolean bloqueada) {
+            this(titulo, bloqueada, "");
+        }
     }
 
     public static List<Ventana> leer(String abiertas) {
@@ -34,7 +37,8 @@ public final class Reconocedor {
                         v.add(new Ventana(d.group(1), false));
                     }
                 }
-                v.add(new Ventana(m.group(1), resto.contains("BLOQUEADA") || resto.contains("minimizada")));
+                Matcher pr = Pattern.compile("^\\s*\\(([^)]*)\\)").matcher(resto);
+                v.add(new Ventana(m.group(1), resto.contains("BLOQUEADA") || resto.contains("minimizada"), pr.find() ? pr.group(1) : ""));
             }
         }
         return v;
@@ -63,6 +67,11 @@ public final class Reconocedor {
                     return e.nombre();
                 }
             }
+            // Una ventana de MN que el mapa no conoce, delante y sin bloquear: no se sigue como si no estuviera.
+            // Pasar a la de debajo haría clics a ciegas con un diálogo encima (así se perdían minutos en limpiezas inútiles).
+            if (esDeMn(w) && !(!mapa.principal().isBlank() && w.titulo().contains(mapa.principal()))) {
+                return "desconocido";
+            }
         }
         for (Ventana w : ventanas) {
             if (!mapa.principal().isBlank() && w.titulo().contains(mapa.principal()) && !w.titulo().contains("Explorador")) {
@@ -70,6 +79,10 @@ public final class Reconocedor {
             }
         }
         return "fuera";
+    }
+
+    private static boolean esDeMn(Ventana w) {
+        return w.programa().equals("GestorConsultas") || w.programa().equals("MNprogram");
     }
 
     /** ¿Hay entre las abiertas alguna cuyo título (con los números como #) contenga eso? */
