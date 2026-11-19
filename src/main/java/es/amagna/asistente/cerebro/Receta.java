@@ -99,9 +99,6 @@ public final class Receta {
             if (CON_CLIC.contains(accion) || "scroll".equals(accion)) {
                 try {
                     var h = Win32.User32.I.GetForegroundWindow();
-                    if (!real.startsWith("MNprogram") && Win32.traerAPantalla(h)) {
-                        System.out.println("  ventana «" + real + "» estaba medio fuera de la pantalla: movida para que se vea entera");
-                    }
                     int[] r = h == null ? null : Win32.rectangulo(h);
                     if (r != null && in.get("coordinate") instanceof List<?> c) {
                         int[] o = manos.escala().aImagen(r[0], r[1]);
@@ -330,6 +327,9 @@ public final class Receta {
                     if (!real.startsWith("MNprogram") && Win32.desmaximizar(h)) {
                         System.out.println("  ventana «" + real + "» maximizada: devuelta a su tamaño normal (las posiciones de la receta son de ese tamaño)");
                     }
+                    if (!real.startsWith("MNprogram") && Win32.traerAPantalla(h)) {
+                        System.out.println("  ventana «" + real + "» estaba medio fuera de la pantalla: movida para que se vea entera");
+                    }
                     int[] r = h == null ? null : Win32.rectangulo(h);
                     if (r == null) {
                         return "no se ve la ventana «" + real + "»";
@@ -347,6 +347,15 @@ public final class Receta {
                     in.put("coordinate", List.of((long) cx, (long) cy));
                 }
             }
+        }
+        if ("cerrar_ventana_mn".equals(p.accion())) {
+            // Cierra con el aspa de Windows (WM_CLOSE) una ventana hija de MN que el mapa nombra: no depende de dónde
+            // esté ni de cuánto mida. Solo se usa en pasos del mapa, que ya saben qué ventana es y que no se ha tocado.
+            if (v == null || p.ventana() == null) {
+                return "no hay ventana que cerrar";
+            }
+            String real = tituloReal(v, p.ventana());
+            return real == null ? null : (v.cerrarVentana(real) == null ? "no se ha podido cerrar «" + real + "»" : null);
         }
         try {
             if (Agente.ES_DE_ORDENADOR.contains(p.accion())) {
