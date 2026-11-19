@@ -1,13 +1,13 @@
 # Cliente ficticio de prueba (UTF-8). Empresa de prueba.
-cliente_nombre=NOEMI TESTEO PRUEBA
-cliente_nif=99887711G
+cliente_nombre=OLGA TESTEO PRUEBA
+cliente_nif=99887700H
 cliente_telefono=600 11 22 33
 cliente_movil=600 11 22 33
-cliente_correo=noemi.testeo.prueba@ejemplo-invalido.test
+cliente_correo=olga.testeo.prueba@ejemplo-invalido.test
 cliente_direccion=Calle de Proba 9
 cliente_cp=15001
 cliente_poblacion=Coruña, A
-cliente_carpeta=NOEMI TESTEO PRUEBA\
+cliente_carpeta=OLGA TESTEO PRUEBA\
 adjunto=C:\Proyectos\asistente-altas\pruebas\ficha\dni-prueba.txt
 adjunto2=C:\Proyectos\asistente-altas\pruebas\ficha\hoja-encargo-prueba.txt
 adjunto3=C:\Proyectos\asistente-altas\pruebas\ficha\justificante-prueba.txt
