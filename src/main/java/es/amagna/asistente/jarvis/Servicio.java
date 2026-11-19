@@ -40,6 +40,51 @@ public final class Servicio {
     private final Set<String> autorizados;
     private final Consumer<String> registro;
     private volatile boolean pausado;
+    private Programadas programadas;
+    private final Map<String, java.util.ArrayDeque<String>> historial = new java.util.concurrent.ConcurrentHashMap<>();
+
+    public Servicio conProgramadas(Programadas p) {
+        this.programadas = p;
+        return this;
+    }
+
+    /** Lo último que se han dicho con esa persona: así «y ponle también el teléfono» se entiende. */
+    private void apuntar(String quien, String linea) {
+        var h = historial.computeIfAbsent(quien, k -> new java.util.ArrayDeque<>());
+        synchronized (h) {
+            h.addLast(linea.length() > 400 ? linea.substring(0, 400) : linea);
+            while (h.size() > 8) {
+                h.removeFirst();
+            }
+        }
+    }
+
+    private String contexto(String quien) {
+        var h = historial.get(quien);
+        if (h == null) {
+            return "";
+        }
+        synchronized (h) {
+            return h.isEmpty() ? "" : "Lo último de la conversación:\n" + String.join("\n", h);
+        }
+    }
+
+    private void decir(String origen, String quien, String texto) {
+        apuntar(quien, "Jarvis: " + texto);
+        salida.enviar(origen, quien, texto);
+    }
+
+    /** Lo llama el bucle principal cada pocos segundos: lanza lo programado que toque. */
+    public void tic(java.time.LocalDateTime ahora) {
+        if (programadas == null) {
+            return;
+        }
+        for (var p : programadas.vencidas(ahora)) {
+            registro.accept("Programada " + p.id() + ": " + p.peticion());
+            decir(p.origen(), p.quien(), "⏰ Toca lo programado: " + p.peticion());
+            recibir(p.origen(), p.quien(), p.peticion());
+        }
+    }
 
     public Servicio(Almacen almacen, Interprete interprete, Hace tareas, Hace libre, Salida salida, Set<String> autorizados,
             Consumer<String> registro) {
@@ -55,7 +100,7 @@ public final class Servicio {
     /** Al arrancar: avisa de lo que se cortó. */
     public void arrancar() {
         for (Trabajo t : almacen.marcarInterrumpidos()) {
-            salida.enviar(t.origen(), t.quien(), "⚠️ Se me apagó el ordenador haciendo esto: «" + t.peticion() + "». No lo repito solo por si ya estaba hecho. "
+            decir(t.origen(), t.quien(), "⚠️ Se me apagó el ordenador haciendo esto: «" + t.peticion() + "». No lo repito solo por si ya estaba hecho. "
                     + "Mira en MN y, si falta, pídemelo otra vez.");
         }
     }
@@ -82,33 +127,51 @@ public final class Servicio {
         Trabajo esperando = ultimoEsperando(quien);
         if (esperando != null && Set.of("si", "sí", "vale", "ok", "confirmo", "adelante", "hazlo", "dale").contains(n)) {
             almacen.guardar(esperando.con(Trabajo.PENDIENTE, null));
-            salida.enviar(origen, quien, "Hecho, me pongo con ello.");
+            decir(origen, quien, "Hecho, me pongo con ello.");
             return;
         }
         if (esperando != null && Set.of("no", "cancela", "cancelar", "para", "olvidalo").contains(n)) {
             almacen.guardar(esperando.con(Trabajo.RECHAZADO, "Cancelado por la persona."));
-            salida.enviar(origen, quien, "Vale, lo dejo.");
+            decir(origen, quien, "Vale, lo dejo.");
             return;
         }
         if (Set.of("estado", "cola", "que haces", "que tal").contains(n)) {
-            salida.enviar(origen, quien, estado());
+            decir(origen, quien, estado());
             return;
         }
         if (Set.of("pausa", "pausar").contains(n)) {
             pausado = true;
-            salida.enviar(origen, quien, "En pausa: no empiezo nada nuevo hasta que me digas «sigue».");
+            decir(origen, quien, "En pausa: no empiezo nada nuevo hasta que me digas «sigue».");
             return;
         }
         if (Set.of("sigue", "continua", "reanuda").contains(n)) {
             pausado = false;
-            salida.enviar(origen, quien, "Seguimos.");
+            decir(origen, quien, "Seguimos.");
             return;
         }
-        Entendido e = interprete.entender(texto, "");
+        apuntar(quien, "Persona: " + texto);
+        if (programadas != null && Set.of("programadas", "agenda", "que hay programado").contains(n)) {
+            var l = programadas.todas();
+            decir(origen, quien, l.isEmpty() ? "No hay nada programado." : "Programado:\n" + l.stream()
+                    .map(p -> "· " + p.id() + " — " + p.hora() + " " + p.dias().size() + " días/sem: " + p.peticion()).collect(java.util.stream.Collectors.joining("\n"))
+                    + "\n(Para quitar uno: «quita p12345».)");
+            return;
+        }
+        if (programadas != null && n.matches("quita p\\d+")) {
+            decir(origen, quien, programadas.quitar(n.substring(6)) ? "Quitado." : "No encuentro esa.");
+            return;
+        }
+        Entendido e = interprete.entender(texto, contexto(quien));
         switch (e.tipo()) {
+            case Entendido.PROGRAMAR -> {
+                String id = programadas == null ? null : programadas.anadir(origen, quien, e.params().getOrDefault("hora", ""),
+                        e.params().getOrDefault("dias", "todos"), e.texto());
+                decir(origen, quien, id == null ? "No he podido programarlo: no entiendo la hora o los días. ¿Me lo repites (por ejemplo «cada día laborable a las 9:00»)?"
+                        : "Programado (" + id + "): " + e.params().getOrDefault("hora", "") + " · " + e.params().getOrDefault("dias", "todos") + " → " + e.texto());
+            }
             case Entendido.TAREA -> {
                 Trabajo t = almacen.nuevo(origen, quien, texto, e.tarea(), e.params(), Trabajo.PENDIENTE);
-                salida.enviar(origen, quien, "Entendido: «" + e.tarea() + "». " + (e.texto().isBlank() ? "" : e.texto() + " ")
+                decir(origen, quien, "Entendido: «" + e.tarea() + "». " + (e.texto().isBlank() ? "" : e.texto() + " ")
                         + "Te aviso cuando acabe. (" + pendientes() + " en cola)");
                 registro.accept("Trabajo " + t.id() + " apuntado: " + e.tarea());
             }
@@ -119,10 +182,10 @@ public final class Servicio {
                     ps.put("_receta", e.tarea());
                 }
                 Trabajo t = almacen.nuevo(origen, quien, texto, "libre", ps, Trabajo.ESPERANDO);
-                salida.enviar(origen, quien, "Voy a hacer esto en el ordenador: " + e.texto() + "\n¿Lo hago? (sí / no)");
+                decir(origen, quien, "Voy a hacer esto en el ordenador: " + e.texto() + "\n¿Lo hago? (sí / no)");
                 registro.accept("Trabajo " + t.id() + " espera confirmación.");
             }
-            default -> salida.enviar(origen, quien, e.texto());
+            default -> decir(origen, quien, e.texto());
         }
     }
 
@@ -144,7 +207,7 @@ public final class Servicio {
             r = new Resultado(false, "Se me ha roto algo por dentro: " + e.getMessage());
         }
         almacen.guardar(t.con(r.bien() ? Trabajo.HECHO : Trabajo.FALLO, r.mensaje()));
-        salida.enviar(t.origen(), t.quien(), (r.bien() ? "✅ " : "❌ ") + r.mensaje());
+        decir(t.origen(), t.quien(), (r.bien() ? "✅ " : "❌ ") + r.mensaje());
         registro.accept("Trabajo " + t.id() + (r.bien() ? " hecho" : " con fallo") + ".");
         return true;
     }

@@ -863,7 +863,8 @@ public final class App {
                 buzon.enviar("respuestas", "[" + java.time.LocalTime.now().withNano(0) + "] " + texto);
             }
         };
-        var servicio = new es.amagna.asistente.jarvis.Servicio(almacen, interprete, tareas, libre, salida, autorizados, registro);
+        var servicio = new es.amagna.asistente.jarvis.Servicio(almacen, interprete, tareas, libre, salida, autorizados, registro)
+                .conProgramadas(new es.amagna.asistente.jarvis.Programadas(datos.resolve("programadas.json")));
         servicio.arrancar();
         boolean[] salir = {false};
         if (!a.contains("--sin-ventana")) {
@@ -914,6 +915,7 @@ public final class App {
                     salir[0] = true;
                     break;
                 }
+                servicio.tic(java.time.LocalDateTime.now());
                 if (!servicio.procesarUno()) {
                     Thread.sleep(1000);
                 }

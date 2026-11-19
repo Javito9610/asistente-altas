@@ -6,6 +6,7 @@ import es.amagna.asistente.jarvis.CanalCarpeta;
 import es.amagna.asistente.jarvis.CanalTelegram;
 import es.amagna.asistente.jarvis.Entendido;
 import es.amagna.asistente.jarvis.Interprete;
+import es.amagna.asistente.jarvis.Programadas;
 import es.amagna.asistente.jarvis.Servicio;
 import es.amagna.asistente.jarvis.Trabajo;
 import java.io.IOException;
@@ -33,6 +34,7 @@ final class ComprobacionesJarvis {
             almacenYServicio();
             telegram();
             buzon();
+            programadas();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -180,5 +182,31 @@ final class ComprobacionesJarvis {
         canal.enviar("respuestas", "hola");
         canal.enviar("respuestas", "adiós");
         ok(Files.readString(raiz.resolve("salida").resolve("respuestas.txt")).equals("hola\nadiós\n"), "buzón: las respuestas se van añadiendo");
+    }
+
+    static void programadas() throws IOException {
+        Path f = Files.createTempDirectory("prog").resolve("p.json");
+        var p = new Programadas(f);
+        ok(Programadas.dias("lun-vie").size() == 5 && Programadas.dias("todos").size() == 7 && Programadas.dias("finde").size() == 2
+                && Programadas.dias("lunes, miércoles").size() == 2, "programadas: entiende los días en español");
+        ok(p.anadir("telegram", "javi", "9:00", "lun-vie", "estado") != null && p.anadir("telegram", "javi", "las nueve", "lun-vie", "x") == null,
+                "programadas: acepta una hora buena y rechaza una mala");
+        var lunes9 = java.time.LocalDateTime.of(2026, 11, 16, 9, 5);
+        ok(p.vencidas(java.time.LocalDateTime.of(2026, 11, 16, 8, 59)).isEmpty(), "programadas: antes de su hora no toca");
+        ok(p.vencidas(lunes9).size() == 1 && p.vencidas(lunes9.plusMinutes(10)).isEmpty(), "programadas: toca una vez al día");
+        ok(p.vencidas(java.time.LocalDateTime.of(2026, 11, 21, 10, 0)).isEmpty(), "programadas: en sábado no (lun-vie)");
+        ok(new Programadas(f).todas().size() == 1 && p.vencidas(java.time.LocalDateTime.of(2026, 11, 17, 12, 0)).size() == 1,
+                "programadas: sobrevive a un reinicio y, si estaba apagado a su hora, lo hace al volver ese día");
+        // De punta a punta con el servicio: «cada día a las 9 …» se programa y a su hora se pide solo.
+        String[] resp = {"{\"tipo\":\"programar\",\"params\":{\"hora\":\"09:00\",\"dias\":\"lun-vie\"},\"texto\":\"estado\"}"};
+        List<String> dicho = new ArrayList<>();
+        var prog = new Programadas(Files.createTempDirectory("prog2").resolve("p.json"));
+        var s = new Servicio(new Almacen(Files.createTempDirectory("alm")), interpreteFalso(resp), t -> new Servicio.Resultado(true, "x"),
+                t -> new Servicio.Resultado(true, "x"), (o, q, t) -> dicho.add(t), Set.of("javi"), x -> { }).conProgramadas(prog);
+        s.recibir("telegram", "javi", "cada día laborable a las 9 dime cómo vas");
+        ok(prog.todas().size() == 1 && dicho.get(dicho.size() - 1).startsWith("Programado ("), "programadas: el servicio programa lo que se le pide");
+        s.tic(lunes9);
+        ok(dicho.stream().anyMatch(d -> d.contains("Toca lo programado")) && dicho.stream().anyMatch(d -> d.contains("No tengo nada pendiente")),
+                "programadas: a su hora se lanza solo");
     }
 }

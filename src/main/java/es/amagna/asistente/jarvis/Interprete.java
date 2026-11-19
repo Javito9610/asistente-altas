@@ -32,7 +32,7 @@ public final class Interprete {
         StringBuilder sistema = new StringBuilder("""
                 Eres el intérprete de Jarvis, el asistente de oficina de un despacho de abogados. Recibes el mensaje de una persona y
                 decides qué hay que hacer. NO haces nada tú: solo respondes con UN objeto JSON, sin texto alrededor:
-                {"tipo":"tarea|libre|preguntar|responder","tarea":"nombre","params":{"dato":"valor"},"texto":"..."}
+                {"tipo":"tarea|libre|programar|preguntar|responder","tarea":"nombre","params":{"dato":"valor"},"texto":"..."}
                 - tipo «tarea»: es una de estas tareas que Jarvis hace solo (poner en «tarea» su nombre y en «params» los datos que
                   la persona ha dado, con los nombres de dato exactos). Tareas:
                 """);
@@ -46,6 +46,9 @@ public final class Interprete {
                   REUTILIZABLE en minúsculas con guiones (p. ej. «abrir-programa», «buscar-en-web»: sin datos concretos dentro) y
                   en «params» los datos que cambian de una vez a otra (p. ej. {"programa":"calc.exe"}, {"consulta":"horario tren"}).
                   Así, la segunda vez que se pida algo igual, Jarvis lo repite solo sin gastar IA.
+                - tipo «programar»: algo que se repite o se hace a una hora («cada día a las 9…», «los lunes a las 10…»). En «params»:
+                  {"hora":"HH:mm","dias":"todos|lun-vie|finde|lun,mie…"} y en «texto» lo que hay que hacer, escrito como la orden que
+                  daría la persona (sin la hora ni los días). Si falta la hora, tipo «preguntar».
                 - tipo «preguntar»: no está claro qué quiere o falta algo. «texto» = una sola pregunta corta.
                 - tipo «responder»: es una pregunta o charla que se contesta con palabras (sin tocar nada). «texto» = la respuesta.
                 Pagos, transferencias, compras, envío de mensajes o correos, y borrar cosas: tipo «libre» solo si la persona lo pide
@@ -109,6 +112,12 @@ public final class Interprete {
                     String slug = tarea.toLowerCase(java.util.Locale.ROOT).strip();
                     return new Entendido(tipo, slug.matches("[a-z0-9]+(-[a-z0-9]+){0,5}") && slug.length() <= 40 ? slug : "", params,
                             t.isBlank() ? "¿Puedes explicarme mejor qué quieres?" : t);
+                }
+                case Entendido.PROGRAMAR -> {
+                    if (params.getOrDefault("hora", "").isBlank() || t.isBlank()) {
+                        return new Entendido(Entendido.PREGUNTAR, "", Map.of(), "¿A qué hora (y qué días) quieres que lo haga?");
+                    }
+                    return new Entendido(tipo, "", params, t);
                 }
                 case Entendido.PREGUNTAR, Entendido.RESPONDER -> {
                     return new Entendido(tipo, "", params, t.isBlank() ? "¿Puedes explicarme mejor qué quieres?" : t);
