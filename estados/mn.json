@@ -11,6 +11,9 @@
     {"nombre": "lista-clientes", "ventana": "Clientes", "sin": "Expediente #"},
     {"nombre": "alta-cliente", "ventana": "Alta Cliente"},
     {"nombre": "editar-cliente", "ventana": "*- Editar Cliente"},
+    {"nombre": "correo-direccion", "ventana": "Dirección Correo Electrónico"},
+    {"nombre": "correo-lista", "ventana": "Direcciones de Correo Electrónico"},
+    {"nombre": "movil-numero", "ventana": "Teléfono Móvil"},
     {"nombre": "abrir-archivo", "ventana": "Abrir"},
     {"nombre": "documento-adjunto", "ventana": "Documento"},
     {"nombre": "carpeta-adjunto", "ventana": "Establece el nombre de la carpeta"},
@@ -471,6 +474,30 @@
     {"nombre": "verificar-cliente-guardado", "de": "lista-clientes", "a": "lista-clientes", "segundos": 60,
      "pasos": [
        {"accion": "auditar", "ventana": "Clientes", "in": {"ventana": "Clientes", "esperado": {"Núm. Clientes": "1"}}}
+     ]},
+
+    {"nombre": "atencion-responder-no", "de": "atencion", "a": "alta-cliente|formulario-expediente|lista-clientes|lista-expedientes|selector-cliente|selector-contrario|selector-tipo|correo-direccion|correo-lista|movil-numero", "segundos": 15,
+     "pasos": [
+       {"accion": "left_click", "ventana": "Atención", "rel": [448, 163], "in": {}},
+       {"accion": "wait", "in": {"duration": 2}}
+     ]},
+
+    {"nombre": "cerrar-correo-direccion", "de": "correo-direccion", "a": "correo-lista|alta-cliente", "segundos": 15,
+     "pasos": [
+       {"accion": "cerrar_ventana_mn", "ventana": "Dirección Correo Electrónico", "in": {}},
+       {"accion": "wait", "in": {"duration": 2}}
+     ]},
+
+    {"nombre": "cerrar-correo-lista", "de": "correo-lista", "a": "alta-cliente", "segundos": 15,
+     "pasos": [
+       {"accion": "cerrar_ventana_mn", "ventana": "Direcciones de Correo Electrónico", "in": {}},
+       {"accion": "wait", "in": {"duration": 2}}
+     ]},
+
+    {"nombre": "cerrar-movil-numero", "de": "movil-numero", "a": "alta-cliente", "segundos": 15,
+     "pasos": [
+       {"accion": "cerrar_ventana_mn", "ventana": "Teléfono Móvil", "in": {}},
+       {"accion": "wait", "in": {"duration": 2}}
      ]},
 
     {"nombre": "cerrar-abrir-archivo", "de": "abrir-archivo", "a": "alta-cliente|formulario-expediente", "segundos": 15,

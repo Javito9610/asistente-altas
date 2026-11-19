@@ -88,7 +88,7 @@ public final class Controles {
         return r;
     }
 
-    private static final int SEGUNDOS_ARBOL = 30;
+    private static final int SEGUNDOS_ARBOL = 10;
 
     private String arbolSinTope(String tituloVentana, int profundidad, int tope) {
         ventanas.despertar(tituloVentana);

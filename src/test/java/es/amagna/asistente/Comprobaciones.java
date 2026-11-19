@@ -1358,6 +1358,14 @@ public final class Comprobaciones {
             ok(es.amagna.asistente.estados.Recuperador.revisar("- «Alta Cliente» (GestorConsultas) [delante, con el foco]\n", params, mundo).isEmpty() && hechos.isEmpty(),
                     "recuperador: con MN delante y nada raro, no hace nada");
         }
+        {
+            String pila = "- «Atención» (GestorConsultas) [delante, con el foco]\n- «Alta Cliente» (GestorConsultas) [pos 1,1 tam 5x5] — diálogos abiertos dentro: «Direcciones de Correo Electrónico» «Dirección Correo Electrónico» [BLOQUEADA]\n" + mnc;
+            var r1 = es.amagna.asistente.estados.Reconocedor.estado(mapa, pila, t -> "texto que no se entiende");
+            var c2 = es.amagna.asistente.estados.Planificador.camino(mapa, r1, "lista-clientes");
+            ok(r1.equals("atencion") && c2 != null && c2.get(0).nombre().equals("atencion-responder-no")
+                            && c2.stream().noneMatch(es.amagna.asistente.estados.Mapa.Transicion::toca),
+                    "estados: un aviso «Atención» que no se entiende se contesta «No» (nunca confirma nada) y de ahí hay salida a la lista sin guardar");
+        }
         var salir = es.amagna.asistente.estados.Planificador.camino(mapa, "alta-cliente", "lista-clientes");
         ok(salir != null && salir.stream().noneMatch(es.amagna.asistente.estados.Mapa.Transicion::toca)
                         && salir.get(0).nombre().equals("cancelar-alta-cliente"),
