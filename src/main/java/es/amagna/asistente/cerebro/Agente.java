@@ -78,6 +78,13 @@ public final class Agente {
     private final int pasosMax;
     private final Consumer<String> registro;
     private Expediente expediente;
+    private es.amagna.asistente.jarvis.Ficheros ficheros;
+
+    /** Le da manos para ficheros (solo dentro de las carpetas permitidas de {@code Ficheros}). */
+    public Agente conFicheros(es.amagna.asistente.jarvis.Ficheros f) {
+        this.ficheros = f;
+        return this;
+    }
     private java.util.Set<String> puede = java.util.Set.of();
     /** Barrera de seguridad en CÓDIGO (no en las instrucciones): recibe acción y datos, devuelve el motivo del veto o null. */
     private java.util.function.BiFunction<String, Map<String, Object>, String> veto;
@@ -261,6 +268,25 @@ public final class Agente {
         h.removeIf(x -> x instanceof Map<?, ?> t && t.get("name") instanceof String n && !permitido(n));
         // La herramienta de ordenador va la última: el cache_control cubre todas las herramientas.
         h.add(Json.obj("type", HERRAMIENTA, "configs", Json.obj("zoom", Json.obj("enabled", true)), "cache_control", Json.obj("type", "ephemeral")));
+        if (ficheros != null) {
+            String carp = ficheros.raices().stream().map(Object::toString).collect(java.util.stream.Collectors.joining(", "));
+            h.add(Json.obj("name", "listar_carpeta", "description", "Lista una carpeta (sin pantalla). Solo dentro de: " + carp,
+                    "input_schema", Json.obj("type", "object", "properties", Json.obj("ruta", Json.obj("type", "string")), "required", List.of("ruta"))));
+            h.add(Json.obj("name", "leer_fichero", "description", "Lee un fichero de texto (hasta 200 KB). Solo dentro de: " + carp,
+                    "input_schema", Json.obj("type", "object", "properties", Json.obj("ruta", Json.obj("type", "string")), "required", List.of("ruta"))));
+            h.add(Json.obj("name", "buscar_ficheros", "description", "Busca ficheros por un trozo del nombre, en una carpeta y sus subcarpetas.",
+                    "input_schema", Json.obj("type", "object", "properties", Json.obj("carpeta", Json.obj("type", "string"),
+                            "nombre", Json.obj("type", "string")), "required", List.of("carpeta", "nombre"))));
+            h.add(Json.obj("name", "escribir_fichero", "description", "Crea un fichero de texto. No sobrescribe salvo sobrescribir=true "
+                    + "(y lo anterior va a _papelera). No se crean ejecutables ni scripts.",
+                    "input_schema", Json.obj("type", "object", "properties", Json.obj("ruta", Json.obj("type", "string"),
+                            "texto", Json.obj("type", "string"), "sobrescribir", Json.obj("type", "boolean")), "required", List.of("ruta", "texto"))));
+            h.add(Json.obj("name", "mover_fichero", "description", "Mueve o renombra un fichero (sin sobrescribir). Para copiar usa copiar=true.",
+                    "input_schema", Json.obj("type", "object", "properties", Json.obj("origen", Json.obj("type", "string"),
+                            "destino", Json.obj("type", "string"), "copiar", Json.obj("type", "boolean")), "required", List.of("origen", "destino"))));
+            h.add(Json.obj("name", "quitar_fichero", "description", "«Borra» un fichero mandándolo a _papelera (recuperable).",
+                    "input_schema", Json.obj("type", "object", "properties", Json.obj("ruta", Json.obj("type", "string")), "required", List.of("ruta"))));
+        }
         return h;
     }
 
@@ -462,7 +488,28 @@ public final class Agente {
     }
 
     /** Herramientas propias (ventanas). */
+    private List<Object> ejecutarFicheros(String accion, Map<String, Object> in) {
+        try {
+            String r = switch (accion) {
+                case "listar_carpeta" -> ficheros.listar((String) in.get("ruta"));
+                case "leer_fichero" -> ficheros.leer((String) in.get("ruta"));
+                case "buscar_ficheros" -> ficheros.buscar((String) in.get("carpeta"), (String) in.get("nombre"));
+                case "escribir_fichero" -> ficheros.escribir((String) in.get("ruta"), String.valueOf(in.get("texto")), Boolean.TRUE.equals(in.get("sobrescribir")));
+                case "mover_fichero" -> Boolean.TRUE.equals(in.get("copiar")) ? ficheros.copiar((String) in.get("origen"), (String) in.get("destino"))
+                        : ficheros.mover((String) in.get("origen"), (String) in.get("destino"));
+                default -> ficheros.aLaPapelera((String) in.get("ruta"));
+            };
+            return List.of(textoBloque(r));
+        } catch (IllegalArgumentException | java.io.IOException e) {
+            return List.of(textoBloque("No se ha podido: " + e.getMessage()));
+        }
+    }
+
     List<Object> ejecutarPropia(String accion, Map<String, Object> in) {
+        if (ficheros != null && java.util.Set.of("listar_carpeta", "leer_fichero", "buscar_ficheros", "escribir_fichero", "mover_fichero",
+                "quitar_fichero").contains(accion)) {
+            return ejecutarFicheros(accion, in);
+        }
         if (ventanas == null) {
             throw new IllegalArgumentException("Herramienta no disponible: " + accion);
         }

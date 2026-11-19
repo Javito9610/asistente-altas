@@ -806,6 +806,20 @@ public final class App {
             var r = corredor.correr(t.tarea(), ps, clave, false);
             return new es.amagna.asistente.jarvis.Servicio.Resultado(r.bien(), r.mensaje());
         };
+        java.util.List<Path> carpetas = new java.util.ArrayList<>();
+        Path fc = datos.resolve("carpetas.txt");
+        if (Files.isRegularFile(fc)) {
+            for (String l : Files.readAllLines(fc, StandardCharsets.UTF_8)) {
+                if (!l.isBlank() && !l.startsWith("#") && Files.isDirectory(Path.of(l.strip()))) {
+                    carpetas.add(Path.of(l.strip()));
+                }
+            }
+        }
+        if (carpetas.isEmpty()) {
+            Files.createDirectories(Path.of("trabajo", "jarvis"));
+            carpetas.add(Path.of("trabajo", "jarvis"));
+        }
+        var ficherosJarvis = new es.amagna.asistente.jarvis.Ficheros(carpetas);
         es.amagna.asistente.jarvis.Servicio.Hace libre = t -> {
             String slug = t.params().getOrDefault("_receta", "");
             var datosEncargo = new java.util.LinkedHashMap<String, String>(t.params());
@@ -839,7 +853,7 @@ public final class App {
                 var esp = es.amagna.asistente.cerebro.Especialista.cargar("general", MODELO_POR_DEFECTO, 400_000);
                 var grabadora = new es.amagna.asistente.cerebro.Receta.Grabadora();
                 Agente ag = new Agente(new ClaudeApi(Clave.leer()), new ManosRobot(false), v, esp.modelo(), esp.instrucciones(), esp.pasos(),
-                        esp.topeTokens(), registro).conControles(new Controles(v)).conExpediente(false).conVeto(barrera).grabando(grabadora);
+                        esp.topeTokens(), registro).conControles(new Controles(v)).conExpediente(false).conVeto(barrera).conFicheros(ficherosJarvis).grabando(grabadora);
                 var r = ag.ejecutar(t.params().getOrDefault("encargo", t.peticion()) + "\n\n(Petición original: " + t.peticion() + ")");
                 if (r.terminado() && !slug.isEmpty() && grabadora.cuantos() > 0) {
                     grabadora.aReceta(slug, t.params().getOrDefault("encargo", t.peticion()), datosEncargo).guardar(rf);

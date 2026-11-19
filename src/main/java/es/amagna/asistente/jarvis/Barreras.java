@@ -15,7 +15,7 @@ public final class Barreras {
 
     /** Acciones que solo miran: valen siempre. */
     static final Set<String> SOLO_MIRAN = Set.of("screenshot", "zoom", "ventanas_abiertas", "ventana_activa", "ver_controles", "ver_ventana",
-            "leer_control", "leer_campo", "esperar_a", "mouse_move", "cursor_position", "wait");
+            "leer_control", "leer_campo", "esperar_a", "mouse_move", "cursor_position", "wait", "listar_carpeta", "leer_fichero", "buscar_ficheros");
 
     /** Programas que tocan el sistema o la seguridad, o que dan una consola. */
     static final List<String> PROGRAMAS_PROHIBIDOS = List.of("cmd", "powershell", "pwsh", "regedit", "mmc", "taskmgr", "gpedit", "secpol",

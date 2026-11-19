@@ -35,6 +35,7 @@ final class ComprobacionesJarvis {
             telegram();
             buzon();
             programadas();
+            ficheros();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -223,5 +224,50 @@ final class ComprobacionesJarvis {
         s.tic(lunes9);
         ok(dicho.stream().anyMatch(d -> d.contains("Toca lo programado")) && dicho.stream().anyMatch(d -> d.contains("No tengo nada pendiente")),
                 "programadas: a su hora se lanza solo");
+    }
+
+    static void ficheros() throws IOException {
+        Path raiz = Files.createTempDirectory("fich");
+        Path fuera = Files.createTempDirectory("fuera");
+        Files.writeString(fuera.resolve("secreto.txt"), "no");
+        var f = new es.amagna.asistente.jarvis.Ficheros(List.of(raiz));
+        String r = raiz.toString();
+        ok(f.escribir(r + "/nota.txt", "hola", false).startsWith("Escrito") && f.leer(r + "/nota.txt").equals("hola"), "ficheros: escribe y lee dentro de la carpeta permitida");
+        ok(f.listar(r).contains("nota.txt") && f.buscar(r, "NOT").contains("nota.txt"), "ficheros: lista y busca");
+        try {
+            f.escribir(r + "/nota.txt", "otra", false);
+            ok(false, "ficheros: no sobrescribe sin decirlo");
+        } catch (IllegalArgumentException e) {
+            ok(e.getMessage().contains("Ya existe"), "ficheros: no sobrescribe sin decirlo");
+        }
+        f.escribir(r + "/nota.txt", "otra", true);
+        ok(f.leer(r + "/nota.txt").equals("otra") && Files.exists(raiz.resolve("_papelera").resolve("nota.txt")), "ficheros: al sobrescribir, lo anterior va a la papelera");
+        for (String mala : new String[] {r + "/../" + fuera.getFileName() + "/secreto.txt", fuera.resolve("secreto.txt").toString(), "/etc/passwd"}) {
+            try {
+                f.leer(mala);
+                ok(false, "ficheros: no sale de su carpeta: " + mala);
+            } catch (IllegalArgumentException e) {
+                ok(e.getMessage().startsWith("NO PERMITIDO"), "ficheros: no sale de su carpeta (" + mala.replace(r, "R") + ")");
+            }
+        }
+        try {
+            f.escribir(r + "/malo.bat", "del *", false);
+            ok(false, "ficheros: no crea scripts");
+        } catch (IllegalArgumentException e) {
+            ok(e.getMessage().contains("ejecutables"), "ficheros: no crea ejecutables ni scripts");
+        }
+        f.mover(r + "/nota.txt", r + "/sub/nota2.txt");
+        ok(Files.exists(raiz.resolve("sub/nota2.txt")), "ficheros: mueve y crea la carpeta destino");
+        f.aLaPapelera(r + "/sub/nota2.txt");
+        ok(!Files.exists(raiz.resolve("sub/nota2.txt")) && Files.exists(raiz.resolve("_papelera/nota2.txt")), "ficheros: «borrar» es mandar a la papelera");
+        try {
+            java.nio.file.Files.createSymbolicLink(raiz.resolve("enlace"), fuera);
+            f.leer(r + "/enlace/secreto.txt");
+            ok(false, "ficheros: un enlace simbólico no saca de la carpeta");
+        } catch (IllegalArgumentException e) {
+            ok(true, "ficheros: un enlace simbólico no saca de la carpeta");
+        } catch (UnsupportedOperationException | IOException e) {
+            ok(true, "ficheros: (este sistema no deja crear enlaces; se omite)");
+        }
     }
 }
