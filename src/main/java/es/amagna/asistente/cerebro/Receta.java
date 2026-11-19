@@ -281,6 +281,7 @@ public final class Receta {
         }
         boolean opcional = Boolean.TRUE.equals(in.remove("_opcional"));
         in.remove("_si");
+        in.remove("_sin_ventana");
         ExecutorService pool = Executors.newSingleThreadExecutor(r -> {
             Thread t = new Thread(r, "paso");
             t.setDaemon(true);

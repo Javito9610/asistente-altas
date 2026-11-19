@@ -1357,6 +1357,36 @@ public final class Comprobaciones {
         ok("Alta Cliente".equals(Agente.tituloMnDelante("- «Claude» (claude) [delante]\n- «Expedientes» (GestorConsultas) [minimizada]\n- «Alta Cliente» (GestorConsultas) [pos 1,1 tam 5x5]\n"))
                 && Agente.tituloMnDelante("- «Claude» (claude)\n") == null,
                 "foto del fallo y espera de quietud miran la ventana de MN de delante, no una minimizada");
+        {
+            // Ruta alternativa: el segundo clic solo se da si el diálogo todavía no ha salido.
+            var mini = es.amagna.asistente.estados.Mapa.desde("""
+                {"principal":"P","reposo":"a","estados":[{"nombre":"a","ventana":"Aaa"}],
+                 "transiciones":[{"nombre":"t","de":"a","a":"a","segundos":1,"pasos":[
+                   {"accion":"uno","in":{}},
+                   {"accion":"dos","in":{"_sin_ventana":"Dlg"}}]}],
+                 "tareas":{"x":[{"hacer":"t"}]}}""");
+            for (boolean sale : new boolean[] {false, true}) {
+                var hechas = new java.util.ArrayList<String>();
+                var ej = new es.amagna.asistente.estados.Ejecutor(mini,
+                        () -> "- «Aaa» (GestorConsultas) [delante]\n" + (sale ? "- «Dlg» (GestorConsultas)\n" : ""),
+                        (pp, ps) -> {
+                            hechas.add(pp.accion());
+                            return null;
+                        }, null, new es.amagna.asistente.estados.Ejecutor.Reloj() {
+                            long t;
+                            public long ahora() {
+                                return t;
+                            }
+
+                            public void dormir(long ms) {
+                                t += ms;
+                            }
+                        }, x -> { });
+                ej.ejecutar("x", java.util.Map.of());
+                ok(hechas.equals(sale ? java.util.List.of("uno") : java.util.List.of("uno", "dos")),
+                        "ruta alternativa: el paso «_sin_ventana» " + (sale ? "se salta si el diálogo ya salió" : "se hace si el diálogo no ha salido"));
+            }
+        }
         var c1 = es.amagna.asistente.estados.Planificador.camino(mapa, "fuera", "formulario-expediente");
         ok(c1 != null && c1.size() == 3 && c1.get(0).nombre().equals("abrir-mn") && c1.get(2).nombre().equals("alta"),
                 "estados: de «fuera» al formulario hay tres pasos: abrir MN, abrir la lista, Alta");

@@ -305,6 +305,10 @@ public final class Ejecutor {
             if (si != null && (params.get(String.valueOf(si)) == null || params.get(String.valueOf(si)).isBlank())) {
                 continue;
             }
+            Object sin = p.in().get("_sin_ventana");
+            if (sin != null && observa.ventanas().contains("«" + sin + "»")) {
+                continue; // ruta alternativa: este paso solo se hace si esa ventana todavía NO ha aparecido
+            }
             long desde = reloj.ahora();
             String err = hace.paso(p, params);
             long ms = reloj.ahora() - desde;
