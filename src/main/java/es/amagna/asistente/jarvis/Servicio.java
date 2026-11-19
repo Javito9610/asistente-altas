@@ -183,6 +183,10 @@ public final class Servicio {
                         + "Te aviso cuando acabe. (" + pendientes() + " en cola)");
                 registro.accept("Trabajo " + t.id() + " apuntado: " + e.tarea());
             }
+            case Entendido.CONSULTAR -> {
+                almacen.nuevo(origen, quien, texto, "consulta", Map.of("pregunta", e.texto()), Trabajo.PENDIENTE);
+                decir(origen, quien, "Voy a mirarlo (solo miro, no toco nada)…");
+            }
             case Entendido.LIBRE -> {
                 Map<String, String> ps = new java.util.LinkedHashMap<>(e.params());
                 ps.put("encargo", e.texto());

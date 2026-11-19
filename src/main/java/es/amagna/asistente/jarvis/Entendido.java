@@ -9,4 +9,5 @@ public record Entendido(String tipo, String tarea, Map<String, String> params, S
     public static final String PREGUNTAR = "preguntar";
     public static final String RESPONDER = "responder";
     public static final String PROGRAMAR = "programar";
+    public static final String CONSULTAR = "consultar";
 }

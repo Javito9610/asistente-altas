@@ -805,6 +805,22 @@ public final class App {
         }
         var corredor = corredorDeTareas(a);
         es.amagna.asistente.jarvis.Servicio.Hace tareas = t -> {
+            if ("consulta".equals(t.tarea())) {
+                // Mirar nunca cambia nada: el especialista «consulta» solo tiene herramientas de lectura (atadas en código).
+                if (!Clave.hay()) {
+                    return new es.amagna.asistente.jarvis.Servicio.Resultado(false, "Para mirar y contarte lo que veo necesito la IA y no tengo clave guardada.");
+                }
+                try {
+                    VentanasNativas v = new VentanasNativas(false);
+                    var esp = es.amagna.asistente.cerebro.Especialista.cargar("consulta", MODELO_POR_DEFECTO, 120_000);
+                    Agente ag = new Agente(new ClaudeApi(Clave.leer()), new ManosRobot(false), v, esp.modelo(), esp.instrucciones(), esp.pasos(),
+                            esp.topeTokens(), registro).conControles(new Controles(v)).conExpediente(false).soloPuede(esp.puede());
+                    var r = ag.ejecutar(t.params().getOrDefault("pregunta", t.peticion()));
+                    return new es.amagna.asistente.jarvis.Servicio.Resultado(r.terminado(), r.mensaje().replaceFirst("^TERMINADO:\\s*", ""));
+                } catch (IOException e) {
+                    return new es.amagna.asistente.jarvis.Servicio.Resultado(false, "No pude preparar al especialista: " + e.getMessage());
+                }
+            }
             var ps = new java.util.LinkedHashMap<>(t.params());
             if ("crear-cliente".equals(t.tarea())) {
                 ps.putIfAbsent("cliente_carpeta", ps.getOrDefault("cliente_nombre", "") + "\\");

@@ -86,6 +86,8 @@ final class ComprobacionesJarvis {
         ok(Entendido.PREGUNTAR.equals(h.tipo()), "intérprete: una respuesta rara de la IA se convierte en pregunta");
         var i = Interprete.leer("Claro:\n```json\n{\"tipo\":\"responder\",\"texto\":\"Son las tres.\"}\n```");
         ok(Entendido.RESPONDER.equals(i.tipo()) && i.texto().equals("Son las tres."), "intérprete: aguanta que la IA envuelva el JSON en texto");
+        var c = Interprete.leer("{\"tipo\":\"consultar\",\"texto\":\"cuántos expedientes hay\"}");
+        ok(Entendido.CONSULTAR.equals(c.tipo()) && c.texto().contains("expedientes"), "intérprete: una pregunta sobre lo que se ve en MN es «consultar»");
         var j = Interprete.leer("{\"tipo\":\"libre\",\"texto\":\"abrir la calculadora\"}");
         ok(Entendido.LIBRE.equals(j.tipo()), "intérprete: lo que no es del mapa es «libre»");
     }
