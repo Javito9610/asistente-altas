@@ -1,0 +1,1 @@
+Lee la pagina https://example.com y guarda en un fichero resumen.txt (en tu carpeta de trabajo) una frase que diga de que trata.
