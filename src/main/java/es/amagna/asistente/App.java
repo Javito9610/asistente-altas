@@ -850,6 +850,7 @@ public final class App {
                 return new es.amagna.asistente.jarvis.Servicio.Resultado(false, "No pude preparar al especialista: " + e.getMessage());
             }
         };
+        var buzon = new es.amagna.asistente.jarvis.CanalCarpeta(datos.resolve("buzon"));
         es.amagna.asistente.jarvis.CanalTelegram[] telegram = new es.amagna.asistente.jarvis.CanalTelegram[1];
         es.amagna.asistente.jarvis.Ventana[] ventana = new es.amagna.asistente.jarvis.Ventana[1];
         es.amagna.asistente.jarvis.Servicio.Salida salida = (origen, quien, texto) -> {
@@ -858,6 +859,8 @@ public final class App {
                 telegram[0].enviar(quien, texto);
             } else if ("ventana".equals(origen) && ventana[0] != null) {
                 ventana[0].decir("Jarvis: " + texto);
+            } else if ("buzon".equals(origen)) {
+                buzon.enviar("respuestas", "[" + java.time.LocalTime.now().withNano(0) + "] " + texto);
             }
         };
         var servicio = new es.amagna.asistente.jarvis.Servicio(almacen, interprete, tareas, libre, salida, autorizados, registro);
@@ -904,6 +907,8 @@ public final class App {
         registro.accept("Jarvis en marcha. Autorizados: " + autorizados.size() + ". Trabajos guardados: " + almacen.todos().size() + ".");
         while (!salir[0]) {
             try {
+                // El buzón (datos\\buzon\\entrada\\*.txt): cada fichero es un mensaje del usuario local; las respuestas van a salida\\respuestas.txt.
+                buzon.sondear((nombre, texto) -> servicio.recibir("buzon", "local", texto));
                 if (!servicio.procesarUno()) {
                     Thread.sleep(1000);
                 }

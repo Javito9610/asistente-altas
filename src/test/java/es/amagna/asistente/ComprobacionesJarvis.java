@@ -2,6 +2,7 @@ package es.amagna.asistente;
 
 import es.amagna.asistente.jarvis.Almacen;
 import es.amagna.asistente.jarvis.Barreras;
+import es.amagna.asistente.jarvis.CanalCarpeta;
 import es.amagna.asistente.jarvis.CanalTelegram;
 import es.amagna.asistente.jarvis.Entendido;
 import es.amagna.asistente.jarvis.Interprete;
@@ -31,6 +32,7 @@ final class ComprobacionesJarvis {
             interprete();
             almacenYServicio();
             telegram();
+            buzon();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -165,5 +167,18 @@ final class ComprobacionesJarvis {
             throw new IOException("fallo con " + url);
         }, logs::add);
         ok(caida.sondear(0, (q, t) -> { }) == -1 && logs.stream().noneMatch(l -> l.contains("TOKEN-SECRETO")), "telegram: sin red no se rompe y el token nunca sale en el registro");
+    }
+
+    static void buzon() throws IOException {
+        Path raiz = Files.createTempDirectory("buzon");
+        var canal = new CanalCarpeta(raiz);
+        ok(canal.sondear((n, t) -> { }) == 0, "buzón: vacío no hace nada");
+        Files.writeString(raiz.resolve("entrada").resolve("a.txt"), "estado\n", java.nio.charset.StandardCharsets.UTF_8);
+        List<String> v = new ArrayList<>();
+        ok(canal.sondear((n, t) -> v.add(n + "=" + t)) == 1 && v.equals(List.of("a=estado")), "buzón: lee un fichero como un mensaje");
+        ok(canal.sondear((n, t) -> v.add("otra vez")) == 0, "buzón: y no lo vuelve a leer");
+        canal.enviar("respuestas", "hola");
+        canal.enviar("respuestas", "adiós");
+        ok(Files.readString(raiz.resolve("salida").resolve("respuestas.txt")).equals("hola\nadiós\n"), "buzón: las respuestas se van añadiendo");
     }
 }
