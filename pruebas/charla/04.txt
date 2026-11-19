@@ -1,1 +1,0 @@
-Preparame un correo para ana@example.com con asunto Concursos, diciendole que el viernes cerramos a las 14:00 y que revise los expedientes pendientes.

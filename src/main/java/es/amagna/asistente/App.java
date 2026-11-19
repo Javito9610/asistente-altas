@@ -919,6 +919,40 @@ public final class App {
         };
         var servicio = new es.amagna.asistente.jarvis.Servicio(almacen, interprete, tareas, libre, salida, autorizados, registro)
                 .conEntregas(ficherosJarvis::drenarEntregas)
+                .conDiagnostico(() -> {
+                    long arranque = java.lang.management.ManagementFactory.getRuntimeMXBean().getStartTime();
+                    var dur = java.time.Duration.ofMillis(System.currentTimeMillis() - arranque);
+                    boolean mn = new VentanasNativas(false).abiertas().contains("(MNprogram)");
+                    long discoGb = 0;
+                    try {
+                        discoGb = Files.getFileStore(Path.of(".").toAbsolutePath()).getUsableSpace() / 1_048_576_000L;
+                    } catch (IOException e) {
+                        // sin dato
+                    }
+                    int lecc = 0;
+                    try {
+                        lecc = new es.amagna.asistente.estados.Lecciones(Path.of("aprendido", "lecciones.json")).cuantas();
+                    } catch (RuntimeException e) {
+                        // sin dato
+                    }
+                    long libres = 0;
+                    try (var l = Files.list(Path.of("aprendido", "libres"))) {
+                        libres = l.filter(x -> x.toString().endsWith(".json")).count();
+                    } catch (IOException e) {
+                        // sin carpeta
+                    }
+                    return "🩺 Diagnóstico de Jarvis\n"
+                            + "· IA (clave): " + (Clave.hay() ? "sí" : "NO — sin ella solo hago lo que sé de memoria (asistente guardar-clave)") + "\n"
+                            + "· Telegram: " + (telegram[0] != null ? "conectado" : "no configurado (asistente secreto telegram)") + "\n"
+                            + "· Personas autorizadas: " + autorizados.size() + "\n"
+                            + "· MN abierto: " + (mn ? "sí" : "no") + "\n"
+                            + "· Encendido desde hace: " + dur.toHours() + " h " + dur.toMinutesPart() + " min\n"
+                            + "· Trabajos guardados: " + almacen.todos().size() + " (en curso: " + almacen.en(es.amagna.asistente.jarvis.Trabajo.EN_CURSO).size() + ")\n"
+                            + "· Tareas libres aprendidas: " + libres + " · lecciones de pantalla: " + lecc + "\n"
+                            + "· Carpetas con las que puedo trabajar: " + ficherosJarvis.raices().stream().map(Path::toString).collect(java.util.stream.Collectors.joining(", ")) + "\n"
+                            + "· Disco libre: " + discoGb + " GB\n"
+                            + "· Hora del equipo: " + java.time.LocalDateTime.now().withNano(0);
+                })
                 .conNotas(new es.amagna.asistente.jarvis.Notas(datos.resolve("notas.txt")))
                 .conProgramadas(new es.amagna.asistente.jarvis.Programadas(datos.resolve("programadas.json")))
                 .conConocimiento(() -> {

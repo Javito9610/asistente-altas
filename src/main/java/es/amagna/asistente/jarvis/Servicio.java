@@ -47,6 +47,7 @@ public final class Servicio {
     private volatile boolean pausado;
     private Programadas programadas;
     private Notas notas;
+    private java.util.function.Supplier<String> diagnostico;
     private java.util.function.Supplier<String> conocimiento = () -> "";
 
     /** Lo que Jarvis ya sabe hacer solo (tareas libres aprendidas): se le cuenta al intérprete para que las reutilice con los mismos nombres. */
@@ -63,6 +64,12 @@ public final class Servicio {
     }
 
     private java.util.function.Supplier<List<java.nio.file.Path>> entregas = List::of;
+
+    /** Lo que se cuenta con «diagnóstico»: cómo está Jarvis por dentro (lo prepara quien lo arranca). */
+    public Servicio conDiagnostico(java.util.function.Supplier<String> d) {
+        this.diagnostico = d;
+        return this;
+    }
 
     public Servicio conNotas(Notas n) {
         this.notas = n;
@@ -189,6 +196,16 @@ public final class Servicio {
             decir(origen, quien, l.isEmpty() ? "No hay nada programado." : "Programado:\n" + l.stream()
                     .map(p -> "· " + p.id() + " — " + p.hora() + (p.fecha().isEmpty() ? " " + p.dias().size() + " días/sem: " : " el " + p.fecha() + ": ") + p.peticion()).collect(java.util.stream.Collectors.joining("\n"))
                     + "\n(Para quitar uno: «quita p12345».)");
+            return;
+        }
+        if (diagnostico != null && Set.of("diagnostico", "como estas", "revisate", "autodiagnostico", "salud").contains(n)) {
+            String d;
+            try {
+                d = diagnostico.get();
+            } catch (RuntimeException e) {
+                d = "No he podido revisarme: " + e.getMessage();
+            }
+            decir(origen, quien, d);
             return;
         }
         if (notas != null && Set.of("notas", "que recuerdas", "que sabes", "que sabes de la oficina").contains(n)) {
