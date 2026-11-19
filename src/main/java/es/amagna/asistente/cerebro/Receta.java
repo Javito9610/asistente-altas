@@ -321,7 +321,9 @@ public final class Receta {
                 if (p.rel() != null) {
                     v.activar(real);
                     var h = ((es.amagna.asistente.manos.VentanasNativas) v).handleDe(real);
-                    if (Win32.desmaximizar(h)) {
+                    // La ventana principal del programa NO se toca: encoger MN entero cambia la pantalla a todo lo demás.
+                    // Esto solo vale para formularios y listas, que MN abre con el último tamaño que tuvieron.
+                    if (!real.startsWith("MNprogram") && Win32.desmaximizar(h)) {
                         System.out.println("  ventana «" + real + "» maximizada: devuelta a su tamaño normal (las posiciones de la receta son de ese tamaño)");
                     }
                     int[] r = h == null ? null : Win32.rectangulo(h);

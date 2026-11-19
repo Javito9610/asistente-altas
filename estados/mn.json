@@ -266,9 +266,10 @@
        {"accion": "wait", "in": {"duration": 2}}
      ]},
 
-    {"nombre": "cerrar-lista-clientes", "de": "lista-clientes", "a": "lista-expedientes", "segundos": 15,
+    {"nombre": "lista-clientes-a-expedientes", "de": "lista-clientes", "a": "lista-expedientes", "segundos": 60,
      "pasos": [
-       {"accion": "key", "in": {"text": "Escape"}}
+       {"accion": "ruta", "ventana": "MNprogram - Abogados",
+        "in": {"ventana": "MNprogram - Abogados", "ruta": ["Bases de Datos", "Expedientes", "Expedientes"]}}
      ]},
 
     {"nombre": "comprobar-cliente-no-existe", "de": "lista-clientes", "a": "lista-clientes", "segundos": 60,
