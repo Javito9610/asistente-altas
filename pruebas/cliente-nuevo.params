@@ -1,13 +1,13 @@
 # Cliente ficticio de prueba (UTF-8). Empresa de prueba.
-cliente_nombre=ELENA TESTEO PRUEBA
-cliente_nif=99887733E
+cliente_nombre=MARTA TESTEO PRUEBA
+cliente_nif=99887722F
 cliente_telefono=600 11 22 33
 cliente_movil=600 11 22 33
-cliente_correo=elena.testeo.prueba@ejemplo-invalido.test
+cliente_correo=marta.testeo.prueba@ejemplo-invalido.test
 cliente_direccion=Calle de Proba 9
 cliente_cp=15001
 cliente_poblacion=Coruña, A
-cliente_carpeta=ELENA TESTEO PRUEBA\
+cliente_carpeta=MARTA TESTEO PRUEBA\
 adjunto=C:\Proyectos\asistente-altas\pruebas\ficha\dni-prueba.txt
 adjunto2=C:\Proyectos\asistente-altas\pruebas\ficha\hoja-encargo-prueba.txt
 adjunto3=C:\Proyectos\asistente-altas\pruebas\ficha\justificante-prueba.txt
