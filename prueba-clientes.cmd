@@ -18,7 +18,7 @@ for %%N in (%NOMBRES%) do (
     set "NIF=9970!TIME:~6,2!!TIME:~9,2!!K!Z"
     set "NIF=!NIF: =0!"
     echo ##### VUELTA !K! %%N !TIME! ##### >> registro\clientes.log
-    %SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -Command "$t=-join ((Get-Date).ToString('mmss').ToCharArray()|%%{[char](65+[int][string]$_)}); (Get-Content -Encoding UTF8 pruebas\cliente-nuevo.params) -replace 'QUICO TESTEO','%%N '+$t+' TESTEO' -replace 'quico.testeo','%%N.'+$t.ToLower()+'.testeo' -replace '99887688K','!NIF!' | Set-Content -Encoding UTF8 pruebas\cliente-auto.params"
+    %SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -Command "$t=-join ((Get-Date).ToString('mmss').ToCharArray()|%%{[char](65+[int][string]$_)}); $n='%%N '+$t+' TESTEO'; $m='%%N.'+$t.ToLower()+'.testeo'; (Get-Content -Encoding UTF8 pruebas\cliente-nuevo.params) -replace 'QUICO TESTEO',$n -replace 'quico.testeo',$m -replace '99887688K','!NIF!' | Set-Content -Encoding UTF8 pruebas\cliente-auto.params"
     call asistente.cmd tarea crear-cliente --param-fichero pruebas\cliente-auto.params --sin-ia >> registro\clientes.log 2>&1
     if !ERRORLEVEL!==0 (
       set /a BIEN+=1
