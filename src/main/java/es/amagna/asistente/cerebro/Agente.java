@@ -79,6 +79,13 @@ public final class Agente {
     private final Consumer<String> registro;
     private Expediente expediente;
     private java.util.Set<String> puede = java.util.Set.of();
+    /** Barrera de seguridad en CÓDIGO (no en las instrucciones): recibe acción y datos, devuelve el motivo del veto o null. */
+    private java.util.function.BiFunction<String, Map<String, Object>, String> veto;
+
+    public Agente conVeto(java.util.function.BiFunction<String, Map<String, Object>, String> v) {
+        this.veto = v;
+        return this;
+    }
     private final Ventanas ventanas;
     private Controles controles;
     private final long topeTokens;
@@ -327,6 +334,14 @@ public final class Agente {
                     if (!permitido(accion)) {
                         String no = "NO PERMITIDO: en esta tarea no puedes usar «" + accion + "». Lo que sí puedes: "
                                 + String.join(", ", puede) + ". Si la tarea no se puede hacer así, termina con PARADO.";
+                        registro.accept("    " + no);
+                        anotar(x -> x.error(no));
+                        resultados.add(resultado(id, List.of(textoBloque(no)), true, ordenador));
+                        continue;
+                    }
+                    String vetado = veto == null ? null : veto.apply(accion, in);
+                    if (vetado != null) {
+                        String no = "VETADO: " + vetado + " Esto no se puede hacer; si el encargo lo necesita, termina con PARADO y explícalo.";
                         registro.accept("    " + no);
                         anotar(x -> x.error(no));
                         resultados.add(resultado(id, List.of(textoBloque(no)), true, ordenador));

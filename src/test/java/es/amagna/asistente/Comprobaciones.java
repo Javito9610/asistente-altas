@@ -45,6 +45,7 @@ public final class Comprobaciones {
         anclas();
         pedidos();
         alta();
+        ComprobacionesJarvis.jarvis();
         System.out.println("\nTODO BIEN: " + bien + " comprobaciones.");
     }
 

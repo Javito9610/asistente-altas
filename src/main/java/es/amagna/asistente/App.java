@@ -52,7 +52,7 @@ public final class App {
             case "tarea" -> 900;
             case "expedientes" -> args.contains("--hacer") ? 3600 : 120;
             case "alta" -> 1200;
-            case "probar-windows", "arranque", "secretos", "secreto", "guardar-clave", "ayuda" -> 0;
+            case "probar-windows", "arranque", "secretos", "secreto", "guardar-clave", "ayuda", "jarvis" -> 0;
             default -> 300;
         };
     }
@@ -108,6 +108,7 @@ public final class App {
                 case "probar-windows" -> PruebasWindows.main(new String[0]);
                 case "expediente-prueba" -> expedientePrueba(Arrays.asList(args).subList(1, args.length));
                 case "tarea" -> tarea(Arrays.asList(args).subList(1, args.length));
+                case "jarvis" -> jarvis(Arrays.asList(args).subList(1, args.length));
                 case "receta" -> receta(Arrays.asList(args).subList(1, args.length));
                 case "agente" -> agente(Arrays.asList(args).subList(1, args.length));
                 case "guion" -> guion(Arrays.asList(args).subList(1, args.length));
@@ -765,6 +766,124 @@ public final class App {
         var r = corredor.correr(a.get(0), parametros(a), clave, a.contains("--repetir"));
         System.out.println(r.mensaje() + String.format(" · %.0f s · %d empujones de la IA", (System.currentTimeMillis() - t0) / 1000.0, r.rescates()));
         System.exit(r.bien() ? 0 : 1);
+    }
+
+    /**
+     * Jarvis: el asistente completo, siempre encendido. Escucha (ventana, Telegram, consola), entiende lo que se le pide, lo apunta
+     * en datos\\trabajos y lo hace de uno en uno; lo que el mapa sabe hacer, sin IA; lo demás, con la IA y las barreras puestas.
+     *   asistente jarvis [--sin-ventana] [--sin-ia]
+     * Telegram: «asistente secreto telegram» (token del bot) y los números de usuario autorizados en datos\\autorizados.txt.
+     */
+    private static void jarvis(List<String> a) throws Exception {
+        Path datos = Path.of("datos");
+        java.util.function.Consumer<String> registro = linea -> System.out.println(
+                "[" + java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")) + "] " + linea);
+        var almacen = new es.amagna.asistente.jarvis.Almacen(datos.resolve("trabajos"));
+        es.amagna.asistente.cerebro.Cerebro cerebro = Clave.hay() && !a.contains("--sin-ia") ? new ClaudeApi(Clave.leer()) : p -> {
+            throw new IllegalStateException("no hay clave de la IA (asistente guardar-clave)");
+        };
+        var interprete = new es.amagna.asistente.jarvis.Interprete(cerebro, MODELO_POR_DEFECTO);
+        java.util.Set<String> autorizados = new java.util.HashSet<>(java.util.Set.of("local"));
+        Path fa = datos.resolve("autorizados.txt");
+        if (Files.isRegularFile(fa)) {
+            for (String l : Files.readAllLines(fa, StandardCharsets.UTF_8)) {
+                if (!l.isBlank() && !l.startsWith("#")) {
+                    autorizados.add(l.strip());
+                }
+            }
+        }
+        var corredor = corredorDeTareas(a);
+        es.amagna.asistente.jarvis.Servicio.Hace tareas = t -> {
+            var ps = new java.util.LinkedHashMap<>(t.params());
+            if ("crear-cliente".equals(t.tarea())) {
+                ps.putIfAbsent("cliente_carpeta", ps.getOrDefault("cliente_nombre", "") + "\\");
+            }
+            String clave = switch (t.tarea()) {
+                case "crear-cliente" -> "cliente|" + ps.getOrDefault("cliente_nif", "");
+                case "crear-expediente" -> "expediente|" + ps.getOrDefault("cliente", "") + "|" + ps.getOrDefault("descripcion", "");
+                default -> t.id();
+            };
+            var r = corredor.correr(t.tarea(), ps, clave, false);
+            return new es.amagna.asistente.jarvis.Servicio.Resultado(r.bien(), r.mensaje());
+        };
+        es.amagna.asistente.jarvis.Servicio.Hace libre = t -> {
+            if (!Clave.hay()) {
+                return new es.amagna.asistente.jarvis.Servicio.Resultado(false, "Para eso necesito la IA y no tengo clave guardada.");
+            }
+            try {
+                VentanasNativas v = new VentanasNativas(false);
+                var esp = es.amagna.asistente.cerebro.Especialista.cargar("general", MODELO_POR_DEFECTO, 400_000);
+                Agente ag = new Agente(new ClaudeApi(Clave.leer()), new ManosRobot(false), v, esp.modelo(), esp.instrucciones(), esp.pasos(),
+                        esp.topeTokens(), registro).conControles(new Controles(v)).conExpediente(false)
+                        .conVeto((accion, in) -> es.amagna.asistente.jarvis.Barreras.veto(accion, in, v.abiertas()));
+                var r = ag.ejecutar(t.params().getOrDefault("encargo", t.peticion()) + "\n\n(Petición original: " + t.peticion() + ")");
+                return new es.amagna.asistente.jarvis.Servicio.Resultado(r.terminado(), r.mensaje());
+            } catch (IOException e) {
+                return new es.amagna.asistente.jarvis.Servicio.Resultado(false, "No pude preparar al especialista: " + e.getMessage());
+            }
+        };
+        es.amagna.asistente.jarvis.CanalTelegram[] telegram = new es.amagna.asistente.jarvis.CanalTelegram[1];
+        es.amagna.asistente.jarvis.Ventana[] ventana = new es.amagna.asistente.jarvis.Ventana[1];
+        es.amagna.asistente.jarvis.Servicio.Salida salida = (origen, quien, texto) -> {
+            registro.accept("→ " + origen + "/" + quien + ": " + texto.replace('\n', ' '));
+            if ("telegram".equals(origen) && telegram[0] != null) {
+                telegram[0].enviar(quien, texto);
+            } else if ("ventana".equals(origen) && ventana[0] != null) {
+                ventana[0].decir("Jarvis: " + texto);
+            }
+        };
+        var servicio = new es.amagna.asistente.jarvis.Servicio(almacen, interprete, tareas, libre, salida, autorizados, registro);
+        servicio.arrancar();
+        boolean[] salir = {false};
+        if (!a.contains("--sin-ventana")) {
+            ventana[0] = es.amagna.asistente.jarvis.Ventana.abrir(
+                    texto -> servicio.recibir("ventana", "local", texto),
+                    () -> {
+                        servicio.pausar(!servicio.pausado());
+                        ventana[0].pausado(servicio.pausado());
+                    },
+                    () -> salir[0] = true);
+            if (ventana[0] != null) {
+                ventana[0].decir("Jarvis listo. Escríbeme lo que necesites (por ejemplo: «estado»).");
+            }
+        }
+        if (es.amagna.asistente.manos.Secreto.hay("telegram")) {
+            char[] token = es.amagna.asistente.manos.Secreto.leer("telegram");
+            if (token != null) {
+                telegram[0] = new es.amagna.asistente.jarvis.CanalTelegram(new String(token), es.amagna.asistente.jarvis.CanalTelegram.redReal(), registro);
+                var tg = telegram[0];
+                tg.escuchar((quien, texto) -> {
+                    if (!autorizados.contains(quien)) {
+                        registro.accept("Telegram: mensaje del usuario " + quien + " (no autorizado). Para autorizarlo, añade ese número a datos\\autorizados.txt.");
+                        tg.enviar(quien, "Hola. Todavía no estás autorizado. Tu número es " + quien + ": díselo a quien me administra.");
+                        return;
+                    }
+                    servicio.recibir("telegram", quien, texto);
+                });
+                registro.accept("Telegram: escuchando.");
+            }
+        } else {
+            registro.accept("Telegram: no configurado (asistente secreto telegram).");
+        }
+        if (ventana[0] == null && System.console() != null) {
+            new Thread(() -> {
+                var sc = new java.util.Scanner(System.in, StandardCharsets.UTF_8);
+                while (sc.hasNextLine()) {
+                    servicio.recibir("consola", "local", sc.nextLine());
+                }
+            }, "consola").start();
+        }
+        registro.accept("Jarvis en marcha. Autorizados: " + autorizados.size() + ". Trabajos guardados: " + almacen.todos().size() + ".");
+        while (!salir[0]) {
+            try {
+                if (!servicio.procesarUno()) {
+                    Thread.sleep(1000);
+                }
+            } catch (InterruptedException e) {
+                break;
+            }
+        }
+        System.exit(0);
     }
 
     private static boolean yaHecha(es.amagna.asistente.estados.Diario d, String clave) {
