@@ -599,28 +599,28 @@ public final class App {
                 Estás en la Empresa de prueba y vas a CREAR UNA FICHA DE CLIENTE NUEVA con datos 100 % ficticios, para aprender el
                 camino exacto. Es lo único que se guarda. Miguel (el jefe) quiere que el asistente: busque al cliente por NIF y,
                 solo si NO existe, cree la ficha; y adjunte a la ficha el DNI, la hoja de encargo y el justificante.
-                Datos de la ficha: Nombre OLIVIA · Apellidos TESTEO PRUEBA · NIF 99887766P · Teléfono/Móvil 600 11 22 33 ·
-                Correo olivia.testeo.prueba@ejemplo-invalido.test · Domicilio Calle de Proba 9, 15001 A Coruña (rellena solo los campos
+                Datos de la ficha: Nombre NOELIA · Apellidos TESTEO PRUEBA · NIF 99887755C · Teléfono/Móvil 600 11 22 33 ·
+                Correo noelia.testeo.prueba@ejemplo-invalido.test · Domicilio Calle de Proba 9, 15001 A Coruña (rellena solo los campos
                 que existan; el resto, vacío).
                 Ficheros ficticios (en el PC): C:\\Proyectos\\asistente-altas\\pruebas\\ficha\\dni-prueba.txt, hoja-encargo-prueba.txt
                 y justificante-prueba.txt (misma carpeta).
                 YA SE SABE (no lo repitas): la lista «Clientes» (Bases de Datos > Clientes) abre con el criterio «NIF/CIF»; se busca con
-                clic en la caja (≈186,68), ctrl+a, NIF, Intro; sin resultados dice «Núm. Clientes: 0». 99887766P NO existe. OJO: un
+                clic en la caja (≈186,68), ctrl+a, NIF, Intro; sin resultados dice «Núm. Clientes: 0». 99887755C NO existe (es nuevo; si aun así existiera, PARA y dilo, no la toques). OJO: un
                 Intro con una fila seleccionada abre «Editar Cliente»; si pasa, Cancelar sin guardar. «Alta» (#btnAlta) abre «Alta Cliente»;
                 su árbol UIA NO responde (no llames a ver_controles ahí: pierde 30 s): usa captura, ratón y teclado. Campos (clic,
-                ctrl+a, teclear): Nombre (445,126) [va TODO el nombre: «OLIVIA TESTEO PRUEBA»], NIF (735,126), Teléfono (349,169),
+                ctrl+a, teclear): Nombre (445,126) [va TODO el nombre: «NOELIA TESTEO PRUEBA»], NIF (735,126), Teléfono (349,169),
                 Dirección (445,213), CP (735,213) [con Tab rellena Población/Provincia/País]. Móvil (541,169) y Correo (830,169) abren
                 un diálogo propio: se escribe ahí y se ACEPTA (Móvil: botón ≈597,387; Correo: ≈597,401 y luego «Salir» de la lista de
                 direcciones ≈871,449); solo así el valor llega a la ficha. Adjuntos: pestaña «Adjuntos» (≈332,303) → «Añadir Adjunto»
                 (≈290,333) → «Importar» → «Abrir»: se teclea la ruta completa e Intro. Después MN pide «Establece el nombre de la
                 carpeta donde se almacenarán todos los adjuntos y subcarpetas de esta ficha». «Cancelar» de la ficha pregunta guardar Sí/No.
                 CONVENCIÓN DE LA CARPETA (ya vista en 3 clientes existentes): el nombre completo del cliente seguido de una barra
-                invertida. Para OLIVIA: «OLIVIA TESTEO PRUEBA\\» (termina en barra invertida). Todos los adjuntos de la ficha van a esa
+                invertida. Para NOELIA: «NOELIA TESTEO PRUEBA\\» (termina en barra invertida). Todos los adjuntos de la ficha van a esa
                 misma carpeta (la primera vez MN la pide; las siguientes puede que no).
                 LO QUE HAY QUE HACER (con pocos pasos y sin explorar más: esto se GRABA para repetirlo sin IA, así que sé directo y
-                no hagas pasos de más): crea la ficha de OLIVIA, adjunta los tres ficheros (dni-prueba.txt, hoja-encargo-prueba.txt,
+                no hagas pasos de más): crea la ficha de NOELIA, adjunta los tres ficheros (dni-prueba.txt, hoja-encargo-prueba.txt,
                 justificante-prueba.txt), verifica que salen en la lista de adjuntos, GUARDA y comprueba que existe buscándola por NIF.
-                Todo lo que no sea guardar la ficha de OLIVIA, NO lo hagas (no modifiques otros clientes, ni «Configuración», ni
+                Todo lo que no sea guardar la ficha de NOELIA, NO lo hagas (no modifiques otros clientes, ni «Configuración», ni
                 Baja/Eliminar). Cierra lo que abras. Si algo no está claro en 2 intentos, para y dilo.
                 Termina con líneas «APRENDIDO: …», una por cosa: orden exacto de pasos, nombres exactos de controles, diálogos,
                 avisos, qué lee UIA y qué no.
