@@ -201,12 +201,12 @@ public final class Ejecutor {
      */
     private void guardarEvidencia(String ventanas) {
         try {
-            var m = java.util.regex.Pattern.compile("«([^»]+)» \\((?:GestorConsultas|MNprogram)\\)").matcher(ventanas);
-            if (!m.find() || ventanas.contains("Empresa de prueba") == false) {
+            String titulo = es.amagna.asistente.cerebro.Agente.tituloMnDelante(ventanas);
+            if (titulo == null || !ventanas.contains("Empresa de prueba")) {
                 return;
             }
             var v = new es.amagna.asistente.manos.VentanasNativas(false);
-            var h = v.handleDe(m.group(1));
+            var h = v.handleDe(titulo);
             var c = es.amagna.asistente.manos.Captura.deVentana(h);
             byte[] png = c == null || !c.valido() ? null : c.png();
             if (png != null) {

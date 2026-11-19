@@ -622,6 +622,67 @@ public final class Agente {
         return null;
     }
 
+    /**
+     * Lo que se mira para saber si el programa ha terminado de dibujar: la ventana de delante (no la pantalla entera: la
+     * consola del propio asistente, el reloj o el cursor la hacían cambiar siempre y la espera agotaba su tiempo).
+     */
+    byte[] capturaParaQuietud() throws Exception {
+        if (ventanas instanceof es.amagna.asistente.manos.VentanasNativas vn) {
+            try {
+                String t = tituloMnDelante(vn.abiertas());
+                var h = t == null ? null : vn.handleDe(t);
+                var c = h == null ? null : es.amagna.asistente.manos.Captura.deVentana(h);
+                byte[] png = c == null || !c.valido() ? null : c.png();
+                if (png != null) {
+                    return png;
+                }
+            } catch (RuntimeException e) {
+                // sigue con la pantalla entera
+            }
+        }
+        return manos.captura();
+    }
+
+    /** Título de la ventana de MN que está más delante y a la vista (no minimizada), o null. */
+    public static String tituloMnDelante(String abiertas) {
+        for (String linea : abiertas.split("\\R")) {
+            var m = java.util.regex.Pattern.compile("^- «([^»]+)» \\((?:GestorConsultas|MNprogram)\\)").matcher(linea);
+            if (m.find() && !linea.contains("[minimizada]")) {
+                return m.group(1);
+            }
+        }
+        return null;
+    }
+
+    /** Dos fotos iguales salvo un parpadeo del cursor o un pixel suelto: diferencia media por debajo del 0,5 %. */
+    public static boolean casiIguales(byte[] a, byte[] b) {
+        if (java.util.Arrays.equals(a, b)) {
+            return true;
+        }
+        try {
+            var ia = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(a));
+            var ib = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(b));
+            if (ia == null || ib == null || ia.getWidth() != ib.getWidth() || ia.getHeight() != ib.getHeight()) {
+                return false;
+            }
+            int paso = Math.max(1, Math.min(ia.getWidth(), ia.getHeight()) / 120);
+            long dif = 0;
+            long n = 0;
+            for (int y = 0; y < ia.getHeight(); y += paso) {
+                for (int x = 0; x < ia.getWidth(); x += paso) {
+                    int p = ia.getRGB(x, y);
+                    int q = ib.getRGB(x, y);
+                    dif += Math.abs(((p >> 16) & 255) - ((q >> 16) & 255)) + Math.abs(((p >> 8) & 255) - ((q >> 8) & 255))
+                            + Math.abs((p & 255) - (q & 255));
+                    n += 3;
+                }
+            }
+            return n > 0 && (double) dif / n / 255.0 < 0.005;
+        } catch (java.io.IOException | RuntimeException e) {
+            return false;
+        }
+    }
+
     /** Espera a que la pantalla deje de cambiar: la forma honrada de saber que un programa ha terminado de cargar. */
     String esperarPantallaQuieta(double segundos) {
         long fin = System.currentTimeMillis() + (long) (segundos * 1000);
@@ -631,9 +692,9 @@ public final class Agente {
         while (System.currentTimeMillis() < fin) {
             try {
                 Thread.sleep(500);
-                byte[] ahora = manos.captura();
+                byte[] ahora = capturaParaQuietud();
                 vueltas++;
-                iguales = antes != null && java.util.Arrays.equals(antes, ahora) ? iguales + 1 : 0;
+                iguales = antes != null && casiIguales(antes, ahora) ? iguales + 1 : 0;
                 antes = ahora;
                 if (iguales >= 2) {
                     return "La pantalla lleva más de un segundo sin cambiar: el programa ha terminado de dibujar. Sigue.";

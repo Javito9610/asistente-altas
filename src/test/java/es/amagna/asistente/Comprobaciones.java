@@ -1331,6 +1331,32 @@ public final class Comprobaciones {
         ok(salir != null && salir.stream().noneMatch(es.amagna.asistente.estados.Mapa.Transicion::toca)
                         && salir.get(0).nombre().equals("cancelar-alta-cliente"),
                 "estados: para salir de una ficha a medias el planificador cancela, nunca guarda");
+        try {
+            var f1 = new java.awt.image.BufferedImage(400, 300, java.awt.image.BufferedImage.TYPE_INT_RGB);
+            var f2 = new java.awt.image.BufferedImage(400, 300, java.awt.image.BufferedImage.TYPE_INT_RGB);
+            var f3 = new java.awt.image.BufferedImage(400, 300, java.awt.image.BufferedImage.TYPE_INT_RGB);
+            f2.setRGB(10, 10, 0xFFFFFF); // un parpadeo
+            for (int y = 0; y < 300; y++) {
+                for (int x = 0; x < 400; x++) {
+                    f3.setRGB(x, y, x < 200 ? 0xFFFFFF : 0);
+                }
+            }
+            java.util.function.Function<java.awt.image.BufferedImage, byte[]> png = im -> {
+                try (var o = new java.io.ByteArrayOutputStream()) {
+                    javax.imageio.ImageIO.write(im, "png", o);
+                    return o.toByteArray();
+                } catch (java.io.IOException e) {
+                    throw new IllegalStateException(e);
+                }
+            };
+            ok(Agente.casiIguales(png.apply(f1), png.apply(f2)) && !Agente.casiIguales(png.apply(f1), png.apply(f3)),
+                    "pantalla quieta: un parpadeo suelto cuenta como quieta, un cambio grande no");
+        } catch (RuntimeException e) {
+            ok(false, "pantalla quieta: " + e);
+        }
+        ok("Alta Cliente".equals(Agente.tituloMnDelante("- «Claude» (claude) [delante]\n- «Expedientes» (GestorConsultas) [minimizada]\n- «Alta Cliente» (GestorConsultas) [pos 1,1 tam 5x5]\n"))
+                && Agente.tituloMnDelante("- «Claude» (claude)\n") == null,
+                "foto del fallo y espera de quietud miran la ventana de MN de delante, no una minimizada");
         var c1 = es.amagna.asistente.estados.Planificador.camino(mapa, "fuera", "formulario-expediente");
         ok(c1 != null && c1.size() == 3 && c1.get(0).nombre().equals("abrir-mn") && c1.get(2).nombre().equals("alta"),
                 "estados: de «fuera» al formulario hay tres pasos: abrir MN, abrir la lista, Alta");
