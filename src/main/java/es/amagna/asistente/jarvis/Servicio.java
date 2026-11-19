@@ -160,7 +160,7 @@ public final class Servicio {
         if (programadas != null && Set.of("programadas", "agenda", "que hay programado").contains(n)) {
             var l = programadas.todas();
             decir(origen, quien, l.isEmpty() ? "No hay nada programado." : "Programado:\n" + l.stream()
-                    .map(p -> "· " + p.id() + " — " + p.hora() + " " + p.dias().size() + " días/sem: " + p.peticion()).collect(java.util.stream.Collectors.joining("\n"))
+                    .map(p -> "· " + p.id() + " — " + p.hora() + (p.fecha().isEmpty() ? " " + p.dias().size() + " días/sem: " : " el " + p.fecha() + ": ") + p.peticion()).collect(java.util.stream.Collectors.joining("\n"))
                     + "\n(Para quitar uno: «quita p12345».)");
             return;
         }

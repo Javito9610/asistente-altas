@@ -21,7 +21,7 @@ import java.util.Set;
  * le vuelven a pedir a Jarvis como si la persona los hubiera escrito (con su mismo permiso: lo «libre» sigue pidiendo un sí).
  */
 public final class Programadas {
-    public record Programada(String id, String origen, String quien, String hora, Set<DayOfWeek> dias, String peticion, String ultima) {
+    public record Programada(String id, String origen, String quien, String hora, Set<DayOfWeek> dias, String peticion, String ultima, String fecha) {
     }
 
     private final Path fichero;
@@ -65,12 +65,24 @@ public final class Programadas {
         } catch (RuntimeException e) {
             return null;
         }
+        String fecha = "";
+        String nd = Servicio.norm(dias);
+        if (nd.contains("hoy") || nd.contains("manana") || nd.matches(".*\\d{4}-\\d{2}-\\d{2}.*")) {
+            try {
+                var m = java.util.regex.Pattern.compile("\\d{4}-\\d{2}-\\d{2}").matcher(nd);
+                LocalDate dia = m.find() ? LocalDate.parse(m.group()) : nd.contains("manana") ? LocalDate.now().plusDays(1) : LocalDate.now();
+                fecha = dia.toString();
+                dias = "todos";
+            } catch (RuntimeException e) {
+                return null;
+            }
+        }
         Set<DayOfWeek> d = dias(dias);
         if (d.isEmpty() || peticion == null || peticion.isBlank()) {
             return null;
         }
         String id = "p" + (System.currentTimeMillis() % 100000);
-        lista.add(new Programada(id, origen, quien, h.toString(), d, peticion.strip(), ""));
+        lista.add(new Programada(id, origen, quien, h.toString(), d, peticion.strip(), "", fecha));
         guardar();
         return id;
     }
@@ -93,9 +105,17 @@ public final class Programadas {
         for (int i = 0; i < lista.size(); i++) {
             Programada p = lista.get(i);
             LocalDate hoy = ahora.toLocalDate();
+            if (!p.fecha().isEmpty()) {
+                if (!hoy.isBefore(LocalDate.parse(p.fecha())) && (hoy.isAfter(LocalDate.parse(p.fecha()))
+                        || !ahora.toLocalTime().isBefore(LocalTime.parse(p.hora())))) {
+                    r.add(p);
+                    lista.remove(i--);
+                }
+                continue;
+            }
             if (p.dias().contains(hoy.getDayOfWeek()) && !ahora.toLocalTime().isBefore(LocalTime.parse(p.hora()))
                     && !hoy.toString().equals(p.ultima())) {
-                lista.set(i, new Programada(p.id(), p.origen(), p.quien(), p.hora(), p.dias(), p.peticion(), hoy.toString()));
+                lista.set(i, new Programada(p.id(), p.origen(), p.quien(), p.hora(), p.dias(), p.peticion(), hoy.toString(), ""));
                 r.add(p);
             }
         }
@@ -118,7 +138,7 @@ public final class Programadas {
                     d.add(DayOfWeek.valueOf(String.valueOf(x)));
                 }
                 lista.add(new Programada(String.valueOf(m.get("id")), String.valueOf(m.get("origen")), String.valueOf(m.get("quien")),
-                        String.valueOf(m.get("hora")), d, String.valueOf(m.get("peticion")), String.valueOf(m.getOrDefault("ultima", ""))));
+                        String.valueOf(m.get("hora")), d, String.valueOf(m.get("peticion")), String.valueOf(m.getOrDefault("ultima", "")), String.valueOf(m.getOrDefault("fecha", ""))));
             }
         } catch (IOException | RuntimeException e) {
             // un fichero estropeado no tumba a Jarvis
@@ -130,7 +150,7 @@ public final class Programadas {
             List<Object> l = new ArrayList<>();
             for (Programada p : lista) {
                 l.add(Json.obj("id", p.id(), "origen", p.origen(), "quien", p.quien(), "hora", p.hora(),
-                        "dias", p.dias().stream().map(DayOfWeek::name).toList(), "peticion", p.peticion(), "ultima", p.ultima()));
+                        "dias", p.dias().stream().map(DayOfWeek::name).toList(), "peticion", p.peticion(), "ultima", p.ultima(), "fecha", p.fecha()));
             }
             Files.createDirectories(fichero.toAbsolutePath().getParent());
             Path tmp = fichero.resolveSibling(fichero.getFileName() + ".tmp");

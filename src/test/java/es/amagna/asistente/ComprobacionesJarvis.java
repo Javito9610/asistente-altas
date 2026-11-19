@@ -216,6 +216,13 @@ final class ComprobacionesJarvis {
         ok(p.vencidas(java.time.LocalDateTime.of(2026, 11, 21, 10, 0)).isEmpty(), "programadas: en sábado no (lun-vie)");
         ok(new Programadas(f).todas().size() == 1 && p.vencidas(java.time.LocalDateTime.of(2026, 11, 17, 12, 0)).size() == 1,
                 "programadas: sobrevive a un reinicio y, si estaba apagado a su hora, lo hace al volver ese día");
+        var una = new Programadas(Files.createTempDirectory("prog1").resolve("p.json"));
+        String hoyS = java.time.LocalDate.now().toString();
+        ok(una.anadir("t", "javi", "10:00", "hoy", "mira") != null && una.anadir("t", "javi", "10:00", "mañana", "mira2") != null
+                && una.anadir("t", "javi", "10:00", "2026-12-25", "navidad") != null, "programadas: acepta hoy, mañana y una fecha (una sola vez)");
+        ok(una.vencidas(java.time.LocalDate.now().atTime(9, 0)).isEmpty(), "programadas: lo de hoy no toca antes de su hora");
+        ok(una.vencidas(java.time.LocalDate.now().atTime(10, 1)).size() == 1 && una.vencidas(java.time.LocalDate.now().atTime(11, 0)).isEmpty()
+                && una.todas().size() == 2, "programadas: lo de una vez se hace una sola vez y se borra");
         // De punta a punta con el servicio: «cada día a las 9 …» se programa y a su hora se pide solo.
         String[] resp = {"{\"tipo\":\"programar\",\"params\":{\"hora\":\"09:00\",\"dias\":\"lun-vie\"},\"texto\":\"estado\"}"};
         List<String> dicho = new ArrayList<>();

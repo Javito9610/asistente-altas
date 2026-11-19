@@ -50,7 +50,7 @@ public final class Interprete {
                   Así, la segunda vez que se pida algo igual, Jarvis lo repite solo sin gastar IA. Si en el Contexto aparece una
                   «tarea libre ya aprendida» que sirve para lo que piden, usa EXACTAMENTE su nombre y los nombres de sus datos.
                 - tipo «programar»: algo que se repite o se hace a una hora («cada día a las 9…», «los lunes a las 10…»). En «params»:
-                  {"hora":"HH:mm","dias":"todos|lun-vie|finde|lun,mie…"} y en «texto» lo que hay que hacer, escrito como la orden que
+                  {"hora":"HH:mm","dias":"todos|lun-vie|finde|lun,mie…|hoy|mañana|AAAA-MM-DD"} («hoy», «mañana» o una fecha = se hace UNA sola vez) y en «texto» lo que hay que hacer, escrito como la orden que
                   daría la persona (sin la hora ni los días). Si falta la hora, tipo «preguntar».
                 - tipo «preguntar»: no está claro qué quiere o falta algo. «texto» = una sola pregunta corta.
                 - tipo «responder»: es una pregunta o charla que se contesta con palabras (sin tocar nada). «texto» = la respuesta.
