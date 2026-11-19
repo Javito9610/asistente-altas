@@ -31,6 +31,7 @@ public final class CanalTelegram {
     }
 
     public static final String ORIGEN = "telegram";
+    private String base = "https://api.telegram.org";
     private final String token;
     private final Red red;
     private final Consumer<String> registro;
@@ -44,6 +45,12 @@ public final class CanalTelegram {
         this.token = token.trim();
         this.red = red;
         this.registro = registro;
+    }
+
+    /** Solo para pruebas: apunta a un servidor local que imita a Telegram. */
+    public CanalTelegram conBase(String base) {
+        this.base = base;
+        return this;
     }
 
     public static Red redReal() {
@@ -94,7 +101,7 @@ public final class CanalTelegram {
     }
 
     private String api(String metodo, String query) {
-        return "https://api.telegram.org/bot" + token + "/" + metodo + (query.isEmpty() ? "" : "?" + query);
+        return base + "/bot" + token + "/" + metodo + (query.isEmpty() ? "" : "?" + query);
     }
 
     /** Pregunta una vez por mensajes nuevos y se los pasa a quien escucha: (usuario, texto). Devuelve cuántos llegaron. */

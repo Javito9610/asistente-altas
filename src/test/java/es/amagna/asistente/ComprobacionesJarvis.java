@@ -36,10 +36,11 @@ final class ComprobacionesJarvis {
             buzon();
             programadas();
             oficina();
+            telegramPorHttp();
             notasYRecordatorios();
             ficheros();
             web();
-        } catch (IOException e) {
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
@@ -247,6 +248,39 @@ final class ComprobacionesJarvis {
             ok(eco.contains("FICHERO d.txt") && eco.stream().noneMatch(x -> x.equals("FICHERO a.pdf")), "servicio: al acabar bien entrega solo lo creado en ese encargo");
         } catch (IOException e) {
             ok(false, "entrega de ficheros: " + e);
+        }
+    }
+
+    /** Telegram de verdad por HTTP, contra un servidor local que lo imita: comprueba el multipart y el sondeo reales. */
+    static void telegramPorHttp() throws Exception {
+        var visto = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        var servidor = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        servidor.createContext("/", ex -> {
+            byte[] cuerpo = ex.getRequestBody().readAllBytes();
+            String ruta = ex.getRequestURI().getPath();
+            String texto = new String(cuerpo, java.nio.charset.StandardCharsets.UTF_8);
+            visto.add(ruta + "|" + ex.getRequestMethod() + "|" + ex.getRequestHeaders().getFirst("Content-Type") + "|" + texto.replace("\r\n", "/"));
+            byte[] r = (ruta.endsWith("getUpdates") ? "{\"ok\":true,\"result\":[{\"update_id\":1,\"message\":{\"text\":\"hola\",\"from\":{\"id\":42},\"chat\":{\"id\":42,\"type\":\"private\"}}}]}"
+                    : "{\"ok\":true}").getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            ex.sendResponseHeaders(200, r.length);
+            ex.getResponseBody().write(r);
+            ex.close();
+        });
+        servidor.start();
+        try {
+            var canal = new CanalTelegram("T0KEN", CanalTelegram.redReal(), x -> { }).conBase("http://127.0.0.1:" + servidor.getAddress().getPort());
+            List<String> recibidos = new ArrayList<>();
+            canal.sondear(0, (q, t) -> recibidos.add(q + ":" + t));
+            ok(recibidos.equals(List.of("42:hola")), "telegram por HTTP: el sondeo real recibe el mensaje");
+            Path f = Files.createTempFile("doc", ".pdf");
+            Files.write(f, "%PDF-contenido".getBytes());
+            canal.enviarFichero("42", f);
+            String envio = visto.stream().filter(v -> v.contains("sendDocument")).findFirst().orElse("");
+            ok(envio.startsWith("/botT0KEN/sendDocument|POST|multipart/form-data; boundary=") && envio.contains("name=\"chat_id\"//42")
+                    && envio.contains("name=\"document\"; filename=\"" + f.getFileName() + "\"") && envio.contains("%PDF-contenido"),
+                    "telegram por HTTP: el fichero sube como multipart con su chat y su nombre");
+        } finally {
+            servidor.stop(0);
         }
     }
 
