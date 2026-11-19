@@ -41,6 +41,12 @@ final class ComprobacionesJarvis {
     }
 
     static void barreras() {
+        es.amagna.asistente.manos.Ventanas falsas = (es.amagna.asistente.manos.Ventanas) java.lang.reflect.Proxy.newProxyInstance(
+                ComprobacionesJarvis.class.getClassLoader(), new Class<?>[] {es.amagna.asistente.manos.Ventanas.class},
+                (proxy, metodo, args) -> metodo.getName().equals("abiertas") ? "- «nota-nueva.txt: Bloc de notas» (notepad) [delante]\n- «Claude» (claude)" : null);
+        ok("nota-nueva.txt: Bloc de notas".equals(es.amagna.asistente.cerebro.Receta.tituloReal(falsas, "justificante-prueba.txt: Bloc de notas")),
+                "recetas: una ventana de documento vale aunque el documento sea otro (mismo programa)");
+        ok(es.amagna.asistente.cerebro.Receta.tituloReal(falsas, "x.txt: Otro programa") == null, "recetas: pero no vale cualquier ventana");
         ok(new es.amagna.asistente.cerebro.Receta.Grabadora().preparar("abrir_programa", new LinkedHashMap<>(Map.of("programa", "notepad.exe")), null) != null,
                 "recetas: abrir un programa se graba (si no, la receta aprendida no sabe empezar desde cero)");
         String mnPrueba = "- «MNprogram - Abogados - Empresa de prueba [\\Usu1]» (MNprogram) [delante, con el foco]";

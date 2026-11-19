@@ -201,7 +201,7 @@ public final class Receta {
     // ---------- reproducir ----------
 
     /** El título real, ahora, de la ventana que se parece a la grabada (mismo título con otros números). */
-    static String tituloReal(Ventanas ventanas, String normalizado) {
+    public static String tituloReal(Ventanas ventanas, String normalizado) {
         if (normalizado == null || normalizado.isBlank()) {
             return null;
         }
@@ -217,7 +217,29 @@ public final class Receta {
                 aproximado = m.group(1);
             }
         }
-        return aproximado;
+        if (aproximado != null) {
+            return aproximado;
+        }
+        // Programas de documentos («informe.txt: Bloc de notas», «Carta - Word»): el nombre del documento cambia de una vez a
+        // otra, el del programa no. Vale la ventana cuyo título acaba con el nombre del programa.
+        String programa = null;
+        for (String sep : List.of(": ", " - ")) {
+            int i = normalizado.lastIndexOf(sep);
+            if (i > 0 && normalizado.length() - i - sep.length() >= 4) {
+                programa = normalizado.substring(i + sep.length());
+                break;
+            }
+        }
+        if (programa != null) {
+            m = TITULO.matcher(ventanas.abiertas());
+            while (m.find()) {
+                String n = norm(m.group(1));
+                if (n.equals(programa) || n.endsWith(": " + programa) || n.endsWith(" - " + programa)) {
+                    return m.group(1);
+                }
+            }
+        }
+        return null;
     }
 
     public static String sustituir(String s, Map<String, String> params) {
