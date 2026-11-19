@@ -1322,6 +1322,9 @@ public final class Comprobaciones {
         ok(es.amagna.asistente.estados.Reconocedor.estado(mapa, "- «Atención» (MNprogram) [delante]\n- «Alta Cliente» (GestorConsultas) [BLOQUEADA]\n" + mnc,
                         t -> "Se va a cerrar la ficha. ¿Deseas guardar los cambios realizados?").equals("atencion-guardar"),
                 "estados: el aviso de «¿guardar los cambios?» de la ficha de cliente tiene su estado");
+        var cc = es.amagna.asistente.estados.Planificador.camino(mapa, "inicio", "lista-clientes");
+        ok(cc != null && cc.size() == 1 && cc.get(0).nombre().equals("abrir-lista-clientes-desde-inicio"),
+                "estados: desde «inicio» la lista de clientes se abre directa (botón de la barra), sin pasar por el menú de expedientes");
         ok(mapa.tareas().containsKey("crear-cliente") && mapa.accion("guardar-cliente").toca() && !mapa.accion("rellenar-cliente").toca(),
                 "estados: la tarea crear-cliente existe y solo Guardar es irreversible");
         var c1 = es.amagna.asistente.estados.Planificador.camino(mapa, "fuera", "formulario-expediente");

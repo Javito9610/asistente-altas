@@ -242,6 +242,14 @@
        {"accion": "esperar_a", "in": {"que": "pantalla quieta", "segundos": 10, "_opcional": true}}
      ]},
 
+    {"nombre": "abrir-lista-clientes-desde-inicio", "de": "inicio", "a": "lista-clientes", "segundos": 60,
+     "pasos": [
+       {"accion": "left_click", "ventana": "MNprogram - Abogados", "rel": [132, 62], "in": {}},
+       {"accion": "wait", "in": {"duration": 3}},
+       {"accion": "esperar_a", "in": {"que": "aparezca", "ventana": "Clientes", "segundos": 20}},
+       {"accion": "esperar_a", "in": {"que": "pantalla quieta", "segundos": 10, "_opcional": true}}
+     ]},
+
     {"nombre": "buscar-cliente", "de": "lista-clientes", "a": "lista-clientes|editar-cliente", "segundos": 40,
      "pasos": [
        {"accion": "left_click", "ventana": "Clientes", "rel": [194, 76], "in": {}},
