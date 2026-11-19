@@ -20,6 +20,9 @@ public final class Ficheros {
     static final List<String> PROHIBIDAS = List.of(".exe", ".dll", ".bat", ".cmd", ".ps1", ".vbs", ".js", ".msi", ".scr", ".jar", ".lnk", ".hta", ".reg", ".sys");
 
     private final List<Path> raices;
+    /** Ficheros que hay que entregar a la persona al acabar el encargo (los recién creados y los que pida «enviar_fichero»). */
+    private final List<Path> aEntregar = new java.util.concurrent.CopyOnWriteArrayList<>();
+    static final long MAX_ENTREGA = 45_000_000;
 
     public Ficheros(List<Path> raices) {
         this.raices = raices.stream().map(r -> r.toAbsolutePath().normalize()).toList();
@@ -106,6 +109,7 @@ public final class Ficheros {
         }
         Files.createDirectories(p.getParent());
         Files.writeString(p, texto, StandardCharsets.UTF_8);
+        aEntregar.add(p);
         return "Escrito «" + ruta + "» (" + texto.length() + " caracteres).";
     }
 
@@ -121,7 +125,31 @@ public final class Ficheros {
         }
         Files.createDirectories(p.getParent());
         Files.write(p, datos);
+        aEntregar.add(p);
         return "Creado «" + ruta + "» (" + tam(p) + ").";
+    }
+
+    /** Pide que un fichero (existente, dentro de las carpetas permitidas) se le entregue a la persona al terminar. */
+    public String entregar(String ruta) throws IOException {
+        Path p = dentro(ruta);
+        if (!Files.isRegularFile(p)) {
+            throw new IllegalArgumentException("No es un fichero: " + ruta);
+        }
+        if (Files.size(p) > MAX_ENTREGA) {
+            throw new IllegalArgumentException("Pesa demasiado para mandarlo (máximo 45 MB).");
+        }
+        nombreSeguro(p);
+        if (!aEntregar.contains(p)) {
+            aEntregar.add(p);
+        }
+        return "Te lo mando al terminar: «" + p.getFileName() + "».";
+    }
+
+    /** Los ficheros pendientes de entregar; los quita de la lista. */
+    public List<Path> drenarEntregas() {
+        List<Path> r = new java.util.ArrayList<>(aEntregar);
+        aEntregar.removeAll(r);
+        return r;
     }
 
     /** La ruta, ya comprobada, para quien necesite leer un fichero suyo (documentos de oficina). */

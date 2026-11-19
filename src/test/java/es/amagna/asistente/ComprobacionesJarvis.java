@@ -189,6 +189,64 @@ final class ComprobacionesJarvis {
             throw new IOException("fallo con " + url);
         }, logs::add);
         ok(caida.sondear(0, (q, t) -> { }) == -1 && logs.stream().noneMatch(l -> l.contains("TOKEN-SECRETO")), "telegram: sin red no se rompe y el token nunca sale en el registro");
+        // Entrega de ficheros: lo creado se manda al terminar, y por Telegram va como documento.
+        List<String> subidos = new ArrayList<>();
+        var conSubida = new CanalTelegram("TOKEN-SECRETO", new CanalTelegram.Red() {
+            @Override
+            public String get(String url) {
+                return "{\"ok\":true}";
+            }
+
+            @Override
+            public String subir(String url, java.util.Map<String, String> campos, String campo, Path f) {
+                subidos.add(url.substring(url.lastIndexOf('/') + 1) + "|" + campos.get("chat_id") + "|" + campo + "|" + f.getFileName());
+                return "{\"ok\":true}";
+            }
+        }, logs::add);
+        conSubida.enviarFichero("777", Path.of("/x/informe.pdf"));
+        ok(subidos.equals(List.of("sendDocument|777|document|informe.pdf")), "telegram: manda un fichero como documento");
+        try {
+            Path carp = Files.createTempDirectory("entr");
+            var fi = new es.amagna.asistente.jarvis.Ficheros(List.of(carp));
+            fi.escribirBytes(carp + "/a.pdf", new byte[] {1}, false);
+            fi.escribir(carp + "/b.txt", "hola", false);
+            Files.writeString(carp.resolve("c.txt"), "viejo");
+            fi.entregar(carp + "/c.txt");
+            boolean raro = false;
+            try {
+                fi.entregar("/etc/passwd");
+            } catch (IllegalArgumentException e) {
+                raro = true;
+            }
+            var l = fi.drenarEntregas();
+            ok(l.size() == 3 && raro && fi.drenarEntregas().isEmpty(), "ficheros: lo creado y lo pedido se entrega una vez; fuera de las carpetas, no");
+            List<String> eco = new ArrayList<>();
+            var sv = new Servicio(new Almacen(Files.createTempDirectory("alm")), new Interprete(p0 -> Map.of("content", List.of(Map.of("type", "text", "text", "{\"tipo\":\"libre\",\"tarea\":\"x\",\"texto\":\"haz\"}"))), "m"),
+                    t -> new Servicio.Resultado(true, "ok"), t -> {
+                        try {
+                            fi.escribir(carp + "/d.txt", "d", false);
+                        } catch (IOException e) {
+                            return new Servicio.Resultado(false, "x");
+                        }
+                        return new Servicio.Resultado(true, "hecho");
+                    }, new Servicio.Salida() {
+                        @Override
+                        public void enviar(String o, String q, String texto) {
+                            eco.add(texto);
+                        }
+
+                        @Override
+                        public void fichero(String o, String q, Path f) {
+                            eco.add("FICHERO " + f.getFileName());
+                        }
+                    }, Set.of("javi"), x -> { }).conEntregas(fi::drenarEntregas);
+            sv.recibir("telegram", "javi", "haz algo");
+            sv.recibir("telegram", "javi", "sí");
+            sv.procesarUno();
+            ok(eco.contains("FICHERO d.txt") && eco.stream().noneMatch(x -> x.equals("FICHERO a.pdf")), "servicio: al acabar bien entrega solo lo creado en ese encargo");
+        } catch (IOException e) {
+            ok(false, "entrega de ficheros: " + e);
+        }
     }
 
     static void buzon() throws IOException {

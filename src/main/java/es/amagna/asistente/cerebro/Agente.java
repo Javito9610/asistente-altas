@@ -312,6 +312,9 @@ public final class Agente {
                             "descripcion", Json.obj("type", "string"), "para", Json.obj("type", "array", "items", Json.obj("type", "string")),
                             "asunto", Json.obj("type", "string"), "texto", Json.obj("type", "string"), "sobrescribir", Json.obj("type", "boolean")),
                             "required", List.of("tipo", "ruta"))));
+            h.add(Json.obj("name", "enviar_fichero", "description", "Pide que un fichero (de las carpetas permitidas) se le MANDE a la persona por el mismo "
+                    + "chat al terminar el encargo (por ejemplo «pásame el PDF»). Los documentos que creas ya se mandan solos.",
+                    "input_schema", Json.obj("type", "object", "properties", Json.obj("ruta", Json.obj("type", "string")), "required", List.of("ruta"))));
             h.add(Json.obj("name", "leer_documento", "description", "Lee el texto de un Word (.docx) o Excel (.xlsx) sin abrir ningún programa.",
                     "input_schema", Json.obj("type", "object", "properties", Json.obj("ruta", Json.obj("type", "string")), "required", List.of("ruta"))));
             h.add(Json.obj("name", "quitar_fichero", "description", "«Borra» un fichero mandándolo a _papelera (recuperable).",
@@ -528,6 +531,7 @@ public final class Agente {
                 case "mover_fichero" -> Boolean.TRUE.equals(in.get("copiar")) ? ficheros.copiar((String) in.get("origen"), (String) in.get("destino"))
                         : ficheros.mover((String) in.get("origen"), (String) in.get("destino"));
                 case "crear_documento" -> oficina.crear(String.valueOf(in.get("tipo")), String.valueOf(in.get("ruta")), in);
+                case "enviar_fichero" -> ficheros.entregar((String) in.get("ruta"));
                 case "leer_documento" -> oficina.leerDocumento((String) in.get("ruta"));
                 default -> ficheros.aLaPapelera((String) in.get("ruta"));
             };
@@ -542,7 +546,7 @@ public final class Agente {
             return List.of(textoBloque(web.leer(String.valueOf(in.get("url")))));
         }
         if (ficheros != null && java.util.Set.of("listar_carpeta", "leer_fichero", "buscar_ficheros", "escribir_fichero", "mover_fichero",
-                "quitar_fichero", "crear_documento", "leer_documento").contains(accion)) {
+                "quitar_fichero", "crear_documento", "leer_documento", "enviar_fichero").contains(accion)) {
             return ejecutarFicheros(accion, in);
         }
         if (ventanas == null) {

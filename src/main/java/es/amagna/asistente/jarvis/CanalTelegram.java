@@ -23,6 +23,11 @@ public final class CanalTelegram {
     /** Lo único que se necesita de la red (se cambia por uno falso en las pruebas). */
     public interface Red {
         String get(String url) throws IOException;
+
+        /** Sube un fichero (multipart). Por defecto no se puede (las pruebas). */
+        default String subir(String url, java.util.Map<String, String> campos, String campoFichero, java.nio.file.Path fichero) throws IOException {
+            throw new IOException("subir no disponible");
+        }
     }
 
     public static final String ORIGEN = "telegram";
@@ -43,17 +48,47 @@ public final class CanalTelegram {
 
     public static Red redReal() {
         HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20)).build();
-        return url -> {
-            try {
-                HttpResponse<String> r = http.send(HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(60)).GET().build(),
-                        HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-                if (r.statusCode() != 200) {
-                    throw new IOException("Telegram respondió " + r.statusCode());
+        return new Red() {
+            @Override
+            public String get(String url) throws IOException {
+                try {
+                    HttpResponse<String> r = http.send(HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(60)).GET().build(),
+                            HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+                    if (r.statusCode() != 200) {
+                        throw new IOException("Telegram respondió " + r.statusCode());
+                    }
+                    return r.body();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("interrumpido");
                 }
-                return r.body();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new IOException("interrumpido");
+            }
+
+            @Override
+            public String subir(String url, java.util.Map<String, String> campos, String campoFichero, java.nio.file.Path fichero) throws IOException {
+                String limite = "----jarvis" + System.nanoTime();
+                java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream();
+                for (var e : campos.entrySet()) {
+                    o.write(("--" + limite + "\r\nContent-Disposition: form-data; name=\"" + e.getKey() + "\"\r\n\r\n" + e.getValue() + "\r\n")
+                            .getBytes(StandardCharsets.UTF_8));
+                }
+                String nombre = fichero.getFileName().toString().replace("\"", "_").replace("\r", "").replace("\n", "");
+                o.write(("--" + limite + "\r\nContent-Disposition: form-data; name=\"" + campoFichero + "\"; filename=\"" + nombre
+                        + "\"\r\nContent-Type: application/octet-stream\r\n\r\n").getBytes(StandardCharsets.UTF_8));
+                o.write(java.nio.file.Files.readAllBytes(fichero));
+                o.write(("\r\n--" + limite + "--\r\n").getBytes(StandardCharsets.UTF_8));
+                try {
+                    HttpResponse<String> r = http.send(HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(180))
+                            .header("Content-Type", "multipart/form-data; boundary=" + limite)
+                            .POST(HttpRequest.BodyPublishers.ofByteArray(o.toByteArray())).build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+                    if (r.statusCode() != 200) {
+                        throw new IOException("Telegram respondió " + r.statusCode());
+                    }
+                    return r.body();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("interrumpido");
+                }
             }
         };
     }
@@ -102,6 +137,15 @@ public final class CanalTelegram {
                 registro.accept("Telegram: no se pudo enviar (" + sinToken(e.getMessage()) + ").");
                 return;
             }
+        }
+    }
+
+    /** Manda un fichero como documento (hasta 45 MB). */
+    public void enviarFichero(String usuario, java.nio.file.Path fichero) {
+        try {
+            red.subir(api("sendDocument", ""), java.util.Map.of("chat_id", usuario), "document", fichero);
+        } catch (IOException | RuntimeException e) {
+            registro.accept("Telegram: no se pudo enviar el fichero (" + sinToken(String.valueOf(e.getMessage())) + ").");
         }
     }
 

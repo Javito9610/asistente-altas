@@ -30,6 +30,11 @@ public final class Servicio {
     /** Por dónde se habla con la persona. */
     public interface Salida {
         void enviar(String origen, String quien, String texto);
+
+        /** Entrega un fichero. Por defecto solo dice dónde está. */
+        default void fichero(String origen, String quien, java.nio.file.Path f) {
+            enviar(origen, quien, "📎 " + f);
+        }
     }
 
     private final Almacen almacen;
@@ -49,6 +54,14 @@ public final class Servicio {
         return this;
     }
     private final Map<String, java.util.ArrayDeque<String>> historial = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** De dónde sacar los ficheros que hay que entregar al acabar cada encargo (vacía la lista al llamarla). */
+    public Servicio conEntregas(java.util.function.Supplier<List<java.nio.file.Path>> entregas) {
+        this.entregas = entregas;
+        return this;
+    }
+
+    private java.util.function.Supplier<List<java.nio.file.Path>> entregas = List::of;
 
     public Programadas programadas() {
         return programadas;
@@ -216,6 +229,7 @@ public final class Servicio {
         }
         Trabajo t = pend.get(0);
         almacen.guardar(t.con(Trabajo.EN_CURSO, null));
+        entregas.get(); // lo que quedara de antes no es de este encargo
         Resultado r;
         try {
             r = ("libre".equals(t.tarea()) ? libre : tareas).hacer(t);
@@ -224,6 +238,17 @@ public final class Servicio {
         }
         almacen.guardar(t.con(r.bien() ? Trabajo.HECHO : Trabajo.FALLO, r.mensaje()));
         decir(t.origen(), t.quien(), (r.bien() ? "✅ " : "❌ ") + r.mensaje());
+        if (r.bien()) {
+            for (java.nio.file.Path f : entregas.get()) {
+                try {
+                    salida.fichero(t.origen(), t.quien(), f);
+                } catch (RuntimeException e) {
+                    registro.accept("No pude entregar «" + f.getFileName() + "»: " + e.getMessage());
+                }
+            }
+        } else {
+            entregas.get();
+        }
         registro.accept("Trabajo " + t.id() + (r.bien() ? " hecho" : " con fallo") + ".");
         return true;
     }

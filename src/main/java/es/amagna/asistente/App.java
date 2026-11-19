@@ -894,17 +894,31 @@ public final class App {
         var buzon = new es.amagna.asistente.jarvis.CanalCarpeta(datos.resolve("buzon"));
         es.amagna.asistente.jarvis.CanalTelegram[] telegram = new es.amagna.asistente.jarvis.CanalTelegram[1];
         es.amagna.asistente.jarvis.Ventana[] ventana = new es.amagna.asistente.jarvis.Ventana[1];
-        es.amagna.asistente.jarvis.Servicio.Salida salida = (origen, quien, texto) -> {
-            registro.accept("→ " + origen + "/" + quien + ": " + texto.replace('\n', ' '));
-            if ("telegram".equals(origen) && telegram[0] != null) {
-                telegram[0].enviar(quien, texto);
-            } else if ("ventana".equals(origen) && ventana[0] != null) {
-                ventana[0].decir("Jarvis: " + texto);
-            } else if ("buzon".equals(origen)) {
-                buzon.enviar("respuestas", "[" + java.time.LocalTime.now().withNano(0) + "] " + texto);
+        es.amagna.asistente.jarvis.Servicio.Salida salida = new es.amagna.asistente.jarvis.Servicio.Salida() {
+            @Override
+            public void enviar(String origen, String quien, String texto) {
+                registro.accept("→ " + origen + "/" + quien + ": " + texto.replace('\n', ' '));
+                if ("telegram".equals(origen) && telegram[0] != null) {
+                    telegram[0].enviar(quien, texto);
+                } else if ("ventana".equals(origen) && ventana[0] != null) {
+                    ventana[0].decir("Jarvis: " + texto);
+                } else if ("buzon".equals(origen)) {
+                    buzon.enviar("respuestas", "[" + java.time.LocalTime.now().withNano(0) + "] " + texto);
+                }
+            }
+
+            @Override
+            public void fichero(String origen, String quien, Path f) {
+                if ("telegram".equals(origen) && telegram[0] != null) {
+                    registro.accept("→ telegram/" + quien + ": fichero " + f.getFileName());
+                    telegram[0].enviarFichero(quien, f);
+                } else {
+                    enviar(origen, quien, "📎 Fichero: " + f);
+                }
             }
         };
         var servicio = new es.amagna.asistente.jarvis.Servicio(almacen, interprete, tareas, libre, salida, autorizados, registro)
+                .conEntregas(ficherosJarvis::drenarEntregas)
                 .conProgramadas(new es.amagna.asistente.jarvis.Programadas(datos.resolve("programadas.json")))
                 .conConocimiento(() -> {
                     StringBuilder b = new StringBuilder();
