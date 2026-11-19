@@ -26,7 +26,7 @@ set /a ESPERA=0
 :esperar
 %SYS%\ping.exe -n 11 127.0.0.1 >nul
 set /a ESPERA+=10
-%SYS%\findstr.exe /C:"TERMINADO" /C:"PARADO" /C:"HECHO" /C:"Hecho de memoria" /C:"Se me ha" /C:"necesito la IA" /C:"FALL" datos\buzon\salida\respuestas.txt >nul 2>&1 && goto fin
+%SYS%\findstr.exe /C:"TERMINADO" /C:"PARADO" /C:"HECHO" /C:"Hecho de memoria" /C:"Se me ha" /C:"necesito la IA" /C:"Programado (" /C:"No he podido" /C:"FALL" datos\buzon\salida\respuestas.txt >nul 2>&1 && goto fin
 if !ESPERA! lss 400 goto esperar
 :fin
 %SYS%\ping.exe -n 6 127.0.0.1 >nul
