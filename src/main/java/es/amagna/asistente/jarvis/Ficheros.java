@@ -37,7 +37,9 @@ public final class Ficheros {
         if (ruta == null || ruta.isBlank()) {
             throw new IllegalArgumentException("Falta la ruta.");
         }
-        Path p = Path.of(ruta).toAbsolutePath().normalize();
+        Path pedida = Path.of(ruta);
+        // Una ruta sin carpeta («informe.pdf») es de la primera carpeta de trabajo; sigue valiendo la comprobación de abajo.
+        Path p = (pedida.isAbsolute() ? pedida : raices.get(0).resolve(pedida)).toAbsolutePath().normalize();
         for (Path r : raices) {
             if (p.startsWith(r)) {
                 // Que un enlace simbólico no saque de la carpeta.

@@ -569,6 +569,15 @@ final class ComprobacionesJarvis {
         var f = new es.amagna.asistente.jarvis.Ficheros(List.of(raiz));
         String r = raiz.toString();
         ok(f.escribir(r + "/nota.txt", "hola", false).startsWith("Escrito") && f.leer(r + "/nota.txt").equals("hola"), "ficheros: escribe y lee dentro de la carpeta permitida");
+        ok(f.escribir("sueltos/relativa.txt", "x", false).startsWith("Escrito") && Files.exists(raiz.resolve("sueltos/relativa.txt")),
+                "ficheros: una ruta sin carpeta cae en la carpeta de trabajo");
+        boolean sube = false;
+        try {
+            f.escribir("../fuera-por-relativa.txt", "x", false);
+        } catch (IllegalArgumentException e) {
+            sube = true;
+        }
+        ok(sube && !Files.exists(raiz.getParent().resolve("fuera-por-relativa.txt")), "ficheros: una ruta relativa con «..» no puede salirse");
         ok(f.listar(r).contains("nota.txt") && f.buscar(r, "NOT").contains("nota.txt"), "ficheros: lista y busca");
         try {
             f.escribir(r + "/nota.txt", "otra", false);
