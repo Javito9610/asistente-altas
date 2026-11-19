@@ -15,13 +15,13 @@ timeout /t 12 /nobreak >nul
 echo estado> datos\buzon\entrada\1.tmp
 move /y datos\buzon\entrada\1.tmp datos\buzon\entrada\1.txt >nul
 timeout /t 8 /nobreak >nul
-echo Da de alta en la Empresa de prueba un cliente ficticio llamado JARVIS PRUEBA %TAG% con NIF %NIF%, telefono 600 11 22 33, direccion Calle de Proba 9, codigo postal 15001 y poblacion Coruña, A> datos\buzon\entrada\2.tmp
+echo Da de alta en la Empresa de prueba un cliente ficticio llamado JARVIS PRUEBA %TAG% con NIF %NIF%, telefono 600 11 22 33, direccion Calle de Proba 9, y codigo postal 15001> datos\buzon\entrada\2.tmp
 move /y datos\buzon\entrada\2.tmp datos\buzon\entrada\2.txt >nul
 set /a ESPERA=0
 :espera
 timeout /t 10 /nobreak >nul
 set /a ESPERA+=10
-findstr /C:"Cliente" /C:"HECHO" /C:"PARADO" /C:"❌" /C:"✅" datos\buzon\salida\respuestas.txt >nul 2>&1 && findstr /C:"✅" /C:"❌" datos\buzon\salida\respuestas.txt >nul 2>&1 && goto fin
+findstr /C:"HECHO" /C:"PARADO" /C:"FALL" /C:"YA HECHA" /C:"roto" datos\buzon\salida\respuestas.txt >nul 2>&1 && goto fin
 if !ESPERA! lss 400 goto espera
 :fin
 echo estado> datos\buzon\entrada\3.tmp
