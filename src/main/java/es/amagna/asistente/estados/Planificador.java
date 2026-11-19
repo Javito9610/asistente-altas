@@ -28,6 +28,9 @@ public final class Planificador {
                 if (!t.de().equals(e)) {
                     continue;
                 }
+                if (t.toca()) {
+                    continue; // lo que guarda o envía solo se hace cuando la tarea lo nombra; nunca como camino ni al limpiar
+                }
                 for (String destino : t.destinos()) {
                     if (destino.equals(t.de()) || vino.containsKey(destino)) {
                         continue;

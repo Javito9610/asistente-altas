@@ -1327,6 +1327,10 @@ public final class Comprobaciones {
                 "estados: desde «inicio» la lista de clientes se abre directa (botón de la barra), sin pasar por el menú de expedientes");
         ok(mapa.tareas().containsKey("crear-cliente") && mapa.accion("guardar-cliente").toca() && !mapa.accion("rellenar-cliente").toca(),
                 "estados: la tarea crear-cliente existe y solo Guardar es irreversible");
+        var salir = es.amagna.asistente.estados.Planificador.camino(mapa, "alta-cliente", "lista-clientes");
+        ok(salir != null && salir.stream().noneMatch(es.amagna.asistente.estados.Mapa.Transicion::toca)
+                        && salir.get(0).nombre().equals("cancelar-alta-cliente"),
+                "estados: para salir de una ficha a medias el planificador cancela, nunca guarda");
         var c1 = es.amagna.asistente.estados.Planificador.camino(mapa, "fuera", "formulario-expediente");
         ok(c1 != null && c1.size() == 3 && c1.get(0).nombre().equals("abrir-mn") && c1.get(2).nombre().equals("alta"),
                 "estados: de «fuera» al formulario hay tres pasos: abrir MN, abrir la lista, Alta");
