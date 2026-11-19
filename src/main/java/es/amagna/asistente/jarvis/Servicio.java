@@ -275,6 +275,10 @@ public final class Servicio {
                         + "Te aviso cuando acabe. (" + pendientes() + " en cola)");
                 registro.accept("Trabajo " + t.id() + " apuntado: " + e.tarea());
             }
+            case Entendido.OFICINA -> {
+                almacen.nuevo(origen, quien, texto, "oficina", Map.of("encargo", e.texto()), Trabajo.PENDIENTE);
+                decir(origen, quien, "Me pongo con ello (documentos y ficheros, sin tocar ninguna ventana): " + e.texto() + " (" + pendientes() + " en cola)");
+            }
             case Entendido.CONSULTAR -> {
                 almacen.nuevo(origen, quien, texto, "consulta", Map.of("pregunta", e.texto()), Trabajo.PENDIENTE);
                 decir(origen, quien, "Voy a mirarlo (solo miro, no toco nada)…");

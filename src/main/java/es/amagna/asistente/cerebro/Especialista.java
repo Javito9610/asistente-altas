@@ -38,7 +38,7 @@ import java.util.Set;
 public record Especialista(String nombre, String modelo, int pasos, long topeTokens, Set<String> puede, String instrucciones) {
 
     /** Los que hay. */
-    public static final List<String> NOMBRES = List.of("cartografo", "desatascador", "consulta", "altas", "expedientes", "general");
+    public static final List<String> NOMBRES = List.of("cartografo", "desatascador", "consulta", "altas", "expedientes", "general", "oficina");
 
     public static Especialista cargar(String nombre, String modeloPorDefecto, long topePorDefecto) throws IOException {
         String bruto = leer("/instrucciones/agentes/" + nombre + ".md");

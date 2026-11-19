@@ -38,6 +38,7 @@ final class ComprobacionesJarvis {
             oficina();
             telegramPorHttp();
             consumo();
+            oficinaSinConfirmar();
             variasCosas();
             notasYRecordatorios();
             ficheros();
@@ -459,6 +460,27 @@ final class ComprobacionesJarvis {
         Files.writeString(lim, "1.500.000\n");
         ok(es.amagna.asistente.jarvis.Consumo.topeDe(lim) == 1_500_000 && es.amagna.asistente.jarvis.Consumo.topeDe(Path.of("/no/existe")) == es.amagna.asistente.jarvis.Consumo.TOPE_POR_DEFECTO,
                 "consumo: lee el tope del fichero y, si no hay, usa el de por defecto");
+    }
+
+    static void oficinaSinConfirmar() throws IOException {
+        var e = Interprete.leer("{\"tipo\":\"oficina\",\"texto\":\"Hazme un PDF con el resumen\"}");
+        ok(Entendido.OFICINA.equals(e.tipo()) && e.texto().contains("PDF"), "intérprete: el trabajo de documentos es «oficina»");
+        ok(Interprete.leer("{\"tipo\":\"oficina\",\"texto\":\"\"}").tipo().equals(Entendido.PREGUNTAR), "intérprete: «oficina» sin orden se convierte en pregunta");
+        String[] resp = {"{\"tipo\":\"oficina\",\"texto\":\"Hazme un Excel con 3 filas\"}"};
+        var alm = new Almacen(Files.createTempDirectory("alm"));
+        List<String> dicho = new ArrayList<>();
+        var s = new Servicio(alm, interpreteFalso(resp), t -> new Servicio.Resultado(true, "hecho " + t.tarea() + ":" + t.params().get("encargo")),
+                t -> new Servicio.Resultado(false, "no debe ir por aquí"), (o, q, t) -> dicho.add(t), Set.of("javi"), x -> { });
+        s.recibir("telegram", "javi", "hazme un excel");
+        ok(alm.en(Trabajo.PENDIENTE).size() == 1 && alm.en(Trabajo.ESPERANDO).isEmpty(), "servicio: lo de oficina se pone en marcha sin pedir confirmación");
+        ok(s.procesarUno() && dicho.get(dicho.size() - 1).contains("hecho oficina:Hazme un Excel con 3 filas"), "servicio: y se hace por el camino de oficina, no por el libre");
+        try {
+            var esp = es.amagna.asistente.cerebro.Especialista.cargar("oficina", "m", 1);
+            ok(esp.puede().contains("crear_documento") && esp.puede().contains("leer_web") && !esp.puede().contains("left_click")
+                    && !esp.puede().contains("mover_fichero") && !esp.puede().contains("quitar_fichero"), "oficina: el especialista solo tiene herramientas de documentos, sin pantalla ni mover/quitar");
+        } catch (IOException ex) {
+            ok(false, "oficina: especialista: " + ex);
+        }
     }
 
     static void variasCosas() throws IOException {

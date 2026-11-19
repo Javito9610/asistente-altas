@@ -805,8 +805,38 @@ public final class App {
                 }
             }
         }
+        java.util.List<Path> carpetas = new java.util.ArrayList<>();
+        Path fc = datos.resolve("carpetas.txt");
+        if (Files.isRegularFile(fc)) {
+            for (String l : Files.readAllLines(fc, StandardCharsets.UTF_8)) {
+                if (!l.isBlank() && !l.startsWith("#") && Files.isDirectory(Path.of(l.strip()))) {
+                    carpetas.add(Path.of(l.strip()));
+                }
+            }
+        }
+        if (carpetas.isEmpty()) {
+            Files.createDirectories(Path.of("trabajo", "jarvis"));
+            carpetas.add(Path.of("trabajo", "jarvis"));
+        }
+        var ficherosJarvis = new es.amagna.asistente.jarvis.Ficheros(carpetas);
         var corredor = corredorDeTareas(a);
         es.amagna.asistente.jarvis.Servicio.Hace tareas = t -> {
+            if ("oficina".equals(t.tarea())) {
+                // Documentos, ficheros y web: sin pantalla, así que no hace falta confirmar. Las herramientas están atadas en código.
+                if (!Clave.hay()) {
+                    return new es.amagna.asistente.jarvis.Servicio.Resultado(false, "Para esto necesito la IA y no tengo clave guardada.");
+                }
+                try {
+                    var esp = es.amagna.asistente.cerebro.Especialista.cargar("oficina", MODELO_POR_DEFECTO, 250_000);
+                    Agente ag = new Agente(consumo, new ManosRobot(false), new VentanasNativas(false), esp.modelo(), esp.instrucciones(), esp.pasos(),
+                            esp.topeTokens(), registro).conExpediente(false).conFicheros(ficherosJarvis).conWeb(new es.amagna.asistente.jarvis.Web())
+                            .soloPuede(esp.puede());
+                    var r = ag.ejecutar(t.params().getOrDefault("encargo", t.peticion()));
+                    return new es.amagna.asistente.jarvis.Servicio.Resultado(r.terminado(), r.mensaje().replaceFirst("^(TERMINADO|PARADO):\\s*", ""));
+                } catch (IOException e) {
+                    return new es.amagna.asistente.jarvis.Servicio.Resultado(false, "No pude preparar al especialista: " + e.getMessage());
+                }
+            }
             if ("consulta".equals(t.tarea())) {
                 // Mirar nunca cambia nada: el especialista «consulta» solo tiene herramientas de lectura (atadas en código).
                 if (!Clave.hay()) {
@@ -835,20 +865,6 @@ public final class App {
             var r = corredor.correr(t.tarea(), ps, clave, false);
             return new es.amagna.asistente.jarvis.Servicio.Resultado(r.bien(), r.mensaje());
         };
-        java.util.List<Path> carpetas = new java.util.ArrayList<>();
-        Path fc = datos.resolve("carpetas.txt");
-        if (Files.isRegularFile(fc)) {
-            for (String l : Files.readAllLines(fc, StandardCharsets.UTF_8)) {
-                if (!l.isBlank() && !l.startsWith("#") && Files.isDirectory(Path.of(l.strip()))) {
-                    carpetas.add(Path.of(l.strip()));
-                }
-            }
-        }
-        if (carpetas.isEmpty()) {
-            Files.createDirectories(Path.of("trabajo", "jarvis"));
-            carpetas.add(Path.of("trabajo", "jarvis"));
-        }
-        var ficherosJarvis = new es.amagna.asistente.jarvis.Ficheros(carpetas);
         es.amagna.asistente.jarvis.Servicio.Hace libre = t -> {
             String slug = t.params().getOrDefault("_receta", "");
             var datosEncargo = new java.util.LinkedHashMap<String, String>(t.params());

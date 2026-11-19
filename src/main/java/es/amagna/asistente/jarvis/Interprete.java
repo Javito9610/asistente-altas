@@ -67,7 +67,7 @@ public final class Interprete {
         StringBuilder sistema = new StringBuilder("""
                 Eres el intérprete de Jarvis, el asistente de oficina de un despacho de abogados. Recibes el mensaje de una persona y
                 decides qué hay que hacer. NO haces nada tú: solo respondes con UN objeto JSON, sin texto alrededor:
-                {"tipo":"tarea|consultar|libre|programar|recordar|recordatorio|preguntar|responder","tarea":"nombre","params":{"dato":"valor"},"texto":"..."}
+                {"tipo":"tarea|consultar|libre|programar|recordar|recordatorio|oficina|preguntar|responder","tarea":"nombre","params":{"dato":"valor"},"texto":"..."}
                 - tipo «tarea»: es una de estas tareas que Jarvis hace solo (poner en «tarea» su nombre y en «params» los datos que
                   la persona ha dado, con los nombres de dato exactos). Tareas:
                 """);
@@ -78,7 +78,11 @@ public final class Interprete {
                   Si falta un dato obligatorio, tipo «preguntar» con la pregunta en «texto». NUNCA inventes ni completes datos.
                 - tipo «consultar»: una pregunta cuya respuesta está en lo que se ve ahora en MN (cuántos expedientes hay en la lista,
                   qué número tiene el último, qué cliente aparece…). Se contesta MIRANDO, sin tocar nada. En «texto» la pregunta.
-                - tipo «libre»: otra cosa que se pueda hacer en el ordenador (abrir un programa, buscar algo, mover ficheros, mirar
+                - tipo «oficina»: trabajo con documentos, ficheros o internet que NO necesita manejar ninguna ventana ni programa: crear un
+                  PDF, Word o Excel, rellenar una plantilla, leer o resumir un documento, preparar una cita o un borrador de correo,
+                  buscar algo en internet. Se hace directamente, sin pedir confirmación (no toca nada fuera de su carpeta). En «texto»
+                  la orden COMPLETA con todos los datos que dio la persona (nada inventado); si falta un dato imprescindible, «preguntar».
+                - tipo «libre»: otra cosa que haya que hacer MANEJANDO programas en pantalla (si sirve «oficina», usa «oficina») (abrir un programa, buscar algo, mover ficheros, mirar
                   una web…). En «texto» una descripción corta y clara de lo que se va a hacer. En «tarea» un nombre corto y
                   REUTILIZABLE en minúsculas con guiones (p. ej. «abrir-programa», «buscar-en-web»: sin datos concretos dentro) y
                   en «params» los datos que cambian de una vez a otra (p. ej. {"programa":"calc.exe"}, {"consulta":"horario tren"}).
@@ -158,6 +162,9 @@ public final class Interprete {
                     String slug = tarea.toLowerCase(java.util.Locale.ROOT).strip();
                     return new Entendido(tipo, slug.matches("[a-z0-9]+(-[a-z0-9]+){0,5}") && slug.length() <= 40 ? slug : "", params,
                             t.isBlank() ? "¿Puedes explicarme mejor qué quieres?" : t);
+                }
+                case Entendido.OFICINA -> {
+                    return t.isBlank() ? new Entendido(Entendido.PREGUNTAR, "", Map.of(), "¿Qué quieres que prepare?") : new Entendido(tipo, "", Map.of(), t);
                 }
                 case Entendido.CONSULTAR -> {
                     return new Entendido(tipo, "", params, t.isBlank() ? "¿Qué quieres que mire?" : t);
