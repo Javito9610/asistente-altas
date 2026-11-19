@@ -280,6 +280,22 @@ public final class Win32 {
         }
     }
 
+    static final int IDNO = 7;
+
+    /**
+     * Contesta «No» a un aviso de Windows (los de MN son MessageBox estándar: «Sí» es el botón 6 y «No» el 7).
+     * Primero pulsa el botón por su texto; si no se encuentra, manda el mando «No» al diálogo. Sin UIA y sin coordenadas.
+     */
+    public static boolean responderNo(Pointer dialogo) {
+        if (dialogo == null) {
+            return false;
+        }
+        if (pulsarBoton(dialogo, "No", 1500)) {
+            return true;
+        }
+        return mandar(dialogo, WM_COMMAND, IDNO, 0);
+    }
+
     /**
      * Pulsa el botón hijo de ESE diálogo cuyo texto es el pedido (Seleccionar).
      * SendMessageTimeout: si el programa no contesta, se deja a los pocos segundos.

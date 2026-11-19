@@ -349,6 +349,11 @@ public final class Receta {
                 }
             }
         }
+        if ("responder_no".equals(p.accion())) {
+            // Contesta «No» a un aviso de MN por el propio Windows (sin UIA, que se cuelga en esos diálogos, y sin coordenadas).
+            var h = v instanceof es.amagna.asistente.manos.VentanasNativas vn && p.ventana() != null ? vn.handleDe(p.ventana()) : null;
+            return h == null ? "no está el aviso «" + p.ventana() + "»" : (Win32.responderNo(h) ? null : "el aviso no ha contestado");
+        }
         if ("cerrar_ventana_mn".equals(p.accion())) {
             // Cierra con el aspa de Windows (WM_CLOSE) una ventana hija de MN que el mapa nombra: no depende de dónde
             // esté ni de cuánto mida. Solo se usa en pasos del mapa, que ya saben qué ventana es y que no se ha tocado.

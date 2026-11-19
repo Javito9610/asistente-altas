@@ -478,7 +478,7 @@
 
     {"nombre": "atencion-responder-no", "de": "atencion", "a": "alta-cliente|formulario-expediente|lista-clientes|lista-expedientes|selector-cliente|selector-contrario|selector-tipo|correo-direccion|correo-lista|movil-numero", "segundos": 15,
      "pasos": [
-       {"accion": "left_click", "ventana": "Atención", "rel": [448, 163], "in": {}},
+       {"accion": "responder_no", "ventana": "Atención", "in": {}},
        {"accion": "wait", "in": {"duration": 2}}
      ]},
 
@@ -525,7 +525,8 @@
 
     {"nombre": "no-guardar-cambios", "de": "atencion-guardar", "a": "lista-clientes", "segundos": 20,
      "pasos": [
-       {"accion": "pulsar_hasta", "ventana": "Atención", "in": {"ventana": "Atención", "control": "boton:No", "hasta": "!«Atención»", "segundos": 15}}
+       {"accion": "responder_no", "ventana": "Atención", "in": {}},
+       {"accion": "wait", "in": {"duration": 2}}
      ]}
   ],
   "tareas": {
