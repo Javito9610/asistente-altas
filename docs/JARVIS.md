@@ -35,6 +35,8 @@ Ejemplos: «dame de alta a ANA PRUEBA, NIF 12345678Z» · «estado» · «pausa�
    como documento) y puedes pedir «pásame el X» (`enviar_fichero`).
 8. **Memoria y avisos**: «apunta que el despacho cierra los viernes a las 14» (`datos\notas.txt`, editable; nunca claves ni tarjetas),
    «notas», «olvida 2»; «recuérdame mañana a las 9 llamar a Ana» (avisa por el chat). Tareas **de una sola vez**: «hoy», «mañana» o una fecha.
+   **Ficheros por Telegram**: si una persona autorizada le manda un documento (hasta 20 MB; con un pie de foto que diga qué hacer), Jarvis lo guarda
+   en `trabajo\\jarvis\\recibidos\\` y se lo da al especialista de oficina («resume este PDF»). De desconocidos no baja nada.
    **Plantillas Word**: `rellenar_plantilla` rellena un .docx con campos «{{nombre}}» (aunque Word los parta en trozos), sin tocar la plantilla,
    y avisa de los campos sin dato (nunca los inventa).
    **Tipo «oficina»**: lo que son solo documentos, ficheros o web se hace **sin pedir confirmación** (el especialista `oficina` solo tiene

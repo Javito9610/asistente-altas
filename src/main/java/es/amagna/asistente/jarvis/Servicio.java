@@ -40,7 +40,7 @@ public final class Servicio {
     static final String AYUDA = """
             Esto es lo que sé hacer (dímelo con tus palabras):
             📋 MN (por ahora solo en la Empresa de prueba): «da de alta al cliente…», «crea un expediente…», «cuántos expedientes hay» (solo mirar).
-            📄 Documentos: «hazme un PDF / Word / Excel de…», «lee este PDF», «prepárame un borrador de correo para…» (no lo envío), «una cita para el lunes a las 10».
+            📄 Documentos: «hazme un PDF / Word / Excel de…», «rellena la plantilla…», «lee este PDF» (también puedes MANDARME un fichero por Telegram con lo que quieres que haga), «prepárame un borrador de correo para…» (no lo envío), «una cita para el lunes a las 10».
             🌐 Internet: «busca en internet…» (solo leer).
             🗂️ Ficheros: «lista / busca / mueve / copia…» dentro de mis carpetas (nada se borra: va a una papelera).
             ⏰ Tiempo: «cada día laborable a las 9, mira…», «recuérdame mañana a las 9 llamar a Ana», «programadas», «quita p123».

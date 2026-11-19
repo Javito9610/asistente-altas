@@ -113,6 +113,17 @@ public final class Ficheros {
         return "Escrito «" + ruta + "» (" + texto.length() + " caracteres).";
     }
 
+    /** Guarda un fichero que ha mandado la persona, en «recibidos» de la primera carpeta (con la hora delante; no se le devuelve). Devuelve la ruta. */
+    public String recibir(String nombre, byte[] datos) throws IOException {
+        Path carpeta = raices.get(0).resolve("recibidos");
+        Path p = carpeta.resolve(java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")) + "-" + nombre);
+        dentro(p.toString());
+        nombreSeguro(p);
+        Files.createDirectories(carpeta);
+        Files.write(p, datos);
+        return p.toString();
+    }
+
     /** Igual que {@link #escribir} pero para ficheros binarios (PDF, Word, Excel…). */
     public String escribirBytes(String ruta, byte[] datos, boolean sobrescribir) throws IOException {
         Path p = dentro(ruta);

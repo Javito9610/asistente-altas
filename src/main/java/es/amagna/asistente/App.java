@@ -1025,7 +1025,13 @@ public final class App {
             char[] token = es.amagna.asistente.manos.Secreto.leer("telegram");
             if (token != null) {
                 telegram[0] = new es.amagna.asistente.jarvis.CanalTelegram(new String(token), es.amagna.asistente.jarvis.CanalTelegram.redReal(), registro);
-                var tg = telegram[0];
+                var tg = telegram[0].conRecepcion(autorizados::contains, (nombre, contenido) -> {
+                    try {
+                        return ficherosJarvis.recibir(nombre, contenido);
+                    } catch (IOException e) {
+                        throw new IllegalStateException(e.getMessage());
+                    }
+                });
                 tg.escuchar((quien, texto) -> {
                     if (!autorizados.contains(quien)) {
                         registro.accept("Telegram: mensaje del usuario " + quien + " (no autorizado). Para autorizarlo, añade ese número a datos\\autorizados.txt.");

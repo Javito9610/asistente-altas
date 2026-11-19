@@ -274,19 +274,46 @@ final class ComprobacionesJarvis {
             byte[] cuerpo = ex.getRequestBody().readAllBytes();
             String ruta = ex.getRequestURI().getPath();
             String texto = new String(cuerpo, java.nio.charset.StandardCharsets.UTF_8);
-            visto.add(ruta + "|" + ex.getRequestMethod() + "|" + ex.getRequestHeaders().getFirst("Content-Type") + "|" + texto.replace("\r\n", "/"));
-            byte[] r = (ruta.endsWith("getUpdates") ? "{\"ok\":true,\"result\":[{\"update_id\":1,\"message\":{\"text\":\"hola\",\"from\":{\"id\":42},\"chat\":{\"id\":42,\"type\":\"private\"}}}]}"
-                    : "{\"ok\":true}").getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            visto.add(ruta + "|" + ex.getRequestMethod() + "|" + ex.getRequestHeaders().getFirst("Content-Type") + "|" + texto.replace("\r\n", "/")
+                    + "|" + (ex.getRequestURI().getQuery() == null ? "" : ex.getRequestURI().getQuery()));
+            byte[] r;
+            if (ruta.endsWith("getUpdates")) {
+                r = ("{\"ok\":true,\"result\":[{\"update_id\":1,\"message\":{\"text\":\"hola\",\"from\":{\"id\":42},\"chat\":{\"id\":42,\"type\":\"private\"}}},"
+                        + "{\"update_id\":2,\"message\":{\"caption\":\"resúmelo\",\"document\":{\"file_id\":\"F1\",\"file_name\":\"../../contrato final.pdf\",\"file_size\":14},\"from\":{\"id\":42},\"chat\":{\"id\":42,\"type\":\"private\"}}},"
+                        + "{\"update_id\":3,\"message\":{\"document\":{\"file_id\":\"F2\",\"file_name\":\"x.pdf\",\"file_size\":5},\"from\":{\"id\":99},\"chat\":{\"id\":99,\"type\":\"private\"}}}]}")
+                        .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            } else if (ruta.endsWith("getFile")) {
+                r = "{\"ok\":true,\"result\":{\"file_path\":\"docs/f.pdf\"}}".getBytes();
+            } else if (ruta.startsWith("/file/botT0KEN/")) {
+                r = "%PDF-contenido".getBytes();
+            } else {
+                r = "{\"ok\":true}".getBytes();
+            }
             ex.sendResponseHeaders(200, r.length);
             ex.getResponseBody().write(r);
             ex.close();
         });
         servidor.start();
         try {
-            var canal = new CanalTelegram("T0KEN", CanalTelegram.redReal(), x -> { }).conBase("http://127.0.0.1:" + servidor.getAddress().getPort());
+            Path carp = Files.createTempDirectory("recib");
+            var fich = new es.amagna.asistente.jarvis.Ficheros(List.of(carp));
+            var canal = new CanalTelegram("T0KEN", CanalTelegram.redReal(), x -> { }).conBase("http://127.0.0.1:" + servidor.getAddress().getPort())
+                    .conRecepcion(u -> u.equals("42"), (nombre, datos) -> {
+                        try {
+                            return fich.recibir(nombre, datos);
+                        } catch (IOException e) {
+                            throw new IllegalStateException(e);
+                        }
+                    });
             List<String> recibidos = new ArrayList<>();
             canal.sondear(0, (q, t) -> recibidos.add(q + ":" + t));
-            ok(recibidos.equals(List.of("42:hola")), "telegram por HTTP: el sondeo real recibe el mensaje");
+            ok(recibidos.size() == 2 && recibidos.get(0).equals("42:hola"), "telegram por HTTP: el sondeo real recibe el mensaje");
+            ok(recibidos.get(1).startsWith("42:He recibido el fichero «") && recibidos.get(1).contains("recibidos") && recibidos.get(1).endsWith("resúmelo"),
+                    "telegram por HTTP: un documento de una persona autorizada se baja y se avisa a Jarvis con su pie de foto");
+            Path guardado = Path.of(recibidos.get(1).substring(recibidos.get(1).indexOf('«') + 1, recibidos.get(1).indexOf('»')));
+            ok(guardado.startsWith(carp) && guardado.getFileName().toString().endsWith("contrato final.pdf") && !guardado.getFileName().toString().contains("..")
+                    && Files.readString(guardado).equals("%PDF-contenido"), "telegram por HTTP: se guarda dentro de la carpeta permitida, con el nombre limpio y su contenido");
+            ok(visto.stream().noneMatch(v -> v.contains("F2")), "telegram por HTTP: de quien no está autorizado no se baja nada");
             Path f = Files.createTempFile("doc", ".pdf");
             Files.write(f, "%PDF-contenido".getBytes());
             canal.enviarFichero("42", f);

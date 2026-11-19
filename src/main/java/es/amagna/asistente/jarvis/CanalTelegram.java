@@ -24,6 +24,11 @@ public final class CanalTelegram {
     public interface Red {
         String get(String url) throws IOException;
 
+        /** Baja un fichero (hasta 20 MB). Por defecto no se puede (las pruebas). */
+        default byte[] bajar(String url) throws IOException {
+            throw new IOException("bajar no disponible");
+        }
+
         /** Sube un fichero (multipart). Por defecto no se puede (las pruebas). */
         default String subir(String url, java.util.Map<String, String> campos, String campoFichero, java.nio.file.Path fichero) throws IOException {
             throw new IOException("subir no disponible");
@@ -32,6 +37,8 @@ public final class CanalTelegram {
 
     public static final String ORIGEN = "telegram";
     private String base = "https://api.telegram.org";
+    private java.util.function.Predicate<String> autorizado = u -> false;
+    private java.util.function.BiFunction<String, byte[], String> guardarFichero;
     private final String token;
     private final Red red;
     private final Consumer<String> registro;
@@ -45,6 +52,16 @@ public final class CanalTelegram {
         this.token = token.trim();
         this.red = red;
         this.registro = registro;
+    }
+
+    /**
+     * Los documentos que mande una persona AUTORIZADA se bajan (máx. 20 MB) y se guardan con {@code guardar(nombre, bytes)}, que
+     * devuelve dónde quedaron; a Jarvis le llega como un mensaje («He recibido el fichero…»). De los demás no se baja nada.
+     */
+    public CanalTelegram conRecepcion(java.util.function.Predicate<String> autorizado, java.util.function.BiFunction<String, byte[], String> guardar) {
+        this.autorizado = autorizado;
+        this.guardarFichero = guardar;
+        return this;
     }
 
     /** Solo para pruebas: apunta a un servidor local que imita a Telegram. */
@@ -61,6 +78,21 @@ public final class CanalTelegram {
                 try {
                     HttpResponse<String> r = http.send(HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(60)).GET().build(),
                             HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+                    if (r.statusCode() != 200) {
+                        throw new IOException("Telegram respondió " + r.statusCode());
+                    }
+                    return r.body();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("interrumpido");
+                }
+            }
+
+            @Override
+            public byte[] bajar(String url) throws IOException {
+                try {
+                    HttpResponse<byte[]> r = http.send(HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(120)).GET().build(),
+                            HttpResponse.BodyHandlers.ofByteArray());
                     if (r.statusCode() != 200) {
                         throw new IOException("Telegram respondió " + r.statusCode());
                     }
@@ -120,18 +152,62 @@ public final class CanalTelegram {
             for (Object o : (List<Object>) r.getOrDefault("result", List.of())) {
                 Map<String, Object> u = (Map<String, Object>) o;
                 siguiente = Math.max(siguiente, ((Number) u.get("update_id")).longValue() + 1);
-                if (!(u.get("message") instanceof Map<?, ?> m) || !(m.get("text") instanceof String texto)
-                        || !(m.get("from") instanceof Map<?, ?> from) || !(m.get("chat") instanceof Map<?, ?> chat)
+                if (!(u.get("message") instanceof Map<?, ?> m) || !(m.get("from") instanceof Map<?, ?> from) || !(m.get("chat") instanceof Map<?, ?> chat)
                         || !"private".equals(chat.get("type"))) {
-                    continue; // solo mensajes de texto en chat privado
+                    continue; // solo chat privado
                 }
-                alRecibir.accept(String.valueOf(((Number) from.get("id")).longValue()), texto);
-                n++;
+                String quien = String.valueOf(((Number) from.get("id")).longValue());
+                if (m.get("text") instanceof String texto) {
+                    alRecibir.accept(quien, texto);
+                    n++;
+                } else if (m.get("document") instanceof Map<?, ?> doc && guardarFichero != null) {
+                    String aviso = recibirDocumento(quien, (Map<String, Object>) doc, m.get("caption") instanceof String c ? c : "");
+                    if (aviso != null) {
+                        alRecibir.accept(quien, aviso);
+                        n++;
+                    }
+                }
             }
         } catch (RuntimeException e) {
             registro.accept("Telegram: respuesta rara, se ignora.");
         }
         return n;
+    }
+
+    @SuppressWarnings("unchecked")
+    private String recibirDocumento(String quien, Map<String, Object> doc, String pie) {
+        if (!autorizado.test(quien)) {
+            registro.accept("Telegram: documento de " + quien + " (no autorizado): no se baja.");
+            return null;
+        }
+        String nombre = String.valueOf(doc.getOrDefault("file_name", "fichero")).replaceAll("[\\\\/:*?\"<>|\\p{Cntrl}]", "_").replace("..", "_").strip();
+        if (nombre.isEmpty() || nombre.startsWith(".")) {
+            nombre = "fichero" + nombre;
+        }
+        if (nombre.length() > 80) {
+            String ext = nombre.contains(".") ? nombre.substring(nombre.lastIndexOf('.')) : "";
+            nombre = nombre.substring(0, 80 - Math.min(ext.length(), 10)) + ext.substring(0, Math.min(ext.length(), 10));
+        }
+        long tam = doc.get("file_size") instanceof Number t ? t.longValue() : 0;
+        if (tam > 20_000_000) {
+            enviar(quien, "Ese fichero pesa más de 20 MB y Telegram no me deja bajarlo.");
+            return null;
+        }
+        try {
+            Map<String, Object> r = Json.objeto(red.get(api("getFile", "file_id=" + URLEncoder.encode(String.valueOf(doc.get("file_id")), StandardCharsets.UTF_8))));
+            String ruta = String.valueOf(((Map<String, Object>) r.get("result")).get("file_path"));
+            byte[] datos = red.bajar(base + "/file/bot" + token + "/" + ruta);
+            if (datos.length > 20_000_000) {
+                enviar(quien, "Ese fichero es demasiado grande.");
+                return null;
+            }
+            String donde = guardarFichero.apply(nombre, datos);
+            return "He recibido el fichero «" + donde + "»." + (pie.isBlank() ? " (No dijo nada más: pregúntame qué quiere que haga con él.)" : " " + pie);
+        } catch (IOException | RuntimeException e) {
+            registro.accept("Telegram: no se pudo bajar el fichero (" + sinToken(String.valueOf(e.getMessage())) + ").");
+            enviar(quien, "No he podido bajar ese fichero: " + sinToken(String.valueOf(e.getMessage())));
+            return null;
+        }
     }
 
     public void enviar(String usuario, String texto) {
