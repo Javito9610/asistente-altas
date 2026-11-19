@@ -232,6 +232,8 @@ public final class Controles {
         }
     }
 
+    private static final int SEGUNDOS_MENU = 6;
+
     /** Pulsa una opción de menú siguiendo su ruta exacta, no por su nombre suelto (en MN hay nombres repetidos). */
     public String pulsarRuta(String tituloVentana, List<String> ruta) {
         ventanas.despertar(tituloVentana);
@@ -247,7 +249,24 @@ public final class Controles {
             Uia.Elemento actual = null;
             for (int i = 0; i < ruta.size(); i++) {
                 Uia.Elemento donde = actual == null ? raiz : actual;
+                // Un menú desplegable tarda lo que tarde MN en dibujarlo (más si está cargando): se espera a que aparezca la
+                // opción, no un tiempo fijo, y si a mitad de espera no sale se vuelve a desplegar el de arriba.
                 Uia.Elemento hijo = hijoLlamado(donde, ruta.get(i), 6);
+                long fin = System.currentTimeMillis() + SEGUNDOS_MENU * 1000L;
+                boolean redesplegado = false;
+                while (hijo == null && i > 0 && System.currentTimeMillis() < fin) {
+                    try {
+                        Thread.sleep(200);
+                    } catch (InterruptedException ex) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                    if (!redesplegado && System.currentTimeMillis() > fin - SEGUNDOS_MENU * 500L && actual != null) {
+                        actual.desplegar();
+                        redesplegado = true;
+                    }
+                    hijo = hijoLlamado(donde, ruta.get(i), 6);
+                }
                 if (actual != null) {
                     actual.close();
                 }
