@@ -34,7 +34,7 @@ import java.util.regex.Pattern;
 public final class Receta {
     /** Lo que se graba. Lo demás (capturas, lecturas) no cambia nada y no hace falta repetirlo. */
     static final Set<String> SE_GRABA = Set.of("left_click", "double_click", "right_click", "triple_click", "type", "key",
-            "scroll", "wait", "pulsar_control", "escribir_en", "esperar_a", "activar_ventana", "cerrar_ventana");
+            "scroll", "wait", "pulsar_control", "escribir_en", "esperar_a", "activar_ventana", "cerrar_ventana", "abrir_programa");
     static final Set<String> CON_CLIC = Set.of("left_click", "double_click", "right_click", "triple_click");
     private static final Pattern TITULO = Pattern.compile("«([^»]+)»");
 

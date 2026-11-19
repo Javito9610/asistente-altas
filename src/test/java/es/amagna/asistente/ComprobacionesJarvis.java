@@ -41,6 +41,8 @@ final class ComprobacionesJarvis {
     }
 
     static void barreras() {
+        ok(new es.amagna.asistente.cerebro.Receta.Grabadora().preparar("abrir_programa", new LinkedHashMap<>(Map.of("programa", "notepad.exe")), null) != null,
+                "recetas: abrir un programa se graba (si no, la receta aprendida no sabe empezar desde cero)");
         String mnPrueba = "- «MNprogram - Abogados - Empresa de prueba [\\Usu1]» (MNprogram) [delante, con el foco]";
         String mnReal = "- «MNprogram - Abogados - Amagna [\\Usu1]» (MNprogram) [delante, con el foco]";
         String bloc = "- «Bloc de notas» (notepad) [delante, con el foco]";
