@@ -614,12 +614,12 @@ public final class App {
                 direcciones ≈871,449); solo así el valor llega a la ficha. Adjuntos: pestaña «Adjuntos» (≈332,303) → «Añadir Adjunto»
                 (≈290,333) → «Importar» → «Abrir»: se teclea la ruta completa e Intro. Después MN pide «Establece el nombre de la
                 carpeta donde se almacenarán todos los adjuntos y subcarpetas de esta ficha». «Cancelar» de la ficha pregunta guardar Sí/No.
-                LO QUE FALTA: 1) SOLO LECTURA: en la lista «Clientes» abre (doble clic) un cliente EXISTENTE que tenga adjuntos (mira
-                varios si hace falta; cancela sin guardar) y mira en su pestaña «Adjuntos» CÓMO SE LLAMA su carpeta (¿nombre del cliente,
-                NIF, número de ficha…?). Apunta 3 ejemplos exactos. Si no se ve ninguna convención, dilo. 2) Con esa convención, crea
-                la ficha de OLIVIA (nombre de carpeta: el que corresponda a la misma convención con sus datos), adjunta los tres
-                ficheros (dni-prueba.txt, hoja-encargo-prueba.txt, justificante-prueba.txt), verifica que salen en la lista de adjuntos,
-                GUARDA y comprueba que existe buscándola por NIF. Si no hay convención, NO inventes: para y dilo (no guardes).
+                CONVENCIÓN DE LA CARPETA (ya vista en 3 clientes existentes): el nombre completo del cliente seguido de una barra
+                invertida. Para OLIVIA: «OLIVIA TESTEO PRUEBA\\» (termina en barra invertida). Todos los adjuntos de la ficha van a esa
+                misma carpeta (la primera vez MN la pide; las siguientes puede que no).
+                LO QUE HAY QUE HACER (con pocos pasos y sin explorar más: esto se GRABA para repetirlo sin IA, así que sé directo y
+                no hagas pasos de más): crea la ficha de OLIVIA, adjunta los tres ficheros (dni-prueba.txt, hoja-encargo-prueba.txt,
+                justificante-prueba.txt), verifica que salen en la lista de adjuntos, GUARDA y comprueba que existe buscándola por NIF.
                 Todo lo que no sea guardar la ficha de OLIVIA, NO lo hagas (no modifiques otros clientes, ni «Configuración», ni
                 Baja/Eliminar). Cierra lo que abras. Si algo no está claro en 2 intentos, para y dilo.
                 Termina con líneas «APRENDIDO: …», una por cosa: orden exacto de pasos, nombres exactos de controles, diálogos,
@@ -722,11 +722,11 @@ public final class App {
         List<String> b = new java.util.ArrayList<>(List.of(tarea, "--como", "expedientes"));
         if ((a.contains("--solo-explorar") || a.contains("--solo-contrario") || a.contains("--solo-cliente") || a.contains("--solo-usuario") || a.contains("--solo-ficha")) && !a.contains("--tope-tokens")) {
             b.add("--tope-tokens");
-            b.add(a.contains("--solo-ficha") ? "2500000" : a.contains("--solo-usuario") ? "1800000" : "900000");
+            b.add(a.contains("--solo-ficha") ? "3500000" : a.contains("--solo-usuario") ? "1800000" : "900000");
         }
         if ((a.contains("--explorar") || a.contains("--solo-explorar") || a.contains("--solo-contrario") || a.contains("--solo-cliente") || a.contains("--solo-usuario") || a.contains("--solo-ficha")) && !a.contains("--pasos")) {
             b.add("--pasos");
-            b.add("100");
+            b.add(a.contains("--solo-ficha") ? "180" : "100");
         }
         if (a.contains("--grabar")) {
             b.add("--grabar");
