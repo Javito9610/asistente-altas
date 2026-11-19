@@ -36,6 +36,7 @@ final class ComprobacionesJarvis {
             buzon();
             programadas();
             oficina();
+            notasYRecordatorios();
             ficheros();
             web();
         } catch (IOException e) {
@@ -354,6 +355,35 @@ final class ComprobacionesJarvis {
         s.tic(lunes9);
         ok(dicho.stream().anyMatch(d -> d.contains("Toca lo programado")) && dicho.stream().anyMatch(d -> d.contains("No tengo nada pendiente")),
                 "programadas: a su hora se lanza solo");
+    }
+
+    static void notasYRecordatorios() throws IOException {
+        Path f = Files.createTempDirectory("notas").resolve("n.txt");
+        var n = new es.amagna.asistente.jarvis.Notas(f);
+        ok(n.anadir("El despacho cierra los viernes a las 14") == null && n.anadir("el despacho cierra los viernes a las 14") == null
+                && n.todas().size() == 1, "notas: apunta y no repite");
+        ok(n.anadir("la clave es 1234abcd") != null && n.anadir("la tarjeta 4111 1111 1111 1111") != null && n.todas().size() == 1,
+                "notas: no guarda claves ni tarjetas");
+        ok(new es.amagna.asistente.jarvis.Notas(f).todas().size() == 1 && new es.amagna.asistente.jarvis.Notas(f).comoContexto().contains("viernes"), "notas: sobreviven a un reinicio y salen como contexto");
+        ok(n.quitar(1) && n.todas().isEmpty() && !n.quitar(1), "notas: se pueden olvidar");
+        String[] resp = {"{\"tipo\":\"recordar\",\"texto\":\"Ana lleva los concursos\"}"};
+        List<String> dicho = new ArrayList<>();
+        var prog = new Programadas(Files.createTempDirectory("prog3").resolve("p.json"));
+        var s = new Servicio(new Almacen(Files.createTempDirectory("alm")), interpreteFalso(resp), t -> new Servicio.Resultado(true, "x"),
+                t -> new Servicio.Resultado(true, "x"), (o, q, t) -> dicho.add(t), Set.of("javi"), x -> { }).conProgramadas(prog).conNotas(n);
+        s.recibir("telegram", "javi", "apunta que Ana lleva los concursos");
+        ok(n.todas().equals(List.of("Ana lleva los concursos")) && dicho.get(dicho.size() - 1).startsWith("Apuntado"), "servicio: «apunta que…» guarda la nota");
+        s.recibir("telegram", "javi", "notas");
+        ok(dicho.get(dicho.size() - 1).contains("1. Ana lleva los concursos"), "servicio: «notas» las enseña");
+        s.recibir("telegram", "javi", "olvida 1");
+        ok(n.todas().isEmpty(), "servicio: «olvida 1» la quita");
+        resp[0] = "{\"tipo\":\"recordatorio\",\"params\":{\"hora\":\"09:00\",\"dias\":\"hoy\"},\"texto\":\"llamar a Ana\"}";
+        s.recibir("telegram", "javi", "recuérdame llamar a Ana hoy a las 9");
+        ok(prog.todas().size() == 1 && dicho.get(dicho.size() - 1).startsWith("Hecho ("), "servicio: el recordatorio se programa");
+        dicho.clear();
+        s.tic(java.time.LocalDate.now().atTime(9, 1));
+        ok(dicho.size() == 1 && dicho.get(0).startsWith("🔔 Recordatorio: llamar a Ana") && prog.todas().isEmpty(),
+                "servicio: a su hora solo avisa (no lo toma por una orden) y se borra");
     }
 
     static void ficheros() throws IOException {

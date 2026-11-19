@@ -46,6 +46,7 @@ public final class Servicio {
     private final Consumer<String> registro;
     private volatile boolean pausado;
     private Programadas programadas;
+    private Notas notas;
     private java.util.function.Supplier<String> conocimiento = () -> "";
 
     /** Lo que Jarvis ya sabe hacer solo (tareas libres aprendidas): se le cuenta al intérprete para que las reutilice con los mismos nombres. */
@@ -62,6 +63,11 @@ public final class Servicio {
     }
 
     private java.util.function.Supplier<List<java.nio.file.Path>> entregas = List::of;
+
+    public Servicio conNotas(Notas n) {
+        this.notas = n;
+        return this;
+    }
 
     public Programadas programadas() {
         return programadas;
@@ -105,6 +111,10 @@ public final class Servicio {
         }
         for (var p : programadas.vencidas(ahora)) {
             registro.accept("Programada " + p.id() + ": " + p.peticion());
+            if (p.peticion().startsWith("🔔")) {
+                decir(p.origen(), p.quien(), p.peticion());
+                continue;
+            }
             decir(p.origen(), p.quien(), "⏰ Toca lo programado: " + p.peticion());
             recibir(p.origen(), p.quien(), p.peticion());
         }
@@ -181,18 +191,41 @@ public final class Servicio {
                     + "\n(Para quitar uno: «quita p12345».)");
             return;
         }
+        if (notas != null && Set.of("notas", "que recuerdas", "que sabes", "que sabes de la oficina").contains(n)) {
+            var l = notas.todas();
+            StringBuilder b = new StringBuilder();
+            for (int i = 0; i < l.size(); i++) {
+                b.append(i + 1).append(". ").append(l.get(i)).append('\n');
+            }
+            decir(origen, quien, l.isEmpty() ? "No tengo ninguna nota. Dime «apunta que…» y la guardo." : "Recuerdo:\n" + b + "(Para quitar una: «olvida 2».)");
+            return;
+        }
+        if (notas != null && n.matches("olvida \\d+")) {
+            decir(origen, quien, notas.quitar(Integer.parseInt(n.substring(7))) ? "Olvidado." : "No encuentro esa nota.");
+            return;
+        }
         if (programadas != null && n.matches("quita p\\d+")) {
             decir(origen, quien, programadas.quitar(n.substring(6)) ? "Quitado." : "No encuentro esa.");
             return;
         }
         String saber = conocimiento.get();
-        Entendido e = interprete.entender(texto, (saber.isBlank() ? "" : saber + "\n") + contexto(quien));
+        Entendido e = interprete.entender(texto, (saber.isBlank() ? "" : saber + "\n") + (notas == null ? "" : notas.comoContexto()) + contexto(quien));
         switch (e.tipo()) {
             case Entendido.PROGRAMAR -> {
                 String id = programadas == null ? null : programadas.anadir(origen, quien, e.params().getOrDefault("hora", ""),
                         e.params().getOrDefault("dias", "todos"), e.texto());
                 decir(origen, quien, id == null ? "No he podido programarlo: no entiendo la hora o los días. ¿Me lo repites (por ejemplo «cada día laborable a las 9:00»)?"
                         : "Programado (" + id + "): " + e.params().getOrDefault("hora", "") + " · " + e.params().getOrDefault("dias", "todos") + " → " + e.texto());
+            }
+            case Entendido.RECORDATORIO -> {
+                String id = programadas == null ? null : programadas.anadir(origen, quien, e.params().getOrDefault("hora", ""),
+                        e.params().getOrDefault("dias", "hoy"), "🔔 Recordatorio: " + e.texto());
+                decir(origen, quien, id == null ? "No he podido apuntar el recordatorio: no entiendo la hora o el día. ¿Me lo repites?"
+                        : "Hecho (" + id + "): te lo recordaré " + e.params().getOrDefault("dias", "hoy") + " a las " + e.params().getOrDefault("hora", "") + ": " + e.texto());
+            }
+            case Entendido.RECORDAR -> {
+                String motivo = notas == null ? "No tengo dónde apuntar cosas." : notas.anadir(e.texto());
+                decir(origen, quien, motivo == null ? "Apuntado: " + e.texto() : motivo);
             }
             case Entendido.TAREA -> {
                 Trabajo t = almacen.nuevo(origen, quien, texto, e.tarea(), e.params(), Trabajo.PENDIENTE);

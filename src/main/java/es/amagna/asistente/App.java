@@ -919,6 +919,7 @@ public final class App {
         };
         var servicio = new es.amagna.asistente.jarvis.Servicio(almacen, interprete, tareas, libre, salida, autorizados, registro)
                 .conEntregas(ficherosJarvis::drenarEntregas)
+                .conNotas(new es.amagna.asistente.jarvis.Notas(datos.resolve("notas.txt")))
                 .conProgramadas(new es.amagna.asistente.jarvis.Programadas(datos.resolve("programadas.json")))
                 .conConocimiento(() -> {
                     StringBuilder b = new StringBuilder();

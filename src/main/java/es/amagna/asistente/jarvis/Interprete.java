@@ -32,7 +32,7 @@ public final class Interprete {
         StringBuilder sistema = new StringBuilder("""
                 Eres el intérprete de Jarvis, el asistente de oficina de un despacho de abogados. Recibes el mensaje de una persona y
                 decides qué hay que hacer. NO haces nada tú: solo respondes con UN objeto JSON, sin texto alrededor:
-                {"tipo":"tarea|consultar|libre|programar|preguntar|responder","tarea":"nombre","params":{"dato":"valor"},"texto":"..."}
+                {"tipo":"tarea|consultar|libre|programar|recordar|recordatorio|preguntar|responder","tarea":"nombre","params":{"dato":"valor"},"texto":"..."}
                 - tipo «tarea»: es una de estas tareas que Jarvis hace solo (poner en «tarea» su nombre y en «params» los datos que
                   la persona ha dado, con los nombres de dato exactos). Tareas:
                 """);
@@ -52,6 +52,12 @@ public final class Interprete {
                 - tipo «programar»: algo que se repite o se hace a una hora («cada día a las 9…», «los lunes a las 10…»). En «params»:
                   {"hora":"HH:mm","dias":"todos|lun-vie|finde|lun,mie…|hoy|mañana|AAAA-MM-DD"} («hoy», «mañana» o una fecha = se hace UNA sola vez) y en «texto» lo que hay que hacer, escrito como la orden que
                   daría la persona (sin la hora ni los días). Si falta la hora, tipo «preguntar».
+                - tipo «recordatorio»: que Jarvis AVISE a la persona de algo («recuérdame mañana a las 9 llamar a Ana»). En «params»
+                  lo mismo que «programar» ({"hora":"HH:mm","dias":"…|hoy|mañana|AAAA-MM-DD"}) y en «texto» lo que hay que recordarle.
+                  Sin hora, tipo «preguntar».
+                - tipo «recordar»: la persona le cuenta algo que Jarvis debe SABER de ahora en adelante («apunta que el despacho
+                  cierra los viernes a las 14», «recuerda que Ana lleva los concursos»). En «texto» el dato, en una frase corta.
+                  Nunca claves, tarjetas ni cuentas bancarias.
                 - tipo «preguntar»: no está claro qué quiere o falta algo. «texto» = una sola pregunta corta.
                 - tipo «responder»: es una pregunta o charla que se contesta con palabras (sin tocar nada). «texto» = la respuesta.
                 Pagos, transferencias, compras, envío de mensajes o correos, y borrar cosas: tipo «libre» solo si la persona lo pide
@@ -124,6 +130,15 @@ public final class Interprete {
                         return new Entendido(Entendido.PREGUNTAR, "", Map.of(), "¿A qué hora (y qué días) quieres que lo haga?");
                     }
                     return new Entendido(tipo, "", params, t);
+                }
+                case Entendido.RECORDATORIO -> {
+                    if (params.getOrDefault("hora", "").isBlank() || t.isBlank()) {
+                        return new Entendido(Entendido.PREGUNTAR, "", Map.of(), "¿A qué hora quieres que te lo recuerde?");
+                    }
+                    return new Entendido(tipo, "", params, t);
+                }
+                case Entendido.RECORDAR -> {
+                    return t.isBlank() ? new Entendido(Entendido.PREGUNTAR, "", Map.of(), "¿Qué quieres que recuerde?") : new Entendido(tipo, "", Map.of(), t);
                 }
                 case Entendido.PREGUNTAR, Entendido.RESPONDER -> {
                     return new Entendido(tipo, "", params, t.isBlank() ? "¿Puedes explicarme mejor qué quieres?" : t);
