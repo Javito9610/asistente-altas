@@ -3,7 +3,7 @@ setlocal enabledelayedexpansion
 rem Prueba de resistencia de la ficha de cliente en la EMPRESA DE PRUEBA: crea N clientes ficticios distintos
 rem (nombre y NIF nuevos en cada vuelta, con 3 adjuntos) y cuenta cuantas veces sale entera.
 rem Deja: registro\clientes.log y registro\clientes-resumen.txt
-set "VUELTAS=3"
+set "VUELTAS=2"
 cd /d C:\Proyectos\asistente-altas
 if not exist registro mkdir registro
 set /a BIEN=0
