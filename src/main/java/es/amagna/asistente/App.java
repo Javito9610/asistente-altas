@@ -931,6 +931,11 @@ public final class App {
                     servicio.recibir("telegram", quien, texto);
                 });
                 registro.accept("Telegram: escuchando.");
+                for (String id : autorizados) {
+                    if (id.matches("\\d+")) {
+                        tg.enviar(id, "🟢 Jarvis en marcha. Escríbeme lo que necesites («estado» para ver cómo voy).");
+                    }
+                }
             }
         } else {
             registro.accept("Telegram: no configurado (asistente secreto telegram).");
