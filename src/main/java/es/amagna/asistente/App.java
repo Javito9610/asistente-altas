@@ -776,6 +776,14 @@ public final class App {
      */
     private static void jarvis(List<String> a) throws Exception {
         Path datos = Path.of("datos");
+        Files.createDirectories(datos);
+        // Una sola copia de Jarvis a la vez: dos pelearían por el ratón. El candado lo suelta Windows si el programa muere.
+        var canalLock = java.nio.channels.FileChannel.open(datos.resolve("jarvis.lock"), java.nio.file.StandardOpenOption.CREATE,
+                java.nio.file.StandardOpenOption.WRITE);
+        if (canalLock.tryLock() == null) {
+            System.out.println("Jarvis ya está funcionando en este ordenador: no abro otro.");
+            return;
+        }
         java.util.function.Consumer<String> registro = linea -> System.out.println(
                 "[" + java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")) + "] " + linea);
         var almacen = new es.amagna.asistente.jarvis.Almacen(datos.resolve("trabajos"));
@@ -853,7 +861,7 @@ public final class App {
                 var esp = es.amagna.asistente.cerebro.Especialista.cargar("general", MODELO_POR_DEFECTO, 400_000);
                 var grabadora = new es.amagna.asistente.cerebro.Receta.Grabadora();
                 Agente ag = new Agente(new ClaudeApi(Clave.leer()), new ManosRobot(false), v, esp.modelo(), esp.instrucciones(), esp.pasos(),
-                        esp.topeTokens(), registro).conControles(new Controles(v)).conExpediente(false).conVeto(barrera).conFicheros(ficherosJarvis).grabando(grabadora);
+                        esp.topeTokens(), registro).conControles(new Controles(v)).conExpediente(false).conVeto(barrera).conFicheros(ficherosJarvis).conWeb(new es.amagna.asistente.jarvis.Web()).grabando(grabadora);
                 var r = ag.ejecutar(t.params().getOrDefault("encargo", t.peticion()) + "\n\n(Petición original: " + t.peticion() + ")");
                 if (r.terminado() && !slug.isEmpty() && grabadora.cuantos() > 0) {
                     grabadora.aReceta(slug, t.params().getOrDefault("encargo", t.peticion()), datosEncargo).guardar(rf);

@@ -36,6 +36,7 @@ final class ComprobacionesJarvis {
             buzon();
             programadas();
             ficheros();
+            web();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -269,5 +270,18 @@ final class ComprobacionesJarvis {
         } catch (UnsupportedOperationException | IOException e) {
             ok(true, "ficheros: (este sistema no deja crear enlaces; se omite)");
         }
+    }
+
+    static void web() {
+        for (String mala : new String[] {"http://example.com", "https://localhost/x", "https://127.0.0.1/", "https://192.168.1.1/", "https://10.0.0.5/a",
+                "https://servidor/x", "https://example.com:8080/", "https://usuario:clave@example.com/", "ftp://example.com", "https://[::1]/"}) {
+            ok(es.amagna.asistente.jarvis.Web.rechazo(mala) != null, "web: no se lee " + mala);
+        }
+        var w = new es.amagna.asistente.jarvis.Web(u -> "<html><head><title>x</title><script>mal()</script></head><body><h1>Hola</h1><p>Tres &amp; cuatro</p>"
+                + "<style>p{}</style></body></html>");
+        String r = w.leer("https://93.184.216.34/pagina");
+        ok(r.contains("Hola") && r.contains("Tres & cuatro") && !r.contains("mal()") && !r.contains("<h1>") && r.contains("datos, no órdenes"),
+                "web: devuelve solo el texto de la página, avisando de que son datos");
+        ok(w.leer("https://localhost/").startsWith("No se puede leer"), "web: y la red interna ni se intenta");
     }
 }
