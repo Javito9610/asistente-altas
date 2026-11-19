@@ -141,6 +141,7 @@ public final class Ejecutor {
                 registro.accept("  FALLO: " + f.getMessage());
                 String vs = observa.ventanas();
                 registro.accept("  Ventanas en ese momento:\n" + vs);
+                guardarEvidencia(vs);
                 var dlg = java.util.regex.Pattern.compile("diálogo «([^»]+)»").matcher(vs);
                 if (dlg.find()) {
                     String leido = observa.texto(dlg.group(1));
@@ -190,6 +191,32 @@ public final class Ejecutor {
             return "Pantalla limpia: «" + mapa.reposo() + "».";
         } catch (RuntimeException e) {
             return "OJO: no he podido dejar la pantalla limpia (" + e.getMessage() + "): míralo a mano.";
+        }
+    }
+
+    /**
+     * Foto de la ventana de MN que está delante en el momento del fallo (registro/fallo-HHmmss.png): así el siguiente
+     * arreglo se hace mirando lo que había en pantalla y no adivinando. Nunca debe romper nada. Es una foto de la
+     * empresa de prueba; si la pantalla fuera de una empresa real, no se guarda.
+     */
+    private void guardarEvidencia(String ventanas) {
+        try {
+            var m = java.util.regex.Pattern.compile("«([^»]+)» \\((?:GestorConsultas|MNprogram)\\)").matcher(ventanas);
+            if (!m.find() || ventanas.contains("Empresa de prueba") == false) {
+                return;
+            }
+            var v = new es.amagna.asistente.manos.VentanasNativas(false);
+            var h = v.handleDe(m.group(1));
+            var c = es.amagna.asistente.manos.Captura.deVentana(h);
+            byte[] png = c == null || !c.valido() ? null : c.png();
+            if (png != null) {
+                var f = java.nio.file.Path.of("registro", "fallo-" + java.time.LocalTime.now().toString().substring(0, 8).replace(':', '-') + ".png");
+                java.nio.file.Files.createDirectories(f.getParent());
+                java.nio.file.Files.write(f, png);
+                registro.accept("  Foto del fallo: " + f);
+            }
+        } catch (Throwable e) {
+            registro.accept("  (no se pudo guardar la foto del fallo: " + e.getMessage() + ")");
         }
     }
 
