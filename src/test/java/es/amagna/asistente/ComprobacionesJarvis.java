@@ -37,6 +37,7 @@ final class ComprobacionesJarvis {
             programadas();
             oficina();
             telegramPorHttp();
+            consumo();
             variasCosas();
             notasYRecordatorios();
             ficheros();
@@ -402,6 +403,36 @@ final class ComprobacionesJarvis {
         s.tic(lunes9);
         ok(dicho.stream().anyMatch(d -> d.contains("Toca lo programado")) && dicho.stream().anyMatch(d -> d.contains("No tengo nada pendiente")),
                 "programadas: a su hora se lanza solo");
+    }
+
+    static void consumo() throws IOException {
+        Path f = Files.createTempDirectory("cons").resolve("c.json");
+        int[] llamadas = {0};
+        es.amagna.asistente.cerebro.Cerebro falso = p -> {
+            llamadas[0]++;
+            return Map.of("usage", Map.of("input_tokens", 600L, "output_tokens", 400L), "content", List.of());
+        };
+        var c = new es.amagna.asistente.jarvis.Consumo(falso, f, 2500);
+        c.pensar(Map.of());
+        c.pensar(Map.of());
+        ok(c.hoy() == 2000 && new es.amagna.asistente.jarvis.Consumo(falso, f, 2500).hoy() == 2000, "consumo: cuenta los tokens del día y no los pierde al reiniciar");
+        c.pensar(Map.of());
+        boolean corta = false;
+        try {
+            c.pensar(Map.of());
+        } catch (IllegalStateException e) {
+            corta = e.getMessage().contains("límite diario");
+        }
+        ok(corta && llamadas[0] == 3, "consumo: al llegar al tope diario corta ANTES de llamar a la IA");
+        var sinTope = new es.amagna.asistente.jarvis.Consumo(falso, Files.createTempDirectory("cons2").resolve("c.json"), 0);
+        for (int i = 0; i < 5; i++) {
+            sinTope.pensar(Map.of());
+        }
+        ok(sinTope.hoy() == 5000, "consumo: tope 0 = sin tope");
+        Path lim = Files.createTempFile("lim", ".txt");
+        Files.writeString(lim, "1.500.000\n");
+        ok(es.amagna.asistente.jarvis.Consumo.topeDe(lim) == 1_500_000 && es.amagna.asistente.jarvis.Consumo.topeDe(Path.of("/no/existe")) == es.amagna.asistente.jarvis.Consumo.TOPE_POR_DEFECTO,
+                "consumo: lee el tope del fichero y, si no hay, usa el de por defecto");
     }
 
     static void variasCosas() throws IOException {

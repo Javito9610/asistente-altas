@@ -793,7 +793,9 @@ public final class App {
         es.amagna.asistente.cerebro.Cerebro cerebro = Clave.hay() && !a.contains("--sin-ia") ? new ClaudeApi(Clave.leer()) : p -> {
             throw new IllegalStateException("no hay clave de la IA (asistente guardar-clave)");
         };
-        var interprete = new es.amagna.asistente.jarvis.Interprete(cerebro, MODELO_POR_DEFECTO);
+        var consumo = new es.amagna.asistente.jarvis.Consumo(cerebro, datos.resolve("consumo.json"),
+                es.amagna.asistente.jarvis.Consumo.topeDe(datos.resolve("limite-tokens.txt")));
+        var interprete = new es.amagna.asistente.jarvis.Interprete(consumo, MODELO_POR_DEFECTO);
         java.util.Set<String> autorizados = new java.util.HashSet<>(java.util.Set.of("local"));
         Path fa = datos.resolve("autorizados.txt");
         if (Files.isRegularFile(fa)) {
@@ -813,7 +815,7 @@ public final class App {
                 try {
                     VentanasNativas v = new VentanasNativas(false);
                     var esp = es.amagna.asistente.cerebro.Especialista.cargar("consulta", MODELO_POR_DEFECTO, 120_000);
-                    Agente ag = new Agente(new ClaudeApi(Clave.leer()), new ManosRobot(false), v, esp.modelo(), esp.instrucciones(), esp.pasos(),
+                    Agente ag = new Agente(consumo, new ManosRobot(false), v, esp.modelo(), esp.instrucciones(), esp.pasos(),
                             esp.topeTokens(), registro).conControles(new Controles(v)).conExpediente(false).soloPuede(esp.puede());
                     var r = ag.ejecutar(t.params().getOrDefault("pregunta", t.peticion()));
                     return new es.amagna.asistente.jarvis.Servicio.Resultado(r.terminado(), r.mensaje().replaceFirst("^TERMINADO:\\s*", ""));
@@ -879,7 +881,7 @@ public final class App {
             try {
                 var esp = es.amagna.asistente.cerebro.Especialista.cargar("general", MODELO_POR_DEFECTO, 400_000);
                 var grabadora = new es.amagna.asistente.cerebro.Receta.Grabadora();
-                Agente ag = new Agente(new ClaudeApi(Clave.leer()), new ManosRobot(false), v, esp.modelo(), esp.instrucciones(), esp.pasos(),
+                Agente ag = new Agente(consumo, new ManosRobot(false), v, esp.modelo(), esp.instrucciones(), esp.pasos(),
                         esp.topeTokens(), registro).conControles(new Controles(v)).conExpediente(false).conVeto(barrera).conFicheros(ficherosJarvis).conWeb(new es.amagna.asistente.jarvis.Web()).grabando(grabadora);
                 var r = ag.ejecutar(t.params().getOrDefault("encargo", t.peticion()) + "\n\n(Petición original: " + t.peticion() + ")");
                 if (r.terminado() && !slug.isEmpty() && grabadora.cuantos() > 0) {
@@ -944,6 +946,7 @@ public final class App {
                     return "🩺 Diagnóstico de Jarvis\n"
                             + "· IA (clave): " + (Clave.hay() ? "sí" : "NO — sin ella solo hago lo que sé de memoria (asistente guardar-clave)") + "\n"
                             + "· Telegram: " + (telegram[0] != null ? "conectado" : "no configurado (asistente secreto telegram)") + "\n"
+                            + "· IA gastada hoy: " + consumo.hoy() + " tokens (tope " + (consumo.tope() == 0 ? "sin tope" : consumo.tope()) + ")\n"
                             + "· Personas autorizadas: " + autorizados.size() + "\n"
                             + "· MN abierto: " + (mn ? "sí" : "no") + "\n"
                             + "· Encendido desde hace: " + dur.toHours() + " h " + dur.toMinutesPart() + " min\n"
