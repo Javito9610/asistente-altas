@@ -59,6 +59,10 @@ public final class Win32 {
 
         boolean ShowWindow(Pointer hwnd, int modo);
 
+        boolean MoveWindow(Pointer hwnd, int x, int y, int ancho, int alto, boolean repintar);
+
+        int GetSystemMetrics(int indice);
+
         boolean AttachThreadInput(int hilo, int conHilo, boolean unir);
 
         boolean GetGUIThreadInfo(int hilo, GuiThreadInfo info);
@@ -178,6 +182,47 @@ public final class Win32 {
      * los abre siempre maximizados y todos los clics caen fuera de sitio. Devuelve true si la ha restaurado.
      */
     public static boolean desmaximizar(Pointer h) {
+        return desmaximizarInterno(h);
+    }
+
+    /**
+     * Si la ventana se sale de la pantalla (MN abre los formularios donde los dejaron, a veces medio fuera), la
+     * mueve para que quepa entera sin cambiar su tamaño: el aspa y los botones de la derecha tienen que verse.
+     * Devuelve true si la ha movido.
+     */
+    public static boolean traerAPantalla(Pointer h) {
+        if (h == null) {
+            return false;
+        }
+        int[] r = rectangulo(h);
+        if (r == null || User32.I.IsZoomed(h)) {
+            return false;
+        }
+        int w = User32.I.GetSystemMetrics(0);
+        int hh = User32.I.GetSystemMetrics(1);
+        int x = r[0];
+        int y = r[1];
+        if (x + r[2] > w) {
+            x = Math.max(0, w - r[2]);
+        }
+        if (y + r[3] > hh) {
+            y = Math.max(0, hh - r[3]);
+        }
+        x = Math.max(x, 0);
+        y = Math.max(y, 0);
+        if (x == r[0] && y == r[1]) {
+            return false;
+        }
+        boolean ok = User32.I.MoveWindow(h, x, y, r[2], r[3], true);
+        try {
+            Thread.sleep(400);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        return ok;
+    }
+
+    private static boolean desmaximizarInterno(Pointer h) {
         if (h == null || !User32.I.IsZoomed(h)) {
             return false;
         }

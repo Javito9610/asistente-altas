@@ -99,6 +99,9 @@ public final class Receta {
             if (CON_CLIC.contains(accion) || "scroll".equals(accion)) {
                 try {
                     var h = Win32.User32.I.GetForegroundWindow();
+                    if (!real.startsWith("MNprogram") && Win32.traerAPantalla(h)) {
+                        System.out.println("  ventana «" + real + "» estaba medio fuera de la pantalla: movida para que se vea entera");
+                    }
                     int[] r = h == null ? null : Win32.rectangulo(h);
                     if (r != null && in.get("coordinate") instanceof List<?> c) {
                         int[] o = manos.escala().aImagen(r[0], r[1]);
