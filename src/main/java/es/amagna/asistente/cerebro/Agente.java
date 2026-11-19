@@ -315,7 +315,7 @@ public final class Agente {
             h.add(Json.obj("name", "enviar_fichero", "description", "Pide que un fichero (de las carpetas permitidas) se le MANDE a la persona por el mismo "
                     + "chat al terminar el encargo (por ejemplo «pásame el PDF»). Los documentos que creas ya se mandan solos.",
                     "input_schema", Json.obj("type", "object", "properties", Json.obj("ruta", Json.obj("type", "string")), "required", List.of("ruta"))));
-            h.add(Json.obj("name", "leer_documento", "description", "Lee el texto de un Word (.docx) o Excel (.xlsx) sin abrir ningún programa.",
+            h.add(Json.obj("name", "leer_documento", "description", "Lee el texto de un PDF, Word (.docx) o Excel (.xlsx) sin abrir ningún programa (un PDF escaneado no tiene texto).",
                     "input_schema", Json.obj("type", "object", "properties", Json.obj("ruta", Json.obj("type", "string")), "required", List.of("ruta"))));
             h.add(Json.obj("name", "quitar_fichero", "description", "«Borra» un fichero mandándolo a _papelera (recuperable).",
                     "input_schema", Json.obj("type", "object", "properties", Json.obj("ruta", Json.obj("type", "string")), "required", List.of("ruta"))));

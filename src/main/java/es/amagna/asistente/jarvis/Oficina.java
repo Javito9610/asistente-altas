@@ -457,7 +457,7 @@ public final class Oficina {
         return t.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&apos;", "'").replace("&amp;", "&");
     }
 
-    /** El texto de un .docx o un .xlsx (las celdas, separadas por tabuladores). */
+    /** El texto de un .pdf, .docx o .xlsx (las celdas, separadas por tabuladores). */
     public String leerDocumento(String ruta) throws IOException {
         Path p = ficheros.rutaPermitida(ruta);
         String n = p.getFileName().toString().toLowerCase(Locale.ROOT);
@@ -466,6 +466,20 @@ public final class Oficina {
         }
         if (Files.size(p) > 30_000_000) {
             throw new IllegalArgumentException("Documento demasiado grande.");
+        }
+        if (n.endsWith(".pdf")) {
+            try (org.apache.pdfbox.pdmodel.PDDocument d = org.apache.pdfbox.Loader.loadPDF(Files.readAllBytes(p))) {
+                var st = new org.apache.pdfbox.text.PDFTextStripper();
+                st.setEndPage(Math.min(d.getNumberOfPages(), 60));
+                String t = st.getText(d);
+                if (t.isBlank()) {
+                    return "(El PDF no tiene texto que se pueda leer: seguramente es un escaneo. Habría que mirarlo como imagen.)";
+                }
+                return (d.getNumberOfPages() > 60 ? "[Solo las primeras 60 de " + d.getNumberOfPages() + " páginas]\n" : "")
+                        + (t.length() > 200_000 ? t.substring(0, 200_000) + "\n[… cortado]" : t);
+            } catch (IOException e) {
+                throw new IllegalArgumentException("El PDF no es válido, está dañado o tiene clave.");
+            }
         }
         try (ZipFile z = new ZipFile(p.toFile())) {
             String t;
@@ -501,7 +515,7 @@ public final class Oficina {
                 }
                 t = s.toString();
             } else {
-                throw new IllegalArgumentException("Solo sé leer .docx y .xlsx (para texto, .txt/.csv con leer_fichero).");
+                throw new IllegalArgumentException("Solo sé leer .pdf, .docx y .xlsx (para texto, .txt/.csv con leer_fichero).");
             }
             return t.length() > 200_000 ? t.substring(0, 200_000) + "\n[… cortado]" : t;
         } catch (java.util.zip.ZipException e) {

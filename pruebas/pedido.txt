@@ -1,1 +1,1 @@
-Hazme un Excel con 4 clientes ficticios (nombre, ciudad, importe) y un PDF de una pagina que resuma ese listado, y una cita de calendario para el lunes 30 de noviembre de 2026 a las 10:00 llamada Revision de altas. Dejalo todo en la carpeta de trabajo.
+Lee el PDF resumen_clientes.pdf de tu carpeta de trabajo y dime cual es el importe medio que aparece y cual es el cliente de mayor importe.
