@@ -13,7 +13,7 @@ for %%f in (cola\*.pedir) do (
   del "%%f" >nul 2>&1
   if exist "!NOMBRE!.cmd" (
     echo [%time%] Ejecutando !NOMBRE!
-    call "!NOMBRE!.cmd" > "cola\hecho-%%~nf.txt" 2>&1
+    call "!NOMBRE!.cmd" < nul > "cola\hecho-%%~nf.txt" 2>&1
     echo [%time%] Terminado !NOMBRE! >> "cola\hecho-%%~nf.txt"
   ) else (
     echo [%time%] Pedido desconocido: !NOMBRE! > "cola\hecho-%%~nf.txt"
