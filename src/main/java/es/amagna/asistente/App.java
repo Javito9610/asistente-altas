@@ -909,6 +909,11 @@ public final class App {
             try {
                 // El buzón (datos\\buzon\\entrada\\*.txt): cada fichero es un mensaje del usuario local; las respuestas van a salida\\respuestas.txt.
                 buzon.sondear((nombre, texto) -> servicio.recibir("buzon", "local", texto));
+                if (Files.deleteIfExists(datos.resolve("parar.txt"))) {
+                    registro.accept("Jarvis se apaga (datos\\parar.txt).");
+                    salir[0] = true;
+                    break;
+                }
                 if (!servicio.procesarUno()) {
                     Thread.sleep(1000);
                 }
