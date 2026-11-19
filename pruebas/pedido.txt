@@ -1,1 +1,1 @@
-Programa para hoy a las 23:50 que me digas cuantos expedientes hay en la lista de MN, solo mirando.
+Hazme un Excel con 4 clientes ficticios (nombre, ciudad, importe) y un PDF de una pagina que resuma ese listado, y una cita de calendario para el lunes 30 de noviembre de 2026 a las 10:00 llamada Revision de altas. Dejalo todo en la carpeta de trabajo.

@@ -79,6 +79,7 @@ public final class Agente {
     private final Consumer<String> registro;
     private Expediente expediente;
     private es.amagna.asistente.jarvis.Ficheros ficheros;
+    private es.amagna.asistente.jarvis.Oficina oficina;
     private es.amagna.asistente.jarvis.Web web;
 
     /** Le da lectura de páginas web (solo https, nunca la red interna). */
@@ -90,6 +91,7 @@ public final class Agente {
     /** Le da manos para ficheros (solo dentro de las carpetas permitidas de {@code Ficheros}). */
     public Agente conFicheros(es.amagna.asistente.jarvis.Ficheros f) {
         this.ficheros = f;
+        this.oficina = new es.amagna.asistente.jarvis.Oficina(f);
         return this;
     }
     private java.util.Set<String> puede = java.util.Set.of();
@@ -297,6 +299,21 @@ public final class Agente {
             h.add(Json.obj("name", "mover_fichero", "description", "Mueve o renombra un fichero (sin sobrescribir). Para copiar usa copiar=true.",
                     "input_schema", Json.obj("type", "object", "properties", Json.obj("origen", Json.obj("type", "string"),
                             "destino", Json.obj("type", "string"), "copiar", Json.obj("type", "boolean")), "required", List.of("origen", "destino"))));
+            h.add(Json.obj("name", "crear_documento", "description", "Crea un documento de oficina SIN pantalla, en las carpetas permitidas. "
+                    + "tipo=pdf|docx: 'titulo' y 'parrafos' (lista de líneas; «# » título, «## » subtítulo, «- » viñeta, línea vacía = espacio). "
+                    + "tipo=xlsx: 'hoja' y 'filas' (lista de filas; cada fila, lista de celdas texto o número; la primera fila es la cabecera). "
+                    + "tipo=cita: 'titulo', 'inicio' (AAAA-MM-DDTHH:mm), 'minutos', 'lugar', 'descripcion' → fichero .ics para añadir al calendario. "
+                    + "tipo=correo: 'para' (lista de direcciones), 'asunto', 'texto' → BORRADOR .eml que NO se envía. "
+                    + "No sobrescribe salvo sobrescribir=true.",
+                    "input_schema", Json.obj("type", "object", "properties", Json.obj("tipo", Json.obj("type", "string", "enum", List.of("pdf", "docx", "xlsx", "cita", "correo")),
+                            "ruta", Json.obj("type", "string"), "titulo", Json.obj("type", "string"), "parrafos", Json.obj("type", "array", "items", Json.obj("type", "string")),
+                            "hoja", Json.obj("type", "string"), "filas", Json.obj("type", "array", "items", Json.obj("type", "array")),
+                            "inicio", Json.obj("type", "string"), "minutos", Json.obj("type", "integer"), "lugar", Json.obj("type", "string"),
+                            "descripcion", Json.obj("type", "string"), "para", Json.obj("type", "array", "items", Json.obj("type", "string")),
+                            "asunto", Json.obj("type", "string"), "texto", Json.obj("type", "string"), "sobrescribir", Json.obj("type", "boolean")),
+                            "required", List.of("tipo", "ruta"))));
+            h.add(Json.obj("name", "leer_documento", "description", "Lee el texto de un Word (.docx) o Excel (.xlsx) sin abrir ningún programa.",
+                    "input_schema", Json.obj("type", "object", "properties", Json.obj("ruta", Json.obj("type", "string")), "required", List.of("ruta"))));
             h.add(Json.obj("name", "quitar_fichero", "description", "«Borra» un fichero mandándolo a _papelera (recuperable).",
                     "input_schema", Json.obj("type", "object", "properties", Json.obj("ruta", Json.obj("type", "string")), "required", List.of("ruta"))));
         }
@@ -510,6 +527,8 @@ public final class Agente {
                 case "escribir_fichero" -> ficheros.escribir((String) in.get("ruta"), String.valueOf(in.get("texto")), Boolean.TRUE.equals(in.get("sobrescribir")));
                 case "mover_fichero" -> Boolean.TRUE.equals(in.get("copiar")) ? ficheros.copiar((String) in.get("origen"), (String) in.get("destino"))
                         : ficheros.mover((String) in.get("origen"), (String) in.get("destino"));
+                case "crear_documento" -> oficina.crear(String.valueOf(in.get("tipo")), String.valueOf(in.get("ruta")), in);
+                case "leer_documento" -> oficina.leerDocumento((String) in.get("ruta"));
                 default -> ficheros.aLaPapelera((String) in.get("ruta"));
             };
             return List.of(textoBloque(r));
@@ -523,7 +542,7 @@ public final class Agente {
             return List.of(textoBloque(web.leer(String.valueOf(in.get("url")))));
         }
         if (ficheros != null && java.util.Set.of("listar_carpeta", "leer_fichero", "buscar_ficheros", "escribir_fichero", "mover_fichero",
-                "quitar_fichero").contains(accion)) {
+                "quitar_fichero", "crear_documento", "leer_documento").contains(accion)) {
             return ejecutarFicheros(accion, in);
         }
         if (ventanas == null) {

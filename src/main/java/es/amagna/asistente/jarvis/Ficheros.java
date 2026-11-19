@@ -109,6 +109,26 @@ public final class Ficheros {
         return "Escrito «" + ruta + "» (" + texto.length() + " caracteres).";
     }
 
+    /** Igual que {@link #escribir} pero para ficheros binarios (PDF, Word, Excel…). */
+    public String escribirBytes(String ruta, byte[] datos, boolean sobrescribir) throws IOException {
+        Path p = dentro(ruta);
+        nombreSeguro(p);
+        if (Files.exists(p) && !sobrescribir) {
+            throw new IllegalArgumentException("Ya existe «" + ruta + "». Si quieres reemplazarlo, dilo (sobrescribir=true).");
+        }
+        if (Files.exists(p)) {
+            papelera(p);
+        }
+        Files.createDirectories(p.getParent());
+        Files.write(p, datos);
+        return "Creado «" + ruta + "» (" + tam(p) + ").";
+    }
+
+    /** La ruta, ya comprobada, para quien necesite leer un fichero suyo (documentos de oficina). */
+    public Path rutaPermitida(String ruta) {
+        return dentro(ruta);
+    }
+
     public String copiar(String origen, String destino) throws IOException {
         Path o = dentro(origen);
         Path d = dentro(destino);

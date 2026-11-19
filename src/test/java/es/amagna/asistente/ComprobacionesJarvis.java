@@ -35,6 +35,7 @@ final class ComprobacionesJarvis {
             telegram();
             buzon();
             programadas();
+            oficina();
             ficheros();
             web();
         } catch (IOException e) {
@@ -201,6 +202,67 @@ final class ComprobacionesJarvis {
         canal.enviar("respuestas", "hola");
         canal.enviar("respuestas", "adiós");
         ok(Files.readString(raiz.resolve("salida").resolve("respuestas.txt")).equals("hola\nadiós\n"), "buzón: las respuestas se van añadiendo");
+    }
+
+    static void oficina() throws IOException {
+        Path d = Files.createTempDirectory("ofi");
+        var f = new es.amagna.asistente.jarvis.Ficheros(List.of(d));
+        var o = new es.amagna.asistente.jarvis.Oficina(f);
+        java.util.Map<String, Object> in = new java.util.HashMap<>();
+        in.put("titulo", "Informe ñ");
+        List<String> par = new ArrayList<>(List.of("# Uno", "Texto áéí (con) \\ & <x>", "- viñeta"));
+        for (int i = 0; i < 90; i++) {
+            par.add("Párrafo largo " + i + " para forzar varias páginas en el PDF de comprobación, con bastante texto para que ajuste líneas.");
+        }
+        in.put("parrafos", par);
+        o.crear("pdf", d + "/a", in);
+        byte[] pdf = Files.readAllBytes(d.resolve("a.pdf"));
+        String cab = new String(pdf, 0, 8, java.nio.charset.StandardCharsets.ISO_8859_1);
+        String pie = new String(pdf, pdf.length - 6, 6, java.nio.charset.StandardCharsets.ISO_8859_1);
+        ok(cab.startsWith("%PDF-1.4") && pie.contains("%%EOF") && new String(pdf, java.nio.charset.StandardCharsets.ISO_8859_1).contains("/Count 4"),
+                "oficina: el PDF se genera con cabecera, pie y varias páginas");
+        o.crear("docx", d + "/a.docx", in);
+        String dx = o.leerDocumento(d + "/a.docx");
+        ok(dx.contains("Informe ñ") && dx.contains("Texto áéí (con) \\ & <x>") && dx.contains("•  viñeta"), "oficina: el Word se escribe y se vuelve a leer igual");
+        in.put("hoja", "Clientes");
+        in.put("filas", List.of(List.of("Nombre", "Importe"), List.of("Ana & Co", 12.5), List.of("=1+1", 3L)));
+        o.crear("xlsx", d + "/a.xlsx", in);
+        String xl = o.leerDocumento(d + "/a.xlsx");
+        ok(xl.contains("Ana & Co\t12.5") && xl.contains("=1+1\t3"), "oficina: el Excel se escribe y se vuelve a leer (y «=» queda como texto)");
+        java.util.Map<String, Object> c = new java.util.HashMap<>();
+        c.put("titulo", "Reunión; con, Ana");
+        c.put("inicio", "2026-11-25T10:30");
+        c.put("minutos", 45L);
+        o.crear("cita", d + "/c", c);
+        String ics = Files.readString(d.resolve("c.ics"));
+        ok(ics.contains("DTSTART:20261125T103000") && ics.contains("DTEND:20261125T111500") && ics.contains("SUMMARY:Reunión\\; con\\, Ana"), "oficina: la cita .ics tiene hora y escapes");
+        java.util.Map<String, Object> m = new java.util.HashMap<>();
+        m.put("para", List.of("ana@example.com"));
+        m.put("asunto", "Hola");
+        m.put("texto", "Cuerpo");
+        String r = o.crear("correo", d + "/m", m);
+        ok(r.contains("BORRADOR") && Files.readString(d.resolve("m.eml")).startsWith("X-Unsent: 1"), "oficina: el correo es un borrador, no se envía");
+        m.put("para", List.of("no-es-correo"));
+        boolean malo = false;
+        try {
+            o.crear("correo", d + "/m2", m);
+        } catch (IllegalArgumentException e) {
+            malo = true;
+        }
+        ok(malo && !Files.exists(d.resolve("m2.eml")), "oficina: rechaza una dirección de correo mala");
+        boolean fuera = false;
+        try {
+            o.crear("pdf", "/tmp/fuera.pdf", in);
+        } catch (IllegalArgumentException e) {
+            fuera = e.getMessage().contains("NO PERMITIDO");
+        }
+        boolean existe = false;
+        try {
+            o.crear("pdf", d + "/a.pdf", in);
+        } catch (IllegalArgumentException e) {
+            existe = e.getMessage().contains("Ya existe");
+        }
+        ok(fuera && existe, "oficina: no escribe fuera de las carpetas permitidas ni sobrescribe sin decirlo");
     }
 
     static void programadas() throws IOException {
