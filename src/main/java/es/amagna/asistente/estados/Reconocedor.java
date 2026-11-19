@@ -58,7 +58,8 @@ public final class Reconocedor {
             String n = Receta.norm(w.titulo());
             for (Mapa.Estado e : mapa.estados()) {
                 if (coincide(n, e.ventana()) && (e.contiene().isBlank()
-                        || llano(textoDe.apply(w.titulo())).contains(llano(e.contiene())))) {
+                        || llano(textoDe.apply(w.titulo())).contains(llano(e.contiene())))
+                        && (e.con().isBlank() || hay(ventanas, e.con())) && (e.sin().isBlank() || !hay(ventanas, e.sin()))) {
                     return e.nombre();
                 }
             }
@@ -71,6 +72,16 @@ public final class Reconocedor {
         return "fuera";
     }
 
+    /** ¿Hay entre las abiertas alguna cuyo título (con los números como #) contenga eso? */
+    private static boolean hay(List<Ventana> ventanas, String trozo) {
+        for (Ventana w : ventanas) {
+            if (Receta.norm(w.titulo()).contains(trozo)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     static String llano(String t) {
         return java.text.Normalizer.normalize(t == null ? "" : t, java.text.Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "").toLowerCase(java.util.Locale.ROOT);
@@ -80,6 +91,9 @@ public final class Reconocedor {
     static boolean coincide(String titulo, String patron) {
         if (titulo.equals(patron)) {
             return true;
+        }
+        if (patron.startsWith("*")) { // «*- Editar Cliente»: el título acaba así (delante va el nombre del cliente)
+            return titulo.endsWith(patron.substring(1).strip());
         }
         String base = patron.replaceAll("(\\.\\.\\.|…)$", "").strip();
         return !base.equals(patron) && !base.isEmpty() && titulo.startsWith(base);

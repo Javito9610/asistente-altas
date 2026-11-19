@@ -1,0 +1,15 @@
+# Cliente ficticio de prueba (UTF-8). Empresa de prueba.
+cliente_nombre=NOELIA TESTEO PRUEBA
+cliente_nif=99887755C
+cliente_telefono=600 11 22 33
+cliente_movil=600 11 22 33
+cliente_correo=noelia.testeo.prueba@ejemplo-invalido.test
+cliente_direccion=Calle de Proba 9
+cliente_cp=15001
+cliente_poblacion=Coruña, A
+cliente_carpeta=NOELIA TESTEO PRUEBA\
+adjunto=C:\Proyectos\asistente-altas\pruebas\ficha\dni-prueba.txt
+adjunto2=C:\Proyectos\asistente-altas\pruebas\ficha\hoja-encargo-prueba.txt
+adjunto3=C:\Proyectos\asistente-altas\pruebas\ficha\justificante-prueba.txt
+adjuntos_total=3
+adjuntos_inicios=dni-prueba|hoja-encargo|justificante

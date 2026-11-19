@@ -27,9 +27,19 @@ import java.util.Map;
  * ventana principal) no hace falta declararlos, pero sí sus transiciones.
  */
 public final class Mapa {
-    public record Estado(String nombre, String ventana, String contiene) {
+    /**
+     * Un estado es una ventana por su título. {@code contiene}: texto que ha de leerse dentro de ella. {@code con} y
+     * {@code sin}: otra ventana (por su título, con los números como #) que ha de estar o NO estar entre las abiertas;
+     * sirve para distinguir dos ventanas que se llaman igual (la lista «Clientes» y el selector «Clientes» de un expediente).
+     * En {@code ventana}, un «*» delante vale «cualquier cosa y luego esto».
+     */
+    public record Estado(String nombre, String ventana, String contiene, String con, String sin) {
+        public Estado(String nombre, String ventana, String contiene) {
+            this(nombre, ventana, contiene, "", "");
+        }
+
         public Estado(String nombre, String ventana) {
-            this(nombre, ventana, "");
+            this(nombre, ventana, "", "", "");
         }
     }
 
@@ -112,7 +122,8 @@ public final class Mapa {
         List<Estado> es = new ArrayList<>();
         for (Object o : (List<Object>) raiz.getOrDefault("estados", List.of())) {
             Map<String, Object> m = (Map<String, Object>) o;
-            es.add(new Estado((String) m.get("nombre"), Receta.norm((String) m.get("ventana")), String.valueOf(m.getOrDefault("contiene", ""))));
+            es.add(new Estado((String) m.get("nombre"), Receta.norm((String) m.get("ventana")), String.valueOf(m.getOrDefault("contiene", "")),
+                    Receta.norm(String.valueOf(m.getOrDefault("con", ""))), Receta.norm(String.valueOf(m.getOrDefault("sin", "")))));
         }
         List<Transicion> ts = new ArrayList<>();
         for (Object o : (List<Object>) raiz.getOrDefault("transiciones", List.of())) {

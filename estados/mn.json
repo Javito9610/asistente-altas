@@ -7,8 +7,12 @@
     {"nombre": "lista-expedientes", "ventana": "Expedientes"},
     {"nombre": "formulario-expediente", "ventana": "Expediente 1/2026"},
     {"nombre": "selector-tipo", "ventana": "Tipo de Expediente"},
-    {"nombre": "selector-cliente", "ventana": "Clientes"},
+    {"nombre": "selector-cliente", "ventana": "Clientes", "con": "Expediente #"},
+    {"nombre": "lista-clientes", "ventana": "Clientes", "sin": "Expediente #"},
+    {"nombre": "alta-cliente", "ventana": "Alta Cliente"},
+    {"nombre": "editar-cliente", "ventana": "*- Editar Cliente"},
     {"nombre": "atencion-salir", "ventana": "Atención", "contiene": "salir"},
+    {"nombre": "atencion-guardar", "ventana": "Atención", "contiene": "guardar los cambios"},
     {"nombre": "atencion", "ventana": "Atención"},
     {"nombre": "selector-contrario", "ventana": "Contrarios"},
     {"nombre": "aviso-informacion", "ventana": "Información"},
@@ -228,9 +232,210 @@
        {"accion": "left_click", "ventana": "Expediente 1/2026", "rel": [317, 519], "in": {}},
        {"accion": "wait", "in": {"duration": 2}},
        {"accion": "esperar_a", "ventana": "Cargando", "in": {"que": "desaparezca", "ventana": "Cargando", "segundos": 20, "_opcional": true}}
+     ]},
+
+    {"nombre": "abrir-lista-clientes", "de": "lista-expedientes", "a": "lista-clientes", "segundos": 60,
+     "pasos": [
+       {"accion": "left_click", "ventana": "MNprogram - Abogados", "rel": [132, 62], "in": {}},
+       {"accion": "wait", "in": {"duration": 3}},
+       {"accion": "esperar_a", "in": {"que": "aparezca", "ventana": "Clientes", "segundos": 20}},
+       {"accion": "esperar_a", "in": {"que": "pantalla quieta", "segundos": 10, "_opcional": true}}
+     ]},
+
+    {"nombre": "buscar-cliente", "de": "lista-clientes", "a": "lista-clientes|editar-cliente", "segundos": 40,
+     "pasos": [
+       {"accion": "left_click", "ventana": "Clientes", "rel": [194, 76], "in": {}},
+       {"accion": "key", "in": {"text": "ctrl+a"}},
+       {"accion": "type", "in": {"text": "{cliente_nif}"}},
+       {"accion": "key", "in": {"text": "Return"}},
+       {"accion": "wait", "in": {"duration": 3}},
+       {"accion": "esperar_a", "in": {"que": "pantalla quieta", "segundos": 10, "_opcional": true}}
+     ]},
+
+    {"nombre": "cerrar-editar-cliente", "de": "editar-cliente", "a": "lista-clientes", "segundos": 15,
+     "pasos": [
+       {"accion": "left_click", "ventana": "Editar Cliente", "rel": [761, 8], "in": {}},
+       {"accion": "wait", "in": {"duration": 2}}
+     ]},
+
+    {"nombre": "cerrar-lista-clientes", "de": "lista-clientes", "a": "lista-expedientes", "segundos": 15,
+     "pasos": [
+       {"accion": "key", "in": {"text": "Escape"}}
+     ]},
+
+    {"nombre": "comprobar-cliente-no-existe", "de": "lista-clientes", "a": "lista-clientes", "segundos": 60,
+     "pasos": [
+       {"accion": "auditar", "ventana": "Clientes", "in": {"ventana": "Clientes", "esperado": {"Núm. Clientes": "0"}}}
+     ]},
+
+    {"nombre": "pulsar-alta-cliente", "de": "lista-clientes", "a": "alta-cliente", "segundos": 40,
+     "pasos": [
+       {"accion": "pulsar_control", "ventana": "Clientes", "in": {"ventana": "Clientes", "control": "#btnAlta"}},
+       {"accion": "esperar_a", "in": {"que": "aparezca", "ventana": "Alta Cliente", "segundos": 15}},
+       {"accion": "esperar_a", "in": {"que": "pantalla quieta", "segundos": 10, "_opcional": true}}
+     ]},
+
+    {"nombre": "rellenar-cliente", "de": "alta-cliente", "a": "alta-cliente", "segundos": 150,
+     "pasos": [
+       {"accion": "esperar_a", "in": {"que": "pantalla quieta", "segundos": 10, "_opcional": true}},
+       {"accion": "left_click", "ventana": "Alta Cliente", "rel": [172, 97], "in": {}},
+       {"accion": "key", "in": {"text": "ctrl+a"}},
+       {"accion": "type", "in": {"text": "{cliente_nombre}"}},
+       {"accion": "left_click", "ventana": "Alta Cliente", "rel": [462, 97], "in": {}},
+       {"accion": "key", "in": {"text": "ctrl+a"}},
+       {"accion": "type", "in": {"text": "{cliente_nif}"}},
+       {"accion": "left_click", "ventana": "Alta Cliente", "rel": [76, 140], "in": {"_si": "cliente_telefono"}},
+       {"accion": "key", "in": {"text": "ctrl+a", "_si": "cliente_telefono"}},
+       {"accion": "type", "in": {"text": "{cliente_telefono}", "_si": "cliente_telefono"}},
+       {"accion": "left_click", "ventana": "Alta Cliente", "rel": [172, 184], "in": {"_si": "cliente_direccion"}},
+       {"accion": "key", "in": {"text": "ctrl+a", "_si": "cliente_direccion"}},
+       {"accion": "type", "in": {"text": "{cliente_direccion}", "_si": "cliente_direccion"}},
+       {"accion": "left_click", "ventana": "Alta Cliente", "rel": [462, 184], "in": {"_si": "cliente_cp"}},
+       {"accion": "key", "in": {"text": "ctrl+a", "_si": "cliente_cp"}},
+       {"accion": "type", "in": {"text": "{cliente_cp}\t", "_si": "cliente_cp"}},
+       {"accion": "wait", "in": {"duration": 2, "_si": "cliente_cp"}},
+       {"accion": "key", "in": {"text": "Tab", "_si": "cliente_cp"}},
+       {"accion": "wait", "in": {"duration": 2, "_si": "cliente_cp"}},
+       {"accion": "type", "in": {"text": "{cliente_poblacion}", "_si": "cliente_poblacion"}},
+       {"accion": "wait", "in": {"duration": 1, "_si": "cliente_poblacion"}},
+       {"accion": "key", "in": {"text": "ctrl+a", "_si": "cliente_poblacion"}},
+       {"accion": "type", "in": {"text": "{cliente_poblacion}\t", "_si": "cliente_poblacion"}},
+       {"accion": "wait", "in": {"duration": 1, "_si": "cliente_poblacion"}},
+       {"accion": "left_click", "ventana": "Alta Cliente", "rel": [268, 140], "in": {"_si": "cliente_movil"}},
+       {"accion": "wait", "in": {"duration": 2, "_si": "cliente_movil"}},
+       {"accion": "wait", "in": {"duration": 2, "_si": "cliente_movil"}},
+       {"accion": "type", "in": {"text": "{cliente_movil}", "_si": "cliente_movil"}},
+       {"accion": "wait", "in": {"duration": 1, "_si": "cliente_movil"}},
+       {"accion": "left_click", "ventana": "Teléfono Móvil", "rel": [77, 58], "in": {"_si": "cliente_movil"}},
+       {"accion": "wait", "in": {"duration": 2, "_si": "cliente_movil"}},
+       {"accion": "left_click", "ventana": "Alta Cliente", "rel": [557, 140], "in": {"_si": "cliente_correo"}},
+       {"accion": "wait", "in": {"duration": 2, "_si": "cliente_correo"}},
+       {"accion": "wait", "in": {"duration": 2, "_si": "cliente_correo"}},
+       {"accion": "left_click", "ventana": "Alta Cliente", "rel": [557, 140], "in": {"_si": "cliente_correo"}},
+       {"accion": "wait", "in": {"duration": 3, "_si": "cliente_correo"}},
+       {"accion": "type", "in": {"text": "n", "_si": "cliente_correo"}},
+       {"accion": "wait", "in": {"duration": 2, "_si": "cliente_correo"}},
+       {"accion": "left_click", "ventana": "Dirección Correo Electrónico", "rel": [179, 6], "in": {"_si": "cliente_correo"}},
+       {"accion": "key", "in": {"text": "ctrl+a", "_si": "cliente_correo"}},
+       {"accion": "type", "in": {"text": "{cliente_correo}", "_si": "cliente_correo"}},
+       {"accion": "left_click", "ventana": "Dirección Correo Electrónico", "rel": [136, 92], "in": {"_si": "cliente_correo"}},
+       {"accion": "wait", "in": {"duration": 2, "_si": "cliente_correo"}},
+       {"accion": "left_click", "ventana": "Direcciones de Correo Electrónico", "rel": [429, 207], "in": {"_si": "cliente_correo"}},
+       {"accion": "wait", "in": {"duration": 2, "_si": "cliente_correo"}}
+     ]},
+
+    {"nombre": "adjuntar-cliente", "de": "alta-cliente", "a": "alta-cliente", "segundos": 300,
+     "pasos": [
+       {"accion": "left_click", "ventana": "Alta Cliente", "rel": [59, 274], "in": {"_si": "adjunto"}},
+       {"accion": "wait", "in": {"duration": 2, "_si": "adjunto"}},
+       {"accion": "left_click", "ventana": "Alta Cliente", "rel": [17, 304], "in": {"_si": "adjunto"}},
+       {"accion": "wait", "in": {"duration": 1, "_si": "adjunto"}},
+       {"accion": "left_click", "ventana": "Alta Cliente", "rel": [97, 385], "in": {"_si": "adjunto"}},
+       {"accion": "esperar_a", "in": {"que": "aparezca", "ventana": "Abrir", "segundos": 30, "_si": "adjunto"}},
+       {"accion": "type", "in": {"text": "{adjunto}", "_si": "adjunto"}},
+       {"accion": "wait", "in": {"duration": 1, "_si": "adjunto"}},
+       {"accion": "key", "in": {"text": "Return", "_si": "adjunto"}},
+       {"accion": "esperar_a", "in": {"que": "aparezca", "ventana": "Establece el nombre de la carpeta", "segundos": 20, "_si": "adjunto"}},
+       {"accion": "left_click", "ventana": "Establece el nombre de la carpeta", "rel": [59, 22], "in": {"_si": "adjunto"}},
+       {"accion": "type", "in": {"text": "{cliente_carpeta}", "_si": "adjunto"}},
+       {"accion": "left_click", "ventana": "Establece el nombre de la carpeta", "rel": [12, 60], "in": {"_si": "adjunto"}},
+       {"accion": "wait", "in": {"duration": 3, "_si": "adjunto"}},
+       {"accion": "esperar_a", "in": {"que": "aparezca", "ventana": "Documento", "segundos": 30, "_si": "adjunto"}},
+       {"accion": "pulsar_control", "ventana": "Documento", "in": {"ventana": "Documento", "control": "boton:Aceptar", "_si": "adjunto"}},
+       {"accion": "wait", "in": {"duration": 2, "_si": "adjunto"}},
+       {"accion": "left_click", "ventana": "Alta Cliente", "rel": [17, 304], "in": {"_si": "adjunto2"}},
+       {"accion": "wait", "in": {"duration": 1, "_si": "adjunto2"}},
+       {"accion": "left_click", "ventana": "Alta Cliente", "rel": [97, 385], "in": {"_si": "adjunto2"}},
+       {"accion": "esperar_a", "in": {"que": "aparezca", "ventana": "Abrir", "segundos": 30, "_si": "adjunto2"}},
+       {"accion": "type", "in": {"text": "{adjunto2}", "_si": "adjunto2"}},
+       {"accion": "wait", "in": {"duration": 1, "_si": "adjunto2"}},
+       {"accion": "key", "in": {"text": "Return", "_si": "adjunto2"}},
+       {"accion": "esperar_a", "in": {"que": "aparezca", "ventana": "Documento", "segundos": 30, "_si": "adjunto2"}},
+       {"accion": "pulsar_control", "ventana": "Documento", "in": {"ventana": "Documento", "control": "boton:Aceptar", "_si": "adjunto2"}},
+       {"accion": "wait", "in": {"duration": 2, "_si": "adjunto2"}},
+       {"accion": "left_click", "ventana": "Alta Cliente", "rel": [17, 304], "in": {"_si": "adjunto3"}},
+       {"accion": "wait", "in": {"duration": 1, "_si": "adjunto3"}},
+       {"accion": "left_click", "ventana": "Alta Cliente", "rel": [97, 385], "in": {"_si": "adjunto3"}},
+       {"accion": "esperar_a", "in": {"que": "aparezca", "ventana": "Abrir", "segundos": 30, "_si": "adjunto3"}},
+       {"accion": "type", "in": {"text": "{adjunto3}", "_si": "adjunto3"}},
+       {"accion": "wait", "in": {"duration": 1, "_si": "adjunto3"}},
+       {"accion": "key", "in": {"text": "Return", "_si": "adjunto3"}},
+       {"accion": "esperar_a", "in": {"que": "aparezca", "ventana": "Documento", "segundos": 30, "_si": "adjunto3"}},
+       {"accion": "pulsar_control", "ventana": "Documento", "in": {"ventana": "Documento", "control": "boton:Aceptar", "_si": "adjunto3"}},
+       {"accion": "wait", "in": {"duration": 2, "_si": "adjunto3"}},
+       {"accion": "left_click", "ventana": "Alta Cliente", "rel": [17, 304], "in": {"_si": "adjunto4"}},
+       {"accion": "wait", "in": {"duration": 1, "_si": "adjunto4"}},
+       {"accion": "left_click", "ventana": "Alta Cliente", "rel": [97, 385], "in": {"_si": "adjunto4"}},
+       {"accion": "esperar_a", "in": {"que": "aparezca", "ventana": "Abrir", "segundos": 30, "_si": "adjunto4"}},
+       {"accion": "type", "in": {"text": "{adjunto4}", "_si": "adjunto4"}},
+       {"accion": "wait", "in": {"duration": 1, "_si": "adjunto4"}},
+       {"accion": "key", "in": {"text": "Return", "_si": "adjunto4"}},
+       {"accion": "esperar_a", "in": {"que": "aparezca", "ventana": "Documento", "segundos": 30, "_si": "adjunto4"}},
+       {"accion": "pulsar_control", "ventana": "Documento", "in": {"ventana": "Documento", "control": "boton:Aceptar", "_si": "adjunto4"}},
+       {"accion": "wait", "in": {"duration": 2, "_si": "adjunto4"}},
+       {"accion": "left_click", "ventana": "Alta Cliente", "rel": [17, 304], "in": {"_si": "adjunto5"}},
+       {"accion": "wait", "in": {"duration": 1, "_si": "adjunto5"}},
+       {"accion": "left_click", "ventana": "Alta Cliente", "rel": [97, 385], "in": {"_si": "adjunto5"}},
+       {"accion": "esperar_a", "in": {"que": "aparezca", "ventana": "Abrir", "segundos": 30, "_si": "adjunto5"}},
+       {"accion": "type", "in": {"text": "{adjunto5}", "_si": "adjunto5"}},
+       {"accion": "wait", "in": {"duration": 1, "_si": "adjunto5"}},
+       {"accion": "key", "in": {"text": "Return", "_si": "adjunto5"}},
+       {"accion": "esperar_a", "in": {"que": "aparezca", "ventana": "Documento", "segundos": 30, "_si": "adjunto5"}},
+       {"accion": "pulsar_control", "ventana": "Documento", "in": {"ventana": "Documento", "control": "boton:Aceptar", "_si": "adjunto5"}},
+       {"accion": "wait", "in": {"duration": 2, "_si": "adjunto5"}},
+       {"accion": "left_click", "ventana": "Alta Cliente", "rel": [17, 304], "in": {"_si": "adjunto6"}},
+       {"accion": "wait", "in": {"duration": 1, "_si": "adjunto6"}},
+       {"accion": "left_click", "ventana": "Alta Cliente", "rel": [97, 385], "in": {"_si": "adjunto6"}},
+       {"accion": "esperar_a", "in": {"que": "aparezca", "ventana": "Abrir", "segundos": 30, "_si": "adjunto6"}},
+       {"accion": "type", "in": {"text": "{adjunto6}", "_si": "adjunto6"}},
+       {"accion": "wait", "in": {"duration": 1, "_si": "adjunto6"}},
+       {"accion": "key", "in": {"text": "Return", "_si": "adjunto6"}},
+       {"accion": "esperar_a", "in": {"que": "aparezca", "ventana": "Documento", "segundos": 30, "_si": "adjunto6"}},
+       {"accion": "pulsar_control", "ventana": "Documento", "in": {"ventana": "Documento", "control": "boton:Aceptar", "_si": "adjunto6"}},
+       {"accion": "wait", "in": {"duration": 2, "_si": "adjunto6"}}
+     ]},
+
+    {"nombre": "comprobar-cliente", "de": "alta-cliente", "a": "alta-cliente", "segundos": 60,
+     "pasos": [
+       {"accion": "auditar", "ventana": "Alta Cliente", "in": {"ventana": "Alta Cliente", "esperado": {"Nombre": "{cliente_nombre}", "NIF/CIF": "{cliente_nif}", "Teléfono": "{cliente_telefono}", "Móvil": "{cliente_movil}", "Correo Electrónico": "{cliente_correo}", "Dirección": "{cliente_direccion}", "Código Postal": "{cliente_cp}", "Población": "{cliente_poblacion}"}, "adjuntos_total": "{adjuntos_total}", "adjuntos_inicios": "{adjuntos_inicios}"}}
+     ]},
+
+    {"nombre": "guardar-cliente", "de": "alta-cliente", "a": "lista-clientes", "segundos": 60, "toca": true,
+     "pasos": [
+       {"accion": "left_click", "ventana": "Alta Cliente", "rel": [-1, 598], "in": {}},
+       {"accion": "wait", "in": {"duration": 3}},
+       {"accion": "esperar_a", "in": {"que": "desaparezca", "ventana": "Alta Cliente", "segundos": 20}},
+       {"accion": "esperar_a", "in": {"que": "pantalla quieta", "segundos": 10, "_opcional": true}}
+     ]},
+
+    {"nombre": "verificar-cliente-guardado", "de": "lista-clientes", "a": "lista-clientes", "segundos": 60,
+     "pasos": [
+       {"accion": "auditar", "ventana": "Clientes", "in": {"ventana": "Clientes", "esperado": {"Núm. Clientes": "1"}}}
+     ]},
+
+    {"nombre": "cancelar-alta-cliente", "de": "alta-cliente", "a": "atencion-guardar|lista-clientes", "segundos": 20,
+     "pasos": [
+       {"accion": "left_click", "ventana": "Alta Cliente", "rel": [80, 598], "in": {}}
+     ]},
+
+    {"nombre": "no-guardar-cambios", "de": "atencion-guardar", "a": "lista-clientes", "segundos": 20,
+     "pasos": [
+       {"accion": "pulsar_hasta", "ventana": "Atención", "in": {"ventana": "Atención", "control": "boton:No", "hasta": "!«Atención»", "segundos": 15}}
      ]}
   ],
   "tareas": {
+    "crear-cliente": [
+      {"ir": "lista-clientes"},
+      {"hacer": "buscar-cliente"},
+      {"si": ["editar-cliente"], "ir": "lista-clientes"},
+      {"hacer": "comprobar-cliente-no-existe"},
+      {"hacer": "pulsar-alta-cliente"},
+      {"hacer": "rellenar-cliente"},
+      {"hacer": "adjuntar-cliente"},
+      {"hacer": "comprobar-cliente"},
+      {"hacer": "guardar-cliente"},
+      {"hacer": "verificar-cliente-guardado"}
+    ],
     "crear-expediente": [
       {"ir": "lista-expedientes"},
       {"hacer": "alta"},

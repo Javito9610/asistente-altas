@@ -1309,6 +1309,21 @@ public final class Comprobaciones {
                 "estados: con el selector delante, las ventanas de debajo están bloqueadas y no cuentan");
         ok(es.amagna.asistente.estados.Reconocedor.estado(mapa, "- «Cargando...» (MNprogram) [delante]\n" + ventanasDe("inicio")).equals("cargando"),
                 "estados: «Cargando...» se reconoce");
+        String mnc = "- «MNprogram - Abogados - Empresa de prueba [\\Usu1] Año 2026» (MNprogram)\n";
+        ok(es.amagna.asistente.estados.Reconocedor.estado(mapa, "- «Clientes» (GestorConsultas) [delante, con el foco]\n- «Expedientes» (GestorConsultas)\n" + mnc)
+                        .equals("lista-clientes")
+                        && es.amagna.asistente.estados.Reconocedor.estado(mapa, ventanasDe("selector")).equals("selector-cliente"),
+                "estados: la lista «Clientes» y el selector «Clientes» de un expediente se distinguen (el selector tiene un expediente debajo)");
+        ok(es.amagna.asistente.estados.Reconocedor.estado(mapa, "- «Alta Cliente» (GestorConsultas) [delante, con el foco]\n- «Clientes» (GestorConsultas) [BLOQUEADA: tiene un diálogo encima]\n" + mnc)
+                        .equals("alta-cliente")
+                        && es.amagna.asistente.estados.Reconocedor.estado(mapa, "- «NOELIA TESTEO PRUEBA - Editar Cliente» (GestorConsultas) [delante]\n- «Clientes» (GestorConsultas) [BLOQUEADA]\n" + mnc)
+                        .equals("editar-cliente"),
+                "estados: «Alta Cliente» y «<nombre> - Editar Cliente» (título que acaba así) se reconocen");
+        ok(es.amagna.asistente.estados.Reconocedor.estado(mapa, "- «Atención» (MNprogram) [delante]\n- «Alta Cliente» (GestorConsultas) [BLOQUEADA]\n" + mnc,
+                        t -> "Se va a cerrar la ficha. ¿Deseas guardar los cambios realizados?").equals("atencion-guardar"),
+                "estados: el aviso de «¿guardar los cambios?» de la ficha de cliente tiene su estado");
+        ok(mapa.tareas().containsKey("crear-cliente") && mapa.accion("guardar-cliente").toca() && !mapa.accion("rellenar-cliente").toca(),
+                "estados: la tarea crear-cliente existe y solo Guardar es irreversible");
         var c1 = es.amagna.asistente.estados.Planificador.camino(mapa, "fuera", "formulario-expediente");
         ok(c1 != null && c1.size() == 3 && c1.get(0).nombre().equals("abrir-mn") && c1.get(2).nombre().equals("alta"),
                 "estados: de «fuera» al formulario hay tres pasos: abrir MN, abrir la lista, Alta");
