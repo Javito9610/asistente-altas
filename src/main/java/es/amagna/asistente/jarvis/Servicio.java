@@ -50,6 +50,10 @@ public final class Servicio {
     }
     private final Map<String, java.util.ArrayDeque<String>> historial = new java.util.concurrent.ConcurrentHashMap<>();
 
+    public Programadas programadas() {
+        return programadas;
+    }
+
     public Servicio conProgramadas(Programadas p) {
         this.programadas = p;
         return this;

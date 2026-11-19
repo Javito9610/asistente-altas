@@ -930,6 +930,18 @@ public final class App {
                     },
                     () -> salir.set(true));
             if (ventana[0] != null) {
+                var progs = servicio.programadas();
+                ventana[0].conPaneles(
+                        () -> servicio.pausado() ? "Pausado" : almacen.en(es.amagna.asistente.jarvis.Trabajo.EN_CURSO).stream().findFirst()
+                                .map(t -> "Trabajando: " + (t.peticion().length() > 70 ? t.peticion().substring(0, 70) + "…" : t.peticion()))
+                                .orElse("Escuchando · " + almacen.todos().size() + " trabajos guardados"),
+                        () -> almacen.todos().stream().sorted((x, y) -> Long.compare(y.creado(), x.creado())).limit(60)
+                                .map(t -> new String[] {java.time.LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(t.creado()),
+                                        java.time.ZoneId.systemDefault()).toLocalTime().withNano(0).toString(), t.estado(), t.peticion(),
+                                        t.resultado() == null ? "" : t.resultado().replace('\n', ' ')}).toList(),
+                        () -> progs == null || progs.todas().isEmpty() ? "No hay nada programado.\n\nPídeselo por la conversación: «cada día laborable a las 9, mira cuántos expedientes hay»."
+                                : progs.todas().stream().map(p -> p.id() + " · " + p.hora() + (p.fecha().isEmpty() ? " (" + p.dias().size() + " días/sem)" : " el " + p.fecha())
+                                        + "\n    " + p.peticion()).collect(java.util.stream.Collectors.joining("\n\n")));
                 ventana[0].decir("Jarvis listo. Escríbeme lo que necesites (por ejemplo: «estado»).");
             }
         }
