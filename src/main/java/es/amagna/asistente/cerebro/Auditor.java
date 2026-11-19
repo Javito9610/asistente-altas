@@ -34,21 +34,19 @@ public final class Auditor {
 
     static final String SISTEMA = """
             Eres el auditor de un asistente que teclea datos en un programa de gestión de un despacho. Te enseño la \
-            captura de UNA ventana y la lista de lo que DEBE poner en cada campo. Tu trabajo es comprobar, campo a campo, \
-            que lo que se VE coincide con lo esperado.
+            captura de UNA ventana y la lista de los campos que me interesan. Tu trabajo es TRANSCRIBIR: decir qué se \
+            VE en cada uno. No juzgas si está bien o mal: eso lo decide el código comparando tu transcripción.
 
             Reglas:
-            - Solo cuenta lo que se ve en la captura. No supongas, no completes, no des por bueno lo que no se lee.
-            - Si un campo esperado no se ve o no se lee con claridad, va en "no_se_ve", y eso NO es un «ok».
-            - Compara el texto tal cual (ignora solo mayúsculas/minúsculas y espacios de sobra). Una letra distinta, un \
-            acento, una cifra o un nombre distinto es una diferencia.
-            - Un campo que debía estar vacío y tiene algo es una diferencia; uno vacío cuando debía tener valor también.
-            - Si ves algo raro en la ventana (un aviso, un campo en rojo, un diálogo encima), dilo en "otros".
+            - Solo cuenta lo que se ve en la captura. No supongas, no completes, no corrijas lo que lees.
+            - Para cada campo de la lista, pon en "vio" EXACTAMENTE el valor que se ve (solo el valor, sin la etiqueta del \
+            campo). Si el campo está vacío, pon "". Si el campo no se ve o no se lee con claridad, no lo pongas en "vio" \
+            y apúntalo en "no_se_ve". «No se ve» nunca cuenta como «bien».
+            - En "otros" apunta SOLO avisos, mensajes de error, campos en rojo o diálogos que tapen la ventana. NO apuntes \
+            lo normal: filtros activos, listas vacías, textos de ayuda, botones, nada que sea contenido corriente.
 
             Contesta SOLO un objeto JSON, sin texto antes ni después:
-            {"ok": true|false, "vio": {"campo": "lo que se ve"}, "diferencias": ["campo: esperado «x», se ve «y»"], \
-            "no_se_ve": ["campo"], "otros": []}
-            "ok" solo es true si TODOS los campos esperados se ven y coinciden y no hay nada raro.""";
+            {"vio": {"campo": "lo que se ve"}, "no_se_ve": ["campo"], "otros": []}""";
 
     /**
      * Lectura PURA de la lista de adjuntos: el modelo solo transcribe lo que ve (total y nombres tal como salen,
@@ -124,6 +122,20 @@ public final class Auditor {
     private Auditor() {
     }
 
+    /** Igual sin mirar mayúsculas, acentos ni espacios de sobra; un valor que la pantalla corta con «…» vale si es un principio del esperado. */
+    static boolean igualLeido(String leido, String esperado) {
+        String l = llano(leido).replaceAll("\\s+", " ").strip();
+        String e = llano(esperado).replaceAll("\\s+", " ").strip();
+        if (l.equals(e)) {
+            return true;
+        }
+        if (l.endsWith("...") || l.endsWith("…")) {
+            String base = l.replaceAll("(\\.\\.\\.|…)$", "").strip();
+            return !base.isEmpty() && e.startsWith(base);
+        }
+        return false;
+    }
+
     static String pregunta(Map<String, String> esperado, String queSeVe) {
         StringBuilder b = new StringBuilder("Esto es " + queSeVe + ". Esperado en cada campo:\n");
         for (var e : esperado.entrySet()) {
@@ -165,10 +177,6 @@ public final class Auditor {
         } catch (RuntimeException e) {
             return new Veredicto(false, List.of(), List.of("el auditor no ha dado un veredicto legible"), "");
         }
-        List<String> dif = new ArrayList<>();
-        for (Object o : (List<Object>) m.getOrDefault("diferencias", List.of())) {
-            dif.add(String.valueOf(o));
-        }
         List<String> falta = new ArrayList<>();
         for (Object o : (List<Object>) m.getOrDefault("no_se_ve", List.of())) {
             falta.add(String.valueOf(o));
@@ -178,14 +186,23 @@ public final class Auditor {
             otros.add(String.valueOf(o));
         }
         Map<String, Object> vio = (Map<String, Object>) m.getOrDefault("vio", Map.of());
-        // Cinturón y tirantes: aunque diga ok, si no ha visto un campo esperado, no vale.
-        for (String campo : esperado.keySet()) {
-            boolean visto = vio.keySet().stream().anyMatch(k -> k.equalsIgnoreCase(campo));
-            if (!visto && !falta.contains(campo) && !dif.stream().anyMatch(d -> d.toLowerCase().startsWith(campo.toLowerCase()))) {
-                falta.add(campo);
+        // El juez es el código, no el modelo: se compara lo transcrito con lo esperado, campo a campo.
+        List<String> dif = new ArrayList<>();
+        for (var e : esperado.entrySet()) {
+            String campo = e.getKey();
+            var visto = vio.entrySet().stream().filter(k -> k.getKey().equalsIgnoreCase(campo)).findFirst();
+            if (visto.isEmpty()) {
+                if (!falta.contains(campo)) {
+                    falta.add(campo);
+                }
+                continue;
+            }
+            String leido = String.valueOf(visto.get().getValue() == null ? "" : visto.get().getValue());
+            if (!igualLeido(leido, e.getValue())) {
+                dif.add(campo + ": esperado «" + e.getValue() + "», se ve «" + leido + "»");
             }
         }
-        boolean ok = Boolean.TRUE.equals(m.get("ok")) && dif.isEmpty() && falta.isEmpty() && otros.isEmpty();
+        boolean ok = dif.isEmpty() && falta.isEmpty() && otros.isEmpty();
         if (!otros.isEmpty()) {
             dif.addAll(otros.stream().map(o -> "ventana: " + o).toList());
         }

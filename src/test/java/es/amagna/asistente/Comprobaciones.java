@@ -1614,6 +1614,19 @@ public final class Comprobaciones {
         ok(!es.amagna.asistente.cerebro.Auditor.deJson("no sé", esp).ok()
                         && !es.amagna.asistente.cerebro.Auditor.deJson("{roto", esp).ok(),
                 "auditor: un veredicto ilegible no es OK");
+        var juezCodigo = es.amagna.asistente.cerebro.Auditor.deJson(
+                "{\"ok\": false, \"vio\": {\"Descripción Expediente\": \"micro\", \"Etapa\": \" PEND.  ENVIAR\"}, \"diferencias\": [\"lo que sea\"], \"no_se_ve\": [], \"otros\": []}", esp);
+        ok(juezCodigo.ok(), "auditor: el juez es el código: si lo transcrito coincide (mayúsculas, espacios) vale aunque el modelo diga otra cosa");
+        var corta = new java.util.LinkedHashMap<String, String>();
+        corta.put("Nombre", "hoja-encargo-prueba");
+        ok(es.amagna.asistente.cerebro.Auditor.deJson("{\"vio\": {\"Nombre\": \"hoja-encargo-pru...\"}, \"no_se_ve\": [], \"otros\": []}", corta).ok()
+                        && !es.amagna.asistente.cerebro.Auditor.deJson("{\"vio\": {\"Nombre\": \"otra-cosa...\"}, \"no_se_ve\": [], \"otros\": []}", corta).ok(),
+                "auditor: un valor cortado por la pantalla («…») vale solo si es un principio del esperado");
+        var vacio = new java.util.LinkedHashMap<String, String>();
+        vacio.put("Núm. Clientes", "0");
+        ok(es.amagna.asistente.cerebro.Auditor.deJson("{\"vio\": {\"Núm. Clientes\": \"0\"}, \"no_se_ve\": [], \"otros\": []}", vacio).ok()
+                        && !es.amagna.asistente.cerebro.Auditor.deJson("{\"vio\": {\"Núm. Clientes\": \"1\"}, \"no_se_ve\": [], \"otros\": []}", vacio).ok(),
+                "auditor: «Núm. Clientes» 0 vale y 1 no (un filtro activo o una lista vacía no son un aviso)");
         var raro = es.amagna.asistente.cerebro.Auditor.deJson(
                 "{\"ok\": true, \"vio\": {\"Descripción Expediente\": \"MICRO\", \"Etapa\": \"PEND. ENVIAR\"}, \"diferencias\": [], \"no_se_ve\": [], \"otros\": [\"hay un aviso rojo encima\"]}", esp);
         ok(!raro.ok(), "auditor: algo raro en la ventana (un aviso) tampoco es OK");

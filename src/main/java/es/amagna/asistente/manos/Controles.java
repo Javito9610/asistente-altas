@@ -246,6 +246,13 @@ public final class Controles {
             return sinUia();
         }
         try {
+            // Camino 1, sin desplegar nada: los menús de MN (WinForms) enseñan sus opciones por UIA aunque estén cerrados,
+            // y se pueden pulsar directamente. No depende de lo que tarde en dibujarse el desplegable.
+            String directa = pulsarRutaDirecta(raiz, ruta);
+            if (directa != null) {
+                return directa;
+            }
+            // Camino 2: desplegar nivel a nivel, esperando a que aparezca cada opción.
             Uia.Elemento actual = null;
             for (int i = 0; i < ruta.size(); i++) {
                 Uia.Elemento donde = actual == null ? raiz : actual;
@@ -297,6 +304,32 @@ public final class Controles {
             }
         } finally {
             raiz.close();
+        }
+    }
+
+    /** Baja por la ruta sin desplegar y pulsa la última opción. Devuelve null si algo no cuadra (se prueba el otro camino). */
+    private String pulsarRutaDirecta(Uia.Elemento raiz, List<String> ruta) {
+        Uia.Elemento actual = null;
+        try {
+            for (String nombre : ruta) {
+                Uia.Elemento hijo = hijoLlamado(actual == null ? raiz : actual, nombre, 6);
+                if (actual != null) {
+                    actual.close();
+                    actual = null;
+                }
+                if (hijo == null) {
+                    return null;
+                }
+                actual = hijo;
+            }
+            if (actual == null || !actual.activo()) {
+                return null;
+            }
+            return actual.pulsar() ? "Pulsado " + String.join(" > ", ruta) + " (directo)" : null;
+        } finally {
+            if (actual != null) {
+                actual.close();
+            }
         }
     }
 
