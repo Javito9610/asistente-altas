@@ -223,6 +223,18 @@ final class ComprobacionesJarvis {
             }
             var l = fi.drenarEntregas();
             ok(l.size() == 3 && raro && fi.drenarEntregas().isEmpty(), "ficheros: lo creado y lo pedido se entrega una vez; fuera de las carpetas, no");
+            Files.writeString(carp.resolve("clave.txt"), "x");
+            Files.createDirectories(carp.resolve("secretos"));
+            Files.writeString(carp.resolve("secretos").resolve("mn.dat"), "x");
+            boolean secreto = false;
+            for (String r0 : List.of("/clave.txt", "/secretos/mn.dat")) {
+                try {
+                    fi.entregar(carp + r0);
+                } catch (IllegalArgumentException e) {
+                    secreto = e.getMessage().contains("secretos") || secreto;
+                }
+            }
+            ok(secreto && fi.drenarEntregas().stream().noneMatch(x -> x.toString().contains("clave") || x.toString().contains("mn.dat")), "ficheros: no manda por el chat claves ni secretos");
             List<String> eco = new ArrayList<>();
             var sv = new Servicio(new Almacen(Files.createTempDirectory("alm")), new Interprete(p0 -> Map.of("content", List.of(Map.of("type", "text", "text", "{\"tipo\":\"libre\",\"tarea\":\"x\",\"texto\":\"haz\"}"))), "m"),
                     t -> new Servicio.Resultado(true, "ok"), t -> {

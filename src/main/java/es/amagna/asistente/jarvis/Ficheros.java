@@ -139,6 +139,12 @@ public final class Ficheros {
             throw new IllegalArgumentException("Pesa demasiado para mandarlo (máximo 45 MB).");
         }
         nombreSeguro(p);
+        String bajo = p.toString().toLowerCase(Locale.ROOT).replace('\\', '/');
+        String nom = p.getFileName().toString().toLowerCase(Locale.ROOT);
+        if (bajo.contains("/secretos/") || bajo.contains("/.ssh/") || bajo.contains("/.git/") || List.of("clave.txt", "mn.dat", "autorizados.txt").contains(nom)
+                || List.of(".dat", ".key", ".pem", ".pfx", ".p12", ".kdbx", ".env").stream().anyMatch(nom::endsWith)) {
+            throw new IllegalArgumentException("NO PERMITIDO: ese fichero guarda claves o secretos y no se manda por el chat.");
+        }
         if (!aEntregar.contains(p)) {
             aEntregar.add(p);
         }
