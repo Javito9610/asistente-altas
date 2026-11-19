@@ -920,7 +920,7 @@ public final class App {
                     return b.length() == 0 ? "" : "Tareas libres ya aprendidas:\n" + b;
                 });
         servicio.arrancar();
-        boolean[] salir = {false};
+        var salir = new java.util.concurrent.atomic.AtomicBoolean(false);
         if (!a.contains("--sin-ventana")) {
             ventana[0] = es.amagna.asistente.jarvis.Ventana.abrir(
                     texto -> servicio.recibir("ventana", "local", texto),
@@ -928,7 +928,7 @@ public final class App {
                         servicio.pausar(!servicio.pausado());
                         ventana[0].pausado(servicio.pausado());
                     },
-                    () -> salir[0] = true);
+                    () -> salir.set(true));
             if (ventana[0] != null) {
                 ventana[0].decir("Jarvis listo. Escríbeme lo que necesites (por ejemplo: «estado»).");
             }
@@ -965,18 +965,32 @@ public final class App {
             }, "consola").start();
         }
         registro.accept("Jarvis en marcha. Autorizados: " + autorizados.size() + ". Trabajos guardados: " + almacen.todos().size() + ".");
-        while (!salir[0]) {
-            try {
-                // El buzón (datos\\buzon\\entrada\\*.txt): cada fichero es un mensaje del usuario local; las respuestas van a salida\\respuestas.txt.
-                buzon.sondear((nombre, texto) -> servicio.recibir("buzon", "local", texto));
-                if (Files.deleteIfExists(datos.resolve("parar.txt"))) {
-                    registro.accept("Jarvis se apaga (datos\\parar.txt).");
-                    salir[0] = true;
-                    break;
-                }
-                servicio.tic(java.time.LocalDateTime.now());
-                if (!servicio.procesarUno()) {
+        // Los oídos (buzón, programadas, orden de apagar) van en su hilo: así Jarvis sigue escuchando mientras trabaja.
+        Thread oidos = new Thread(() -> {
+            while (!salir.get()) {
+                try {
+                    // El buzón (datos\\buzon\\entrada\\*.txt): cada fichero es un mensaje del usuario local; las respuestas van a salida\\respuestas.txt.
+                    buzon.sondear((nombre, texto) -> servicio.recibir("buzon", "local", texto));
+                    if (Files.deleteIfExists(datos.resolve("parar.txt"))) {
+                        registro.accept("Jarvis se apaga cuando acabe lo que está haciendo (datos\\parar.txt).");
+                        salir.set(true);
+                        return;
+                    }
+                    servicio.tic(java.time.LocalDateTime.now());
                     Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    return;
+                } catch (IOException | RuntimeException e) {
+                    registro.accept("Oídos: " + e.getMessage());
+                }
+            }
+        }, "oidos");
+        oidos.setDaemon(true);
+        oidos.start();
+        while (!salir.get()) {
+            try {
+                if (!servicio.procesarUno()) {
+                    Thread.sleep(500);
                 }
             } catch (InterruptedException e) {
                 break;
