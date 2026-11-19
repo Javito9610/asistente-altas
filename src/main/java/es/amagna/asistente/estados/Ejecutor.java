@@ -20,6 +20,11 @@ public final class Ejecutor {
         default String texto(String ventana) {
             return "";
         }
+
+        /** Pone en orden lo que se pueda sin tocar MN (foco, visores). Devuelve lo que ha hecho, o vacío. */
+        default java.util.List<String> recuperar(Map<String, String> params) {
+            return java.util.List.of();
+        }
     }
 
     /** null = hecho; si no, el motivo. */
@@ -139,6 +144,7 @@ public final class Ejecutor {
                 break;
             } catch (Fallo f) {
                 registro.accept("  FALLO: " + f.getMessage());
+                ordenar(datos, "tras el fallo");
                 String vs = observa.ventanas();
                 registro.accept("  Ventanas en ese momento:\n" + vs);
                 guardarEvidencia(vs);
@@ -295,7 +301,18 @@ public final class Ejecutor {
         throw new Fallo("no he conseguido llegar a «" + destino + "» tras 8 intentos.");
     }
 
+    private void ordenar(Map<String, String> params, String motivo) {
+        try {
+            for (String h : observa.recuperar(params)) {
+                registro.accept("  RECUPERADOR (" + motivo + "): " + h);
+            }
+        } catch (RuntimeException e) {
+            registro.accept("  (el recuperador no ha podido mirar: " + e.getMessage() + ")");
+        }
+    }
+
     private void recorrer(Mapa.Transicion t, Map<String, String> params) {
+        ordenar(params, "antes de «" + t.nombre() + "»");
         registro.accept("  " + t.de() + " → " + t.a() + (t.nombre().isBlank() ? "" : " (" + t.nombre() + ")"));
         if (t.toca()) {
             comprometido = true; // desde el primer paso: un clic en Guardar puede haber guardado aunque lo demás falle

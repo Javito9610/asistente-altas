@@ -1331,6 +1331,33 @@ public final class Comprobaciones {
                         && es.amagna.asistente.estados.Reconocedor.estado(mapa, "- «Documento» (GestorConsultas) [delante]\n- «Alta Cliente» (GestorConsultas) [BLOQUEADA]\n" + mnc).equals("documento-adjunto")
                         && es.amagna.asistente.estados.Planificador.camino(mapa, "abrir-archivo", "alta-cliente").size() == 1,
                 "estados: los diálogos de importar adjuntos se reconocen y tienen salida sin guardar nada");
+        {
+            var hechos = new java.util.ArrayList<String>();
+            var mundo = new es.amagna.asistente.estados.Recuperador.Mundo() {
+                public boolean activar(String t) {
+                    hechos.add("activar:" + t);
+                    return true;
+                }
+
+                public boolean cerrar(String t) {
+                    hechos.add("cerrar:" + t);
+                    return true;
+                }
+            };
+            String pantalla = "- «Superposición de Herramienta Recortes» (SnippingTool) [delante, con el foco] [pos 0,0 tam 1x1]\n"
+                    + "- «Alta Cliente» (GestorConsultas) [pos 1,1 tam 5x5] — diálogos abiertos dentro: «Abrir»  [BLOQUEADA]\n"
+                    + "- «justificante-prueba.txt: Bloc de notas» (Notepad) [pos 1,1 tam 5x5]\n"
+                    + "- «*notas-de-Javi.txt: Bloc de notas» (Notepad) [pos 1,1 tam 5x5]\n"
+                    + "- «dni-prueba.txt - Bloc de notas» (Notepad) [minimizada]\n";
+            var params = java.util.Map.of("adjunto", "C:\\x\\pruebas\\ficha\\justificante-prueba.txt", "adjuntos_total", "3");
+            var r = es.amagna.asistente.estados.Recuperador.revisar(pantalla, params, mundo);
+            ok(r.size() == 2 && hechos.contains("cerrar:justificante-prueba.txt: Bloc de notas") && hechos.contains("activar:Abrir")
+                            && hechos.stream().noneMatch(x -> x.contains("notas-de-Javi") || x.contains("dni-prueba")),
+                    "recuperador: cierra solo el visor de un documento nuestro y devuelve el teclado al diálogo de MN; no toca lo ajeno");
+            hechos.clear();
+            ok(es.amagna.asistente.estados.Recuperador.revisar("- «Alta Cliente» (GestorConsultas) [delante, con el foco]\n", params, mundo).isEmpty() && hechos.isEmpty(),
+                    "recuperador: con MN delante y nada raro, no hace nada");
+        }
         var salir = es.amagna.asistente.estados.Planificador.camino(mapa, "alta-cliente", "lista-clientes");
         ok(salir != null && salir.stream().noneMatch(es.amagna.asistente.estados.Mapa.Transicion::toca)
                         && salir.get(0).nombre().equals("cancelar-alta-cliente"),

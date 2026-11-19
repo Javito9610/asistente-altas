@@ -832,6 +832,23 @@ public final class App {
                     return "";
                 }
             }
+
+            public java.util.List<String> recuperar(java.util.Map<String, String> params) {
+                var hecho = es.amagna.asistente.estados.Recuperador.revisar(ventanas.abiertas(), params,
+                        new es.amagna.asistente.estados.Recuperador.Mundo() {
+                            public boolean activar(String t) {
+                                return ventanas.activar(t);
+                            }
+
+                            public boolean cerrar(String t) {
+                                return ventanas instanceof es.amagna.asistente.manos.VentanasNativas vn && vn.cerrarVentana(t) != null;
+                            }
+                        });
+                for (String h : hecho) {
+                    es.amagna.asistente.estados.Aprendizaje.anotar(h);
+                }
+                return hecho;
+            }
         };
         java.util.function.Consumer<String> conHora = linea -> System.out.println(
                 "[" + java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")) + "] " + linea.stripLeading());
