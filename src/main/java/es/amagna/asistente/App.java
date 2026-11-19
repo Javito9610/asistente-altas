@@ -808,15 +808,23 @@ public final class App {
         es.amagna.asistente.estados.Ejecutor.Rescate rescate = null;
         if (!a.contains("--sin-ia") && Clave.hay()) {
             var esp = es.amagna.asistente.cerebro.Especialista.cargar("expedientes", MODELO_POR_DEFECTO, 400_000);
-            rescate = (nombre, situacion) -> {
-                Agente ag = new Agente(new ClaudeApi(Clave.leer()), new ManosRobot(false), ventanas, esp.modelo(), esp.instrucciones(),
-                        25, 300_000, System.out::println).conControles(ctrl).conExpediente(true);
-                var r = ag.ejecutar("El asistente está haciendo la tarea «" + nombre + "» en la Empresa de prueba y se ha atascado:\n"
-                        + situacion + "\n\nTU TRABAJO NO ES TERMINAR LA TAREA. Es dejar MN en un punto limpio para que el asistente "
-                        + "vuelva a empezar él solo: sin diálogos «Atención» o de aviso abiertos, sin formularios de expediente "
-                        + "abiertos (Cancelar y «Sí» para salir sin guardar) y sin selectores abiertos. Si el formulario ya estaba "
-                        + "GUARDADO, no lo toques y dilo. Termina con TERMINADO: y cómo ha quedado la pantalla.");
-                System.out.println("  IA: " + r.mensaje());
+            var ultimaGrabacion = new es.amagna.asistente.cerebro.Receta.Grabadora[1];
+            rescate = new es.amagna.asistente.estados.Ejecutor.Rescate() {
+                public void intentar(String nombre, String situacion) {
+                    ultimaGrabacion[0] = new es.amagna.asistente.cerebro.Receta.Grabadora();
+                    Agente ag = new Agente(new ClaudeApi(Clave.leer()), new ManosRobot(false), ventanas, esp.modelo(), esp.instrucciones(),
+                            25, 300_000, System.out::println).conControles(ctrl).conExpediente(true).grabando(ultimaGrabacion[0]);
+                    var r = ag.ejecutar("El asistente está haciendo la tarea «" + nombre + "» en la Empresa de prueba y se ha atascado:\n"
+                            + situacion + "\n\nTU TRABAJO NO ES TERMINAR LA TAREA. Es dejar MN en un punto limpio para que el asistente "
+                            + "vuelva a empezar él solo: sin diálogos «Atención» o de aviso abiertos, sin formularios de expediente "
+                            + "abiertos (Cancelar y «Sí» para salir sin guardar) y sin selectores abiertos. Si el formulario ya estaba "
+                            + "GUARDADO, no lo toques y dilo. Termina con TERMINADO: y cómo ha quedado la pantalla.");
+                    System.out.println("  IA: " + r.mensaje());
+                }
+
+                public java.util.List<es.amagna.asistente.cerebro.Receta.Paso> grabados() {
+                    return ultimaGrabacion[0] == null ? java.util.List.of() : ultimaGrabacion[0].pasosGrabados();
+                }
             };
             System.out.println("IA de guardia: solo entra si algo se atasca (máximo 2 empujones).");
         }
@@ -852,7 +860,8 @@ public final class App {
         };
         java.util.function.Consumer<String> conHora = linea -> System.out.println(
                 "[" + java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")) + "] " + linea.stripLeading());
-        var ej = new es.amagna.asistente.estados.Ejecutor(mapa, observa, hace, rescate, null, conHora);
+        var ej = new es.amagna.asistente.estados.Ejecutor(mapa, observa, hace, rescate, null, conHora)
+                .conLecciones(new es.amagna.asistente.estados.Lecciones(Path.of("aprendido", "lecciones.json")));
         var diario = new es.amagna.asistente.estados.Diario(Path.of("registro", "tareas-hechas.tsv"));
         return (tarea, params, clave, repetir) -> {
             // El diario: una tarea con clave que ya se hizo NO se repite (dos expedientes iguales es el peor error posible).

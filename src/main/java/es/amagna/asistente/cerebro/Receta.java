@@ -127,6 +127,10 @@ public final class Receta {
             return pasos.size();
         }
 
+        public List<Paso> pasosGrabados() {
+            return List.copyOf(pasos);
+        }
+
         /** Guarda la receta. params: nombre → valor que tenía esta vez (se sustituye por {nombre} donde aparezca). */
         public Receta aReceta(String nombre, Map<String, String> params) {
             return aReceta(nombre, "", params);

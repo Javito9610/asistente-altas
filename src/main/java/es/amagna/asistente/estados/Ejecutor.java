@@ -34,6 +34,11 @@ public final class Ejecutor {
 
     public interface Rescate {
         void intentar(String tarea, String situacion);
+
+        /** Los pasos que dio la IA en el último empujón (para que el asistente los aprenda). Vacío si no se graban. */
+        default List<Receta.Paso> grabados() {
+            return List.of();
+        }
     }
 
     public interface Reloj {
@@ -69,6 +74,15 @@ public final class Ejecutor {
     private final Observa observa;
     private final Hace hace;
     private final Rescate rescate;
+    private Lecciones lecciones;
+    /** La lección que se está probando en esta tarea: se confirma (o se castiga) según cómo acabe. */
+    private String leccionEnPrueba;
+
+    /** Lo que la IA enseñó otras veces: se repite antes de molestar a la IA. */
+    public Ejecutor conLecciones(Lecciones l) {
+        this.lecciones = l;
+        return this;
+    }
     private final Reloj reloj;
     private final java.util.function.Consumer<String> registro;
     private String numero = "";
@@ -177,17 +191,63 @@ public final class Ejecutor {
                     registro.accept("  Pantalla limpia con el mapa (sin IA); se reintenta la tarea desde ahí.");
                     continue;
                 }
+                String firma = Lecciones.firma(observa.ventanas(), textoDelDialogo(observa.ventanas()));
+                if (lecciones != null && leccionEnPrueba == null) {
+                    var l = lecciones.buscar(firma);
+                    if (l != null) {
+                        registro.accept("  Lo había aprendido: esta pantalla ya la resolvió la IA (" + l.exitos() + " éxitos, " + l.fallos()
+                                + " fallos). Repito sus " + l.pasos().size() + " pasos, sin IA.");
+                        String roto = null;
+                        for (Receta.Paso p : l.pasos()) {
+                            roto = hace.paso(p, datos);
+                            if (roto != null) {
+                                break;
+                            }
+                        }
+                        String despues = Lecciones.firma(observa.ventanas(), textoDelDialogo(observa.ventanas()));
+                        if (roto == null && !despues.equals(firma)) {
+                            leccionEnPrueba = firma;
+                            Aprendizaje.anotar("lección aplicada sin IA: " + firma);
+                            continue;
+                        }
+                        registro.accept("  La lección no ha servido" + (roto == null ? "" : " (" + roto + ")") + ".");
+                        lecciones.resultado(firma, false);
+                    }
+                }
                 if (rescate == null || rescates >= MAX_RESCATES) {
+                    if (lecciones != null && leccionEnPrueba != null) {
+                        lecciones.resultado(leccionEnPrueba, false);
+                    }
                     return new Resultado(false, "PARADO: " + f.getMessage(), numero, rescates);
                 }
                 rescates++;
                 registro.accept("  La IA da el empujón (" + rescates + " de " + MAX_RESCATES + ")…");
                 rescate.intentar(tarea, f.getMessage() + " Estado actual: " + estado() + ". Ventanas:\n" + observa.ventanas());
+                if (lecciones != null) {
+                    String no = lecciones.aprender(firma, rescate.grabados());
+                    registro.accept(no == null ? "  Apuntado lo que hizo la IA: la próxima vez esta pantalla la resuelvo yo."
+                            : "  No se aprende de este empujón: " + no + ".");
+                    if (no == null) {
+                        leccionEnPrueba = firma;
+                    }
+                }
                 // Después del empujón se vuelve a empezar la tarea desde donde esté la pantalla: el mapa vale desde cualquier punto.
             }
         }
+        if (lecciones != null && leccionEnPrueba != null) {
+            lecciones.resultado(leccionEnPrueba, true);
+        }
         return new Resultado(true, "HECHO: «" + tarea + "»" + (numero.isBlank() ? "" : " (expediente " + numero + ")")
                 + (incidencias.isEmpty() ? "" : " CON INCIDENCIAS: " + String.join(" · ", incidencias)), numero, rescates, List.copyOf(incidencias));
+    }
+
+    private String textoDelDialogo(String vs) {
+        var dlg = java.util.regex.Pattern.compile("diálogo «([^»]+)»").matcher(vs);
+        try {
+            return dlg.find() ? observa.texto(dlg.group(1)) : "";
+        } catch (RuntimeException e) {
+            return "";
+        }
     }
 
     /** Sale de lo que haya abierto sin guardar (Cancelar y «¿salir?» → Sí) hasta el estado de reposo del mapa. */

@@ -1226,6 +1226,10 @@ public final class Comprobaciones {
             if (w.auditaMal && p.accion().equals("auditar")) {
                 return "AUDITORÍA NO OK (no coincide: Cliente)";
             }
+            if (p.in().get("leccion") != null) {
+                w.estado = "lista";
+                return null;
+            }
             switch (p.accion()) {
                 case "abrir_mn" -> w.estado = "inicio";
                 case "ruta" -> w.estado = "lista";
@@ -1263,9 +1267,16 @@ public final class Comprobaciones {
             }
             return null;
         };
-        es.amagna.asistente.estados.Ejecutor.Rescate rescate = conIa ? (n, sit) -> {
-            w.rescates++;
-            w.estado = "lista"; // la IA deja la pantalla limpia
+        es.amagna.asistente.estados.Ejecutor.Rescate rescate = conIa ? new es.amagna.asistente.estados.Ejecutor.Rescate() {
+            public void intentar(String n, String sit) {
+                w.rescates++;
+                w.estado = "lista"; // la IA deja la pantalla limpia
+            }
+
+            public java.util.List<es.amagna.asistente.cerebro.Receta.Paso> grabados() {
+                return java.util.List.of(new es.amagna.asistente.cerebro.Receta.Paso("left_click",
+                        new java.util.LinkedHashMap<>(java.util.Map.of("leccion", "cerrar")), "atención", new int[] {10, 10}));
+            }
         } : null;
         es.amagna.asistente.estados.Ejecutor.Observa observa = new es.amagna.asistente.estados.Ejecutor.Observa() {
             public String ventanas() {
@@ -1449,6 +1460,28 @@ public final class Comprobaciones {
         var wc = new MundoFalso("atencion-otra");
         var rc = correrFalso(mapa, wc, true);
         ok(rc.bien() && wc.rescates == 1 && wc.guardados == 1, "estados: ese aviso desconocido lo resuelve la IA y la tarea sigue");
+        // Lecciones: lo que la IA arregla una vez, el asistente lo repite solo la siguiente.
+        try {
+            var f = java.nio.file.Files.createTempFile("lecciones", ".json");
+            java.nio.file.Files.delete(f);
+            var l1 = new es.amagna.asistente.estados.Lecciones(f);
+            var w1 = new MundoFalso("atencion-otra");
+            var r1 = ejecutorFalso(mapa, w1, true).conLecciones(l1).ejecutar("crear-expediente", parametrosFalsos(w1));
+            ok(r1.bien() && w1.rescates == 1 && l1.cuantas() == 1, "lecciones: la IA arregla un aviso raro y el asistente apunta lo que hizo");
+            var l2 = new es.amagna.asistente.estados.Lecciones(f);
+            var w2l = new MundoFalso("atencion-otra");
+            var r2l = ejecutorFalso(mapa, w2l, true).conLecciones(l2).ejecutar("crear-expediente", parametrosFalsos(w2l));
+            ok(r2l.bien() && w2l.rescates == 0 && w2l.guardados == 1, "lecciones: la segunda vez (aunque se reinicie el programa) lo resuelve solo, sin IA");
+            ok(l2.tal(es.amagna.asistente.estados.Lecciones.firma(ventanasDe("atencion-otra"), "")).exitos() == 2,
+                    "lecciones: tras acabar bien, la lección cuenta un éxito");
+            ok(!es.amagna.asistente.estados.Lecciones.seguros(java.util.List.of(new es.amagna.asistente.cerebro.Receta.Paso("type",
+                    new java.util.LinkedHashMap<>(java.util.Map.of("text", "x")), null, null))), "lecciones: teclear datos no se aprende");
+            ok(!es.amagna.asistente.estados.Lecciones.seguros(java.util.List.of(new es.amagna.asistente.cerebro.Receta.Paso("key",
+                    new java.util.LinkedHashMap<>(java.util.Map.of("text", "Return")), null, null))), "lecciones: darle a Intro a ciegas no se aprende");
+            java.nio.file.Files.deleteIfExists(f);
+        } catch (java.io.IOException e) {
+            throw new RuntimeException(e);
+        }
         var wk = new MundoFalso("lista");
         var vistos = new java.util.ArrayList<String>();
         wk.espia = vistos;
