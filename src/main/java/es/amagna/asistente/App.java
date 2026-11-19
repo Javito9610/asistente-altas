@@ -774,13 +774,16 @@ public final class App {
      *   asistente jarvis [--sin-ventana] [--sin-ia]
      * Telegram: «asistente secreto telegram» (token del bot) y los números de usuario autorizados en datos\\autorizados.txt.
      */
+    /** Se guarda en un campo para que el recolector de basura no cierre el canal (y con él suelte el candado). */
+    private static java.nio.channels.FileChannel CANDADO;
+
     private static void jarvis(List<String> a) throws Exception {
         Path datos = Path.of("datos");
         Files.createDirectories(datos);
         // Una sola copia de Jarvis a la vez: dos pelearían por el ratón. El candado lo suelta Windows si el programa muere.
-        var canalLock = java.nio.channels.FileChannel.open(datos.resolve("jarvis.lock"), java.nio.file.StandardOpenOption.CREATE,
+        CANDADO = java.nio.channels.FileChannel.open(datos.resolve("jarvis.lock"), java.nio.file.StandardOpenOption.CREATE,
                 java.nio.file.StandardOpenOption.WRITE);
-        if (canalLock.tryLock() == null) {
+        if (CANDADO.tryLock() == null) {
             System.out.println("Jarvis ya está funcionando en este ordenador: no abro otro.");
             return;
         }
