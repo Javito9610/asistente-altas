@@ -35,8 +35,15 @@ Ejemplos: «dame de alta a ANA PRUEBA, NIF 12345678Z» · «estado» · «pausa�
    como documento) y puedes pedir «pásame el X» (`enviar_fichero`).
 8. **Memoria y avisos**: «apunta que el despacho cierra los viernes a las 14» (`datos\notas.txt`, editable; nunca claves ni tarjetas),
    «notas», «olvida 2»; «recuérdame mañana a las 9 llamar a Ana» (avisa por el chat). Tareas **de una sola vez**: «hoy», «mañana» o una fecha.
+   **Plantillas Word**: `rellenar_plantilla` rellena un .docx con campos «{{nombre}}» (aunque Word los parta en trozos), sin tocar la plantilla,
+   y avisa de los campos sin dato (nunca los inventa).
+   **Tipo «oficina»**: lo que son solo documentos, ficheros o web se hace **sin pedir confirmación** (el especialista `oficina` solo tiene
+   herramientas de ese tipo, atadas en código: no puede tocar ventanas ni mover/borrar). Lo que maneja programas en pantalla («libre») sí la pide.
+   **Varias peticiones en un mensaje**: se separan (máximo 4) y un solo «sí» confirma todas.
 9. **Control sin IA**: «ayuda» (qué sabe hacer), «diagnóstico» (clave de IA, Telegram, MN, disco, lo aprendido), «estado», «pausa» / «sigue».
-10. **Ventana**: estado en vivo (verde escuchando · azul trabajando · ámbar en pausa), pestañas Conversación / Trabajos / Programadas,
+10. **Freno de gasto**: `Consumo` cuenta los tokens de IA de cada día (`datos\\consumo.json`) y corta al llegar al tope diario
+    (`datos\\limite-tokens.txt`, un número; 0 = sin tope; por defecto 3.000.000). «diagnóstico» enseña lo gastado.
+11. **Ventana**: estado en vivo (verde escuchando · azul trabajando · ámbar en pausa), pestañas Conversación / Trabajos / Ficheros (doble clic abre) / Programadas,
     icono junto al reloj (abrir, pausa, salir). Cerrarla no lo apaga.
 
 ## Seguridad (en código, no solo en las instrucciones)
@@ -52,5 +59,5 @@ Ejemplos: «dame de alta a ANA PRUEBA, NIF 12345678Z» · «estado» · «pausa�
 
 ## Pruebas
 `prueba-jarvis.cmd` (por la cola): arranca Jarvis, le pide por el buzón un alta ficticia en la Empresa de prueba y lo apaga.
-`asistente.cmd` ejecuta además todas las comprobaciones (477).
+`asistente.cmd` ejecuta además todas las comprobaciones (497).
 `prueba-pedido.cmd` (una orden de `pruebas\\pedido.txt` + «sí») y `prueba-charla.cmd` (varios mensajes de `pruebas\\charla\\*.txt`, uno cada 25 s).

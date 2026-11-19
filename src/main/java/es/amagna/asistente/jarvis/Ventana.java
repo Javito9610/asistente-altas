@@ -57,6 +57,14 @@ public final class Ventana {
             return false;
         }
     };
+    private final DefaultTableModel tablaFicheros = new DefaultTableModel(new String[] {"Fichero", "Tamaño", "Modificado"}, 0) {
+        @Override
+        public boolean isCellEditable(int r, int c) {
+            return false;
+        }
+    };
+    private volatile Supplier<List<java.nio.file.Path>> ficheros;
+    private volatile List<java.nio.file.Path> ficherosMostrados = List.of();
     private final JTextArea programadas = new JTextArea();
     private final JLabel estadoTexto = new JLabel("Arrancando…");
     private Color colorEstado = AMBAR;
@@ -81,6 +89,12 @@ public final class Ventana {
         this.estado = estado;
         this.trabajos = trabajos;
         this.agenda = agenda;
+        return this;
+    }
+
+    /** Los ficheros de trabajo de Jarvis (los últimos primero): se abren con doble clic. */
+    public Ventana conFicheros(Supplier<List<java.nio.file.Path>> ficheros) {
+        this.ficheros = ficheros;
         return this;
     }
 
@@ -140,6 +154,27 @@ public final class Ventana {
         t.getColumnModel().getColumn(1).setPreferredWidth(110);
         t.getColumnModel().getColumn(2).setPreferredWidth(260);
         t.getColumnModel().getColumn(3).setPreferredWidth(320);
+        JTable tf = new JTable(tablaFicheros);
+        oscuro(tf);
+        tf.setGridColor(FONDO);
+        tf.setRowHeight(24);
+        tf.setFillsViewportHeight(true);
+        tf.getTableHeader().setBackground(FONDO);
+        tf.getTableHeader().setForeground(APAGADO);
+        tf.getColumnModel().getColumn(0).setPreferredWidth(380);
+        tf.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseClicked(java.awt.event.MouseEvent e) {
+                int fila = tf.getSelectedRow();
+                if (e.getClickCount() == 2 && fila >= 0 && fila < ficherosMostrados.size()) {
+                    try {
+                        java.awt.Desktop.getDesktop().open(ficherosMostrados.get(fila).toFile());
+                    } catch (Exception ex) {
+                        decir("Jarvis: no he podido abrir el fichero (" + ex.getMessage() + ").");
+                    }
+                }
+            }
+        });
         programadas.setEditable(false);
         oscuro(programadas);
         programadas.setLineWrap(true);
@@ -149,6 +184,7 @@ public final class Ventana {
         pestanas.setBackground(FONDO);
         pestanas.addTab("Conversación", marcoOscuro(new JScrollPane(charla)));
         pestanas.addTab("Trabajos", marcoOscuro(new JScrollPane(t)));
+        pestanas.addTab("Ficheros", marcoOscuro(new JScrollPane(tf)));
         pestanas.addTab("Programadas", marcoOscuro(new JScrollPane(programadas)));
         pestanas.setForeground(TEXTO);
         for (int i = 0; i < pestanas.getTabCount(); i++) {
@@ -235,6 +271,24 @@ public final class Ventana {
                 tabla.setRowCount(0);
                 for (String[] f : filas) {
                     tabla.addRow(f);
+                }
+            }
+            Supplier<List<java.nio.file.Path>> fs = ficheros;
+            if (fs != null) {
+                List<java.nio.file.Path> lista = fs.get();
+                ficherosMostrados = lista;
+                tablaFicheros.setRowCount(0);
+                for (java.nio.file.Path f : lista) {
+                    long t = 0;
+                    long m = 0;
+                    try {
+                        t = java.nio.file.Files.size(f);
+                        m = java.nio.file.Files.getLastModifiedTime(f).toMillis();
+                    } catch (java.io.IOException ex) {
+                        // desapareció entre medias
+                    }
+                    tablaFicheros.addRow(new String[] {f.getFileName().toString(), t < 1024 ? t + " B" : t < 1_048_576 ? t / 1024 + " KB" : t / 1_048_576 + " MB",
+                            java.time.LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(m), java.time.ZoneId.systemDefault()).withNano(0).toString().replace('T', ' ')});
                 }
             }
             Supplier<String> ag = agenda;

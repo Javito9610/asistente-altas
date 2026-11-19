@@ -1010,6 +1010,14 @@ public final class App {
                         () -> progs == null || progs.todas().isEmpty() ? "No hay nada programado.\n\nPídeselo por la conversación: «cada día laborable a las 9, mira cuántos expedientes hay»."
                                 : progs.todas().stream().map(p -> p.id() + " · " + p.hora() + (p.fecha().isEmpty() ? " (" + p.dias().size() + " días/sem)" : " el " + p.fecha())
                                         + "\n    " + p.peticion()).collect(java.util.stream.Collectors.joining("\n\n")));
+                ventana[0].conFicheros(() -> {
+                    try (var st = Files.walk(ficherosJarvis.raices().get(0), 2)) {
+                        return st.filter(Files::isRegularFile).filter(x -> !x.toString().contains("_papelera"))
+                                .sorted((x, y) -> Long.compare(y.toFile().lastModified(), x.toFile().lastModified())).limit(40).toList();
+                    } catch (IOException | RuntimeException e) {
+                        return java.util.List.<Path>of();
+                    }
+                });
                 ventana[0].decir("Jarvis listo. Escríbeme lo que necesites (por ejemplo: «estado»).");
             }
         }
