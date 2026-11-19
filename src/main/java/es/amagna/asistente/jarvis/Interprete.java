@@ -42,7 +42,10 @@ public final class Interprete {
         sistema.append("""
                   Si falta un dato obligatorio, tipo «preguntar» con la pregunta en «texto». NUNCA inventes ni completes datos.
                 - tipo «libre»: otra cosa que se pueda hacer en el ordenador (abrir un programa, buscar algo, mover ficheros, mirar
-                  una web…). En «texto» una descripción corta y clara de lo que se va a hacer.
+                  una web…). En «texto» una descripción corta y clara de lo que se va a hacer. En «tarea» un nombre corto y
+                  REUTILIZABLE en minúsculas con guiones (p. ej. «abrir-programa», «buscar-en-web»: sin datos concretos dentro) y
+                  en «params» los datos que cambian de una vez a otra (p. ej. {"programa":"calc.exe"}, {"consulta":"horario tren"}).
+                  Así, la segunda vez que se pida algo igual, Jarvis lo repite solo sin gastar IA.
                 - tipo «preguntar»: no está claro qué quiere o falta algo. «texto» = una sola pregunta corta.
                 - tipo «responder»: es una pregunta o charla que se contesta con palabras (sin tocar nada). «texto» = la respuesta.
                 Pagos, transferencias, compras, envío de mensajes o correos, y borrar cosas: tipo «libre» solo si la persona lo pide
@@ -102,7 +105,12 @@ public final class Interprete {
                     }
                     return new Entendido(Entendido.TAREA, tarea, params, t);
                 }
-                case Entendido.LIBRE, Entendido.PREGUNTAR, Entendido.RESPONDER -> {
+                case Entendido.LIBRE -> {
+                    String slug = tarea.toLowerCase(java.util.Locale.ROOT).strip();
+                    return new Entendido(tipo, slug.matches("[a-z0-9]+(-[a-z0-9]+){0,5}") && slug.length() <= 40 ? slug : "", params,
+                            t.isBlank() ? "¿Puedes explicarme mejor qué quieres?" : t);
+                }
+                case Entendido.PREGUNTAR, Entendido.RESPONDER -> {
                     return new Entendido(tipo, "", params, t.isBlank() ? "¿Puedes explicarme mejor qué quieres?" : t);
                 }
                 default -> {

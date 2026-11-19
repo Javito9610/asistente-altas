@@ -82,6 +82,11 @@ public final class Agente {
     /** Barrera de seguridad en CÓDIGO (no en las instrucciones): recibe acción y datos, devuelve el motivo del veto o null. */
     private java.util.function.BiFunction<String, Map<String, Object>, String> veto;
 
+    /** El veto de seguridad (si lo hay) para una acción, también cuando se repite de memoria. null = permitida. */
+    public String vetar(String accion, Map<String, Object> in) {
+        return veto == null ? null : veto.apply(accion, in);
+    }
+
     public Agente conVeto(java.util.function.BiFunction<String, Map<String, Object>, String> v) {
         this.veto = v;
         return this;
@@ -339,7 +344,7 @@ public final class Agente {
                         resultados.add(resultado(id, List.of(textoBloque(no)), true, ordenador));
                         continue;
                     }
-                    String vetado = veto == null ? null : veto.apply(accion, in);
+                    String vetado = vetar(accion, in);
                     if (vetado != null) {
                         String no = "VETADO: " + vetado + " Esto no se puede hacer; si el encargo lo necesita, termina con PARADO y explícalo.";
                         registro.accept("    " + no);

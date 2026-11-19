@@ -309,6 +309,10 @@ public final class Receta {
 
     /** Devuelve null si ha ido bien, o por qué no. */
     private String hacer(Agente ag, Paso p, Map<String, Object> in) {
+        String vetado = ag.vetar(p.accion(), in);
+        if (vetado != null) {
+            return "VETADO: " + vetado;
+        }
         Ventanas v = ag.ventanas();
         Manos manos = ag.manos();
         boolean desdeDerecha = Boolean.TRUE.equals(in.remove("_der"));

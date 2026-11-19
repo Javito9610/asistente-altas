@@ -113,7 +113,12 @@ public final class Servicio {
                 registro.accept("Trabajo " + t.id() + " apuntado: " + e.tarea());
             }
             case Entendido.LIBRE -> {
-                Trabajo t = almacen.nuevo(origen, quien, texto, "libre", Map.of("encargo", e.texto()), Trabajo.ESPERANDO);
+                Map<String, String> ps = new java.util.LinkedHashMap<>(e.params());
+                ps.put("encargo", e.texto());
+                if (!e.tarea().isBlank()) {
+                    ps.put("_receta", e.tarea());
+                }
+                Trabajo t = almacen.nuevo(origen, quien, texto, "libre", ps, Trabajo.ESPERANDO);
                 salida.enviar(origen, quien, "Voy a hacer esto en el ordenador: " + e.texto() + "\n¿Lo hago? (sí / no)");
                 registro.accept("Trabajo " + t.id() + " espera confirmación.");
             }

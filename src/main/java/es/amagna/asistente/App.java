@@ -807,16 +807,44 @@ public final class App {
             return new es.amagna.asistente.jarvis.Servicio.Resultado(r.bien(), r.mensaje());
         };
         es.amagna.asistente.jarvis.Servicio.Hace libre = t -> {
+            String slug = t.params().getOrDefault("_receta", "");
+            var datosEncargo = new java.util.LinkedHashMap<String, String>(t.params());
+            datosEncargo.keySet().removeIf(k -> k.startsWith("_") || k.equals("encargo"));
+            Path rf = Path.of("aprendido", "libres", slug + ".json");
+            VentanasNativas v = new VentanasNativas(false);
+            java.util.function.BiFunction<String, java.util.Map<String, Object>, String> barrera =
+                    (accion, in) -> es.amagna.asistente.jarvis.Barreras.veto(accion, in, v.abiertas());
+            // 1) Si ya lo había hecho la IA otra vez, lo repite él solo (sin gastar un token).
+            if (!slug.isEmpty() && Files.isRegularFile(rf)) {
+                try {
+                    var rec = es.amagna.asistente.cerebro.Receta.leer(rf);
+                    var motor = new Agente(new ClaudeApi("sin-uso"), new ManosRobot(false), v, MODELO_POR_DEFECTO, "", 1, 1, registro)
+                            .conControles(new Controles(v)).conVeto(barrera);
+                    registro.accept("Esto ya lo sé hacer («" + slug + "», " + rec.pasos().size() + " pasos): lo repito sin IA.");
+                    var r = rec.reproducir(motor, datosEncargo, 25, registro);
+                    if (r.bien()) {
+                        return new es.amagna.asistente.jarvis.Servicio.Resultado(true, "Hecho de memoria, sin IA (" + r.pasosHechos()
+                                + " pasos). Échale un vistazo por si acaso.");
+                    }
+                    registro.accept("La receta se ha perdido (" + r.mensaje() + "): entra la IA.");
+                } catch (IOException | RuntimeException e) {
+                    registro.accept("No se pudo repetir de memoria (" + e.getMessage() + "): entra la IA.");
+                }
+            }
+            // 2) Si no, la IA lo hace y se graba lo que hace para la próxima.
             if (!Clave.hay()) {
                 return new es.amagna.asistente.jarvis.Servicio.Resultado(false, "Para eso necesito la IA y no tengo clave guardada.");
             }
             try {
-                VentanasNativas v = new VentanasNativas(false);
                 var esp = es.amagna.asistente.cerebro.Especialista.cargar("general", MODELO_POR_DEFECTO, 400_000);
+                var grabadora = new es.amagna.asistente.cerebro.Receta.Grabadora();
                 Agente ag = new Agente(new ClaudeApi(Clave.leer()), new ManosRobot(false), v, esp.modelo(), esp.instrucciones(), esp.pasos(),
-                        esp.topeTokens(), registro).conControles(new Controles(v)).conExpediente(false)
-                        .conVeto((accion, in) -> es.amagna.asistente.jarvis.Barreras.veto(accion, in, v.abiertas()));
+                        esp.topeTokens(), registro).conControles(new Controles(v)).conExpediente(false).conVeto(barrera).grabando(grabadora);
                 var r = ag.ejecutar(t.params().getOrDefault("encargo", t.peticion()) + "\n\n(Petición original: " + t.peticion() + ")");
+                if (r.terminado() && !slug.isEmpty() && grabadora.cuantos() > 0) {
+                    grabadora.aReceta(slug, t.params().getOrDefault("encargo", t.peticion()), datosEncargo).guardar(rf);
+                    registro.accept("Aprendido «" + slug + "»: " + grabadora.cuantos() + " pasos guardados; la próxima vez lo hago sin IA.");
+                }
                 return new es.amagna.asistente.jarvis.Servicio.Resultado(r.terminado(), r.mensaje());
             } catch (IOException e) {
                 return new es.amagna.asistente.jarvis.Servicio.Resultado(false, "No pude preparar al especialista: " + e.getMessage());
