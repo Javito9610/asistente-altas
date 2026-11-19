@@ -179,7 +179,7 @@ public final class Servicio {
             }
             case Entendido.TAREA -> {
                 Trabajo t = almacen.nuevo(origen, quien, texto, e.tarea(), e.params(), Trabajo.PENDIENTE);
-                decir(origen, quien, "Entendido: «" + e.tarea() + "». " + (e.texto().isBlank() ? "" : e.texto() + " ")
+                decir(origen, quien, "Entendido: «" + e.tarea() + "» (por ahora solo en la Empresa de prueba de MN). " + (e.texto().isBlank() ? "" : e.texto() + " ")
                         + "Te aviso cuando acabe. (" + pendientes() + " en cola)");
                 registro.accept("Trabajo " + t.id() + " apuntado: " + e.tarea());
             }
