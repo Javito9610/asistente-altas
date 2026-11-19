@@ -281,7 +281,6 @@ public final class Receta {
         }
         boolean opcional = Boolean.TRUE.equals(in.remove("_opcional"));
         in.remove("_si");
-        boolean desdeDerecha = Boolean.TRUE.equals(in.remove("_der"));
         ExecutorService pool = Executors.newSingleThreadExecutor(r -> {
             Thread t = new Thread(r, "paso");
             t.setDaemon(true);
@@ -307,6 +306,7 @@ public final class Receta {
     private String hacer(Agente ag, Paso p, Map<String, Object> in) {
         Ventanas v = ag.ventanas();
         Manos manos = ag.manos();
+        boolean desdeDerecha = Boolean.TRUE.equals(in.remove("_der"));
         if (p.ventana() != null && v != null) {
             String real = tituloReal(v, p.ventana());
             if (real == null && !"cerrar_ventana".equals(p.accion()) && !"esperar_a".equals(p.accion())) {
