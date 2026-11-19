@@ -176,14 +176,18 @@ public final class Servicio {
             return;
         }
         // Palabras sueltas que no necesitan IA.
-        Trabajo esperando = ultimoEsperando(quien);
-        if (esperando != null && Set.of("si", "sí", "vale", "ok", "confirmo", "adelante", "hazlo", "dale").contains(n)) {
-            almacen.guardar(esperando.con(Trabajo.PENDIENTE, null));
-            decir(origen, quien, "Hecho, me pongo con ello.");
+        List<Trabajo> esperando = todosEsperando(quien);
+        if (!esperando.isEmpty() && Set.of("si", "sí", "vale", "ok", "confirmo", "adelante", "hazlo", "dale").contains(n)) {
+            for (Trabajo w : esperando) {
+                almacen.guardar(w.con(Trabajo.PENDIENTE, null));
+            }
+            decir(origen, quien, esperando.size() == 1 ? "Hecho, me pongo con ello." : "Hecho, me pongo con las " + esperando.size() + " cosas, una detrás de otra.");
             return;
         }
-        if (esperando != null && Set.of("no", "cancela", "cancelar", "para", "olvidalo").contains(n)) {
-            almacen.guardar(esperando.con(Trabajo.RECHAZADO, "Cancelado por la persona."));
+        if (!esperando.isEmpty() && Set.of("no", "cancela", "cancelar", "para", "olvidalo").contains(n)) {
+            for (Trabajo w : esperando) {
+                almacen.guardar(w.con(Trabajo.RECHAZADO, "Cancelado por la persona."));
+            }
             decir(origen, quien, "Vale, lo dejo.");
             return;
         }
@@ -241,7 +245,13 @@ public final class Servicio {
             return;
         }
         String saber = conocimiento.get();
-        Entendido e = interprete.entender(texto, (saber.isBlank() ? "" : saber + "\n") + (notas == null ? "" : notas.comoContexto()) + contexto(quien));
+        List<Entendido> varios = interprete.entenderVarios(texto, (saber.isBlank() ? "" : saber + "\n") + (notas == null ? "" : notas.comoContexto()) + contexto(quien));
+        for (Entendido e : varios) {
+            atender(origen, quien, texto, e);
+        }
+    }
+
+    private void atender(String origen, String quien, String texto, Entendido e) {
         switch (e.tipo()) {
             case Entendido.PROGRAMAR -> {
                 String id = programadas == null ? null : programadas.anadir(origen, quien, e.params().getOrDefault("hora", ""),
@@ -335,15 +345,16 @@ public final class Servicio {
         return almacen.en(Trabajo.PENDIENTE).size();
     }
 
-    private Trabajo ultimoEsperando(String quien) {
-        Trabajo r = null;
+    private List<Trabajo> todosEsperando(String quien) {
+        List<Trabajo> r = new ArrayList<>();
         for (Trabajo t : almacen.en(Trabajo.ESPERANDO)) {
             if (t.quien().equals(quien)) {
-                r = t;
+                r.add(t);
             }
         }
         return r;
     }
+
 
     static String norm(String s) {
         return Normalizer.normalize(s == null ? "" : s, Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase(Locale.ROOT)

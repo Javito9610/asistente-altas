@@ -37,6 +37,7 @@ final class ComprobacionesJarvis {
             programadas();
             oficina();
             telegramPorHttp();
+            variasCosas();
             notasYRecordatorios();
             ficheros();
             web();
@@ -389,6 +390,24 @@ final class ComprobacionesJarvis {
         s.tic(lunes9);
         ok(dicho.stream().anyMatch(d -> d.contains("Toca lo programado")) && dicho.stream().anyMatch(d -> d.contains("No tengo nada pendiente")),
                 "programadas: a su hora se lanza solo");
+    }
+
+    static void variasCosas() throws IOException {
+        var l = Interprete.leerVarios("[{\"tipo\":\"libre\",\"tarea\":\"crear-pdf\",\"texto\":\"haz un pdf\"},{\"tipo\":\"recordar\",\"texto\":\"x\"},{\"tipo\":\"consultar\",\"texto\":\"y\"}]");
+        ok(l.size() == 3 && l.get(0).tipo().equals("libre") && l.get(2).tipo().equals("consultar"), "intérprete: un mensaje con varias cosas se separa en varias, en orden");
+        ok(Interprete.leerVarios("{\"tipo\":\"responder\",\"texto\":\"hola\"}").size() == 1, "intérprete: un objeto suelto sigue siendo una sola cosa");
+        ok(Interprete.leerVarios("[{\"tipo\":\"responder\",\"texto\":\"1\"},{\"tipo\":\"responder\",\"texto\":\"2\"},{\"tipo\":\"responder\",\"texto\":\"3\"},{\"tipo\":\"responder\",\"texto\":\"4\"},{\"tipo\":\"responder\",\"texto\":\"5\"}]").size() == 4,
+                "intérprete: como mucho cuatro cosas por mensaje");
+        String[] resp = {"[{\"tipo\":\"libre\",\"tarea\":\"uno\",\"texto\":\"haz uno\"},{\"tipo\":\"libre\",\"tarea\":\"dos\",\"texto\":\"haz dos\"}]"};
+        List<String> dicho = new ArrayList<>();
+        var alm = new Almacen(Files.createTempDirectory("alm"));
+        var s = new Servicio(alm, interpreteFalso(resp), t -> new Servicio.Resultado(true, "x"), t -> new Servicio.Resultado(true, "hecho " + t.params().get("encargo")),
+                (o, q, t) -> dicho.add(t), Set.of("javi"), x -> { });
+        s.recibir("telegram", "javi", "haz uno y dos");
+        ok(alm.en(Trabajo.ESPERANDO).size() == 2, "servicio: dos cosas en un mensaje esperan las dos confirmación");
+        s.recibir("telegram", "javi", "sí");
+        ok(alm.en(Trabajo.PENDIENTE).size() == 2 && s.procesarUno() && s.procesarUno() && !s.procesarUno()
+                && dicho.stream().filter(d -> d.startsWith("✅")).count() == 2, "servicio: un «sí» confirma las dos y se hacen una detrás de otra");
     }
 
     static void notasYRecordatorios() throws IOException {

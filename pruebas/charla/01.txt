@@ -1,1 +1,1 @@
-diagnostico
+Hazme un PDF llamado nota_prueba con el titulo Nota de prueba y una frase, y ademas apunta que la oficina tiene un jarron azul, y recuerdame hoy a las 23:59 revisar la nota.

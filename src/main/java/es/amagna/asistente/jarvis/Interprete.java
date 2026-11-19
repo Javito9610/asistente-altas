@@ -29,6 +29,41 @@ public final class Interprete {
 
     @SuppressWarnings("unchecked")
     public Entendido entender(String mensaje, String contexto) {
+        return entenderVarios(mensaje, contexto).get(0);
+    }
+
+    /** Un mensaje puede pedir varias cosas: devuelve una por cada una (máximo 4), en orden. */
+    @SuppressWarnings("unchecked")
+    public List<Entendido> entenderVarios(String mensaje, String contexto) {
+        String crudo = pensar(mensaje, contexto);
+        return leerVarios(crudo);
+    }
+
+    public static List<Entendido> leerVarios(String texto) {
+        int a = texto.indexOf('[');
+        int z = texto.lastIndexOf(']');
+        int llave = texto.indexOf('{');
+        if (a >= 0 && z > a && (llave < 0 || a < llave)) {
+            try {
+                Map<String, Object> w = Json.objeto("{\"l\":" + texto.substring(a, z + 1) + "}");
+                List<Entendido> r = new java.util.ArrayList<>();
+                for (Object o : (List<Object>) w.get("l")) {
+                    if (o instanceof Map<?, ?> m && r.size() < 4) {
+                        r.add(leer(Json.escribir(m)));
+                    }
+                }
+                if (!r.isEmpty()) {
+                    return r;
+                }
+            } catch (RuntimeException e) {
+                // cae a leer una sola
+            }
+        }
+        return List.of(leer(texto));
+    }
+
+    @SuppressWarnings("unchecked")
+    private String pensar(String mensaje, String contexto) {
         StringBuilder sistema = new StringBuilder("""
                 Eres el intérprete de Jarvis, el asistente de oficina de un despacho de abogados. Recibes el mensaje de una persona y
                 decides qué hay que hacer. NO haces nada tú: solo respondes con UN objeto JSON, sin texto alrededor:
@@ -60,6 +95,7 @@ public final class Interprete {
                   Nunca claves, tarjetas ni cuentas bancarias.
                 - tipo «preguntar»: no está claro qué quiere o falta algo. «texto» = una sola pregunta corta.
                 - tipo «responder»: es una pregunta o charla que se contesta con palabras (sin tocar nada). «texto» = la respuesta.
+                Si el mensaje pide VARIAS cosas distintas, responde con un array JSON de objetos (máximo 4), en el orden pedido; si es una sola, un objeto.
                 Pagos, transferencias, compras, envío de mensajes o correos, y borrar cosas: tipo «libre» solo si la persona lo pide
                 de forma explícita; siempre se le pide confirmación después. Español, tuteo, breve.
                 """);
@@ -80,9 +116,10 @@ public final class Interprete {
             }
             texto = b.toString();
         } catch (RuntimeException e) {
-            return new Entendido(Entendido.RESPONDER, "", Map.of(), "Ahora mismo no puedo pensar (" + e.getMessage() + "). Inténtalo en un rato.");
+            return "{\"tipo\":\"responder\",\"texto\":\"Ahora mismo no puedo pensar (" + String.valueOf(e.getMessage()).replace("\\", " ").replace("\"", "'").replace("\n", " ")
+                    + "). Inténtalo en un rato.\"}";
         }
-        return leer(texto);
+        return texto;
     }
 
     /** Lee la respuesta de la IA con desconfianza: lo que no cuadra con el catálogo se convierte en pregunta. */
