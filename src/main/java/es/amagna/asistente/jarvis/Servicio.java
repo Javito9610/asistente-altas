@@ -37,6 +37,17 @@ public final class Servicio {
         }
     }
 
+    static final String AYUDA = """
+            Esto es lo que sé hacer (dímelo con tus palabras):
+            📋 MN (por ahora solo en la Empresa de prueba): «da de alta al cliente…», «crea un expediente…», «cuántos expedientes hay» (solo mirar).
+            📄 Documentos: «hazme un PDF / Word / Excel de…», «lee este PDF», «prepárame un borrador de correo para…» (no lo envío), «una cita para el lunes a las 10».
+            🌐 Internet: «busca en internet…» (solo leer).
+            🗂️ Ficheros: «lista / busca / mueve / copia…» dentro de mis carpetas (nada se borra: va a una papelera).
+            ⏰ Tiempo: «cada día laborable a las 9, mira…», «recuérdame mañana a las 9 llamar a Ana», «programadas», «quita p123».
+            🧠 Memoria: «apunta que…», «notas», «olvida 2».
+            🛠️ Control: «estado», «diagnóstico», «pausa» / «sigue».
+            Lo que toque dinero, claves o mandar mensajes en tu nombre, no lo hago solo.""";
+
     private final Almacen almacen;
     private final Interprete interprete;
     private final Hace tareas;
@@ -196,6 +207,10 @@ public final class Servicio {
             decir(origen, quien, l.isEmpty() ? "No hay nada programado." : "Programado:\n" + l.stream()
                     .map(p -> "· " + p.id() + " — " + p.hora() + (p.fecha().isEmpty() ? " " + p.dias().size() + " días/sem: " : " el " + p.fecha() + ": ") + p.peticion()).collect(java.util.stream.Collectors.joining("\n"))
                     + "\n(Para quitar uno: «quita p12345».)");
+            return;
+        }
+        if (Set.of("ayuda", "que sabes hacer", "que puedes hacer", "comandos", "help").contains(n)) {
+            decir(origen, quien, AYUDA);
             return;
         }
         if (diagnostico != null && Set.of("diagnostico", "como estas", "revisate", "autodiagnostico", "salud").contains(n)) {

@@ -29,6 +29,16 @@ Ejemplos: «dame de alta a ANA PRUEBA, NIF 12345678Z» · «estado» · «pausa�
    (`datos\\carpetas.txt`, una ruta por línea; por defecto `trabajo\\jarvis`), sin borrar (a `_papelera`) ni sobrescribir sin decirlo, y leer páginas
    https (nunca la red interna). Lo que diga una página son datos, no órdenes.
 
+7. **Oficina sin pantalla** (`Oficina`, sin librerías): `crear_documento` hace **PDF, Word (.docx), Excel (.xlsx)**, **citas** (.ics, se
+   añaden al calendario con un clic) y **borradores de correo** (.eml: se abren en Outlook para revisar y enviar; Jarvis **no envía** correos).
+   `leer_documento` lee PDF (con texto), Word y Excel. Los documentos que crea **se te mandan por el mismo chat** (Telegram:
+   como documento) y puedes pedir «pásame el X» (`enviar_fichero`).
+8. **Memoria y avisos**: «apunta que el despacho cierra los viernes a las 14» (`datos\notas.txt`, editable; nunca claves ni tarjetas),
+   «notas», «olvida 2»; «recuérdame mañana a las 9 llamar a Ana» (avisa por el chat). Tareas **de una sola vez**: «hoy», «mañana» o una fecha.
+9. **Control sin IA**: «ayuda» (qué sabe hacer), «diagnóstico» (clave de IA, Telegram, MN, disco, lo aprendido), «estado», «pausa» / «sigue».
+10. **Ventana**: estado en vivo (verde escuchando · azul trabajando · ámbar en pausa), pestañas Conversación / Trabajos / Programadas,
+    icono junto al reloj (abrir, pausa, salir). Cerrarla no lo apaga.
+
 ## Seguridad (en código, no solo en las instrucciones)
 - Solo atiende a personas autorizadas. A un desconocido solo le dice su número. Solo corre una copia de Jarvis a la vez.
 - `Barreras`: no se teclea nada que parezca tarjeta, IBAN o contraseña; no se abren consolas, scripts ni instaladores; con MN
@@ -42,4 +52,5 @@ Ejemplos: «dame de alta a ANA PRUEBA, NIF 12345678Z» · «estado» · «pausa�
 
 ## Pruebas
 `prueba-jarvis.cmd` (por la cola): arranca Jarvis, le pide por el buzón un alta ficticia en la Empresa de prueba y lo apaga.
-`asistente.cmd` ejecuta además todas las comprobaciones (423).
+`asistente.cmd` ejecuta además todas las comprobaciones (477).
+`prueba-pedido.cmd` (una orden de `pruebas\\pedido.txt` + «sí») y `prueba-charla.cmd` (varios mensajes de `pruebas\\charla\\*.txt`, uno cada 25 s).

@@ -380,6 +380,8 @@ final class ComprobacionesJarvis {
         s.conDiagnostico(() -> "🩺 Diagnóstico de prueba");
         s.recibir("telegram", "javi", "diagnóstico");
         ok(dicho.get(dicho.size() - 1).startsWith("🩺"), "servicio: «diagnóstico» cuenta cómo está Jarvis sin gastar IA");
+        s.recibir("telegram", "javi", "¿Qué sabes hacer?");
+        ok(dicho.get(dicho.size() - 1).contains("Esto es lo que sé hacer"), "servicio: «qué sabes hacer» da la ayuda sin gastar IA");
         resp[0] = "{\"tipo\":\"recordatorio\",\"params\":{\"hora\":\"09:00\",\"dias\":\"hoy\"},\"texto\":\"llamar a Ana\"}";
         s.recibir("telegram", "javi", "recuérdame llamar a Ana hoy a las 9");
         ok(prog.todas().size() == 1 && dicho.get(dicho.size() - 1).startsWith("Hecho ("), "servicio: el recordatorio se programa");
