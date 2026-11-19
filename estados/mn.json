@@ -11,6 +11,9 @@
     {"nombre": "lista-clientes", "ventana": "Clientes", "sin": "Expediente #"},
     {"nombre": "alta-cliente", "ventana": "Alta Cliente"},
     {"nombre": "editar-cliente", "ventana": "*- Editar Cliente"},
+    {"nombre": "abrir-archivo", "ventana": "Abrir"},
+    {"nombre": "documento-adjunto", "ventana": "Documento"},
+    {"nombre": "carpeta-adjunto", "ventana": "Establece el nombre de la carpeta"},
     {"nombre": "atencion-salir", "ventana": "Atención", "contiene": "salir"},
     {"nombre": "atencion-guardar", "ventana": "Atención", "contiene": "guardar los cambios"},
     {"nombre": "atencion", "ventana": "Atención"},
@@ -468,6 +471,24 @@
     {"nombre": "verificar-cliente-guardado", "de": "lista-clientes", "a": "lista-clientes", "segundos": 60,
      "pasos": [
        {"accion": "auditar", "ventana": "Clientes", "in": {"ventana": "Clientes", "esperado": {"Núm. Clientes": "1"}}}
+     ]},
+
+    {"nombre": "cerrar-abrir-archivo", "de": "abrir-archivo", "a": "alta-cliente|formulario-expediente", "segundos": 15,
+     "pasos": [
+       {"accion": "cerrar_ventana_mn", "ventana": "Abrir", "in": {}},
+       {"accion": "wait", "in": {"duration": 2}}
+     ]},
+
+    {"nombre": "cerrar-carpeta-adjunto", "de": "carpeta-adjunto", "a": "alta-cliente|formulario-expediente", "segundos": 15,
+     "pasos": [
+       {"accion": "cerrar_ventana_mn", "ventana": "Establece el nombre de la carpeta", "in": {}},
+       {"accion": "wait", "in": {"duration": 2}}
+     ]},
+
+    {"nombre": "cerrar-documento-adjunto", "de": "documento-adjunto", "a": "alta-cliente|formulario-expediente", "segundos": 15,
+     "pasos": [
+       {"accion": "cerrar_ventana_mn", "ventana": "Documento", "in": {}},
+       {"accion": "wait", "in": {"duration": 2}}
      ]},
 
     {"nombre": "cancelar-alta-cliente", "de": "alta-cliente", "a": "atencion-guardar|lista-clientes", "segundos": 20,

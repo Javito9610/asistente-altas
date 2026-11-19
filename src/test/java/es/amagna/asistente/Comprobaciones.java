@@ -1327,6 +1327,10 @@ public final class Comprobaciones {
                 "estados: desde «inicio» la lista de clientes se abre directa (botón de la barra), sin pasar por el menú de expedientes");
         ok(mapa.tareas().containsKey("crear-cliente") && mapa.accion("guardar-cliente").toca() && !mapa.accion("rellenar-cliente").toca(),
                 "estados: la tarea crear-cliente existe y solo Guardar es irreversible");
+        ok(es.amagna.asistente.estados.Reconocedor.estado(mapa, "- «Abrir» (GestorConsultas) [delante]\n- «Alta Cliente» (GestorConsultas) [BLOQUEADA]\n" + mnc).equals("abrir-archivo")
+                        && es.amagna.asistente.estados.Reconocedor.estado(mapa, "- «Documento» (GestorConsultas) [delante]\n- «Alta Cliente» (GestorConsultas) [BLOQUEADA]\n" + mnc).equals("documento-adjunto")
+                        && es.amagna.asistente.estados.Planificador.camino(mapa, "abrir-archivo", "alta-cliente").size() == 1,
+                "estados: los diálogos de importar adjuntos se reconocen y tienen salida sin guardar nada");
         var salir = es.amagna.asistente.estados.Planificador.camino(mapa, "alta-cliente", "lista-clientes");
         ok(salir != null && salir.stream().noneMatch(es.amagna.asistente.estados.Mapa.Transicion::toca)
                         && salir.get(0).nombre().equals("cancelar-alta-cliente"),
