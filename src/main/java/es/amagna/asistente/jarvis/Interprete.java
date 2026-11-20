@@ -88,8 +88,10 @@ public final class Interprete {
                   Si falta el destinatario (una dirección completa) o no se sabe qué decir, tipo «preguntar». Para LEER o resumir los
                   correos que han llegado, usa «oficina», no «correo».
                 - tipo «abrir»: abrir una página web, un programa o una carpeta/documento (sin más). En «params»:
-                  {"que":"web|programa|carpeta|documento","valor":"…"}: para «web» la dirección COMPLETA (https://…; si dicen «abre google»,
-                  https://www.google.com); para «programa» el nombre que dice la persona (calculadora, bloc de notas, word, excel, chrome,
+                  {"que":"web|google|youtube|maps|programa|carpeta|documento","valor":"…"}: para «web» la dirección COMPLETA (https://…; si dicen
+                  «abre google», https://www.google.com); para «google» lo que hay que BUSCAR en Google («busca en google horarios de tren»
+                  → valor «horarios de tren»); para «youtube» la canción, vídeo o tema que quiere ver u oír («pon Bohemian Rhapsody en
+                  youtube» → valor «Bohemian Rhapsody»; Jarvis lo busca y lo pone); para «maps» el lugar o ruta a buscar en Google Maps; para «programa» el nombre que dice la persona (calculadora, bloc de notas, word, excel, chrome,
                   edge, outlook…); para «carpeta»/«documento» la ruta. «texto» = qué se abre. Si además hay que hacer algo DENTRO de lo que
                   se abre (escribir, pulsar, buscar), no es «abrir»: es «libre».
                 - tipo «captura»: la persona quiere VER lo que hay ahora en la pantalla del ordenador (una captura, un pantallazo, «pásame
@@ -112,8 +114,11 @@ public final class Interprete {
                 - tipo «preguntar»: no está claro qué quiere o falta algo. «texto» = una sola pregunta corta.
                 - tipo «responder»: es una pregunta o charla que se contesta con palabras (sin tocar nada). «texto» = la respuesta.
                 Si el mensaje pide VARIAS cosas distintas, responde con un array JSON de objetos (máximo 4), en el orden pedido; si es una sola, un objeto.
-                El «Contexto» solo sirve para entender mejor lo que la persona dice ahora: NUNCA copies de él nombres, NIF ni datos a
-                lo que te pide, y no cambies lo que pregunta. Si pide algo general, «texto» es su pregunta tal cual.
+                El «Contexto» es la conversación reciente: úsalo para RESOLVER lo que la persona dice con referencias («el mismo texto»,
+                «ese correo», «ponle también el teléfono», «lo de antes», «sí, a esa dirección»). En «texto» y «params» escribe siempre la
+                orden COMPLETA y que se entienda sola, copiando literalmente del Contexto el texto o los datos a los que se refiere
+                (nunca dejes «el mismo texto» sin resolver). Pero NUNCA añadas datos del Contexto que la persona no pida usar ahora, y no
+                cambies lo que pregunta. Si pide algo general, «texto» es su pregunta tal cual.
                 Pagos, transferencias, compras, envío de mensajes o correos, y borrar cosas: tipo «libre» solo si la persona lo pide
                 de forma explícita; siempre se le pide confirmación después. Español, tuteo, breve.
                 """);
@@ -196,7 +201,7 @@ public final class Interprete {
                 }
                 case Entendido.ABRIR -> {
                     String que = params.getOrDefault("que", "");
-                    if (!java.util.Set.of("web", "programa", "carpeta", "documento").contains(que) || params.getOrDefault("valor", "").isBlank()) {
+                    if (!java.util.Set.of("web", "google", "youtube", "maps", "programa", "carpeta", "documento").contains(que) || params.getOrDefault("valor", "").isBlank()) {
                         return new Entendido(Entendido.PREGUNTAR, "", Map.of(), "¿Qué quieres que abra? (una página, un programa o una carpeta)");
                     }
                     return new Entendido(tipo, "", params, t);

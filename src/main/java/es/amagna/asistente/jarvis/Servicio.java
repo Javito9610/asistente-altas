@@ -41,7 +41,7 @@ public final class Servicio {
             Esto es lo que sé hacer (dímelo con tus palabras):
             📋 MN (por ahora solo en la Empresa de prueba): «da de alta al cliente…», «crea un expediente…», «cuántos expedientes hay» (solo mirar).
             ✉️ Correo: «mándale un correo a… diciendo…» (te enseño el borrador y solo sale con tu «sí»), «léeme los correos nuevos» (solo leo, no marco nada).
-            🖥️ Ordenador: «captura» (te mando lo que se ve en pantalla); «abre…», «busca en el navegador…» y otras cosas de escritorio (te pido el sí antes; nunca consolas, instaladores ni claves).
+            🖥️ Ordenador: «captura» (te mando lo que se ve en pantalla), «limpia la pantalla» (minimiza todo, sin cerrar nada) y «restaura las ventanas»; «abre…», «busca en google…», «pon X en youtube», «busca en maps…» y otras cosas de escritorio (te pido el sí antes; nunca consolas, instaladores ni claves).
             📄 Documentos: «hazme un PDF / Word / Excel de…», «rellena la plantilla…», «lee este PDF» (también puedes MANDARME un fichero por Telegram con lo que quieres que haga), «prepárame un borrador de correo para…» (guardado, sin enviar), «una cita para el lunes a las 10».
             🌐 Internet: «busca en internet…» (solo leer).
             🗂️ Ficheros: «lista / busca / mueve / copia…» dentro de mis carpetas (nada se borra: va a una papelera).
@@ -65,6 +65,15 @@ public final class Servicio {
     private String correoDe = "";
     private java.util.function.Supplier<java.nio.file.Path> captura;
     private Abrir abridor;
+    private Runnable minimizar;
+    private Runnable restaurar;
+
+    /** Despejar el escritorio (minimizar todo) y devolverlo a como estaba. Nunca cierra ventanas. */
+    public Servicio conEscritorio(Runnable minimizar, Runnable restaurar) {
+        this.minimizar = minimizar;
+        this.restaurar = restaurar;
+        return this;
+    }
 
     /** Cómo abrir páginas, programas y carpetas sin IA (lo que no sepa abrir pasa a «libre», con confirmación). */
     public Servicio conAbrir(Abrir a) {
@@ -121,24 +130,83 @@ public final class Servicio {
         return this;
     }
 
-    /** Lo último que se han dicho con esa persona: así «y ponle también el teléfono» se entiende. */
+    private static final int MAX_LINEAS = 40;
+    private static final int MAX_LINEA = 2500;
+    private static final int MAX_CONTEXTO = 7000;
+    private java.nio.file.Path carpetaHistorial;
+
+    /** La conversación se guarda en disco: sobrevive a reinicios y apagones, y Jarvis sigue sabiendo de qué se hablaba. */
+    public Servicio conHistorial(java.nio.file.Path carpeta) {
+        this.carpetaHistorial = carpeta;
+        return this;
+    }
+
+    private java.nio.file.Path ficheroHistorial(String quien) {
+        return carpetaHistorial.resolve(quien.replaceAll("[^A-Za-z0-9_-]", "_") + ".json");
+    }
+
+    @SuppressWarnings("unchecked")
+    private java.util.ArrayDeque<String> historialDe(String quien) {
+        return historial.computeIfAbsent(quien, k -> {
+            var h = new java.util.ArrayDeque<String>();
+            if (carpetaHistorial != null) {
+                try {
+                    var f = ficheroHistorial(k);
+                    if (java.nio.file.Files.isRegularFile(f)) {
+                        var m = es.amagna.asistente.Json.objeto(java.nio.file.Files.readString(f, java.nio.charset.StandardCharsets.UTF_8));
+                        for (Object o : (List<Object>) m.getOrDefault("l", List.of())) {
+                            h.addLast(String.valueOf(o));
+                        }
+                    }
+                } catch (java.io.IOException | RuntimeException e) {
+                    registro.accept("No he podido leer la conversación guardada: " + e.getMessage());
+                }
+            }
+            return h;
+        });
+    }
+
+    /** Lo que se han dicho con esa persona (largo y guardado): así «el mismo texto» o «ponle también el teléfono» se entienden. */
     private void apuntar(String quien, String linea) {
-        var h = historial.computeIfAbsent(quien, k -> new java.util.ArrayDeque<>());
+        var h = historialDe(quien);
         synchronized (h) {
-            h.addLast(linea.length() > 400 ? linea.substring(0, 400) : linea);
-            while (h.size() > 8) {
+            h.addLast(linea.length() > MAX_LINEA ? linea.substring(0, MAX_LINEA) + "…" : linea);
+            while (h.size() > MAX_LINEAS) {
                 h.removeFirst();
+            }
+            if (carpetaHistorial != null) {
+                try {
+                    java.nio.file.Files.createDirectories(carpetaHistorial);
+                    var f = ficheroHistorial(quien);
+                    var tmp = f.resolveSibling(f.getFileName() + ".tmp");
+                    java.nio.file.Files.writeString(tmp, es.amagna.asistente.Json.escribir(es.amagna.asistente.Json.obj("l", new ArrayList<>(h))),
+                            java.nio.charset.StandardCharsets.UTF_8);
+                    java.nio.file.Files.move(tmp, f, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                } catch (java.io.IOException e) {
+                    registro.accept("No he podido guardar la conversación: " + e.getMessage());
+                }
             }
         }
     }
 
     private String contexto(String quien) {
-        var h = historial.get(quien);
-        if (h == null) {
-            return "";
-        }
+        var h = historialDe(quien);
         synchronized (h) {
-            return h.isEmpty() ? "" : "Lo último de la conversación:\n" + String.join("\n", h);
+            if (h.isEmpty()) {
+                return "";
+            }
+            java.util.ArrayDeque<String> sel = new java.util.ArrayDeque<>();
+            int total = 0;
+            var it = h.descendingIterator();
+            while (it.hasNext()) {
+                String l = it.next();
+                if (total + l.length() > MAX_CONTEXTO && !sel.isEmpty()) {
+                    break;
+                }
+                total += l.length();
+                sel.addFirst(l);
+            }
+            return "Lo último de la conversación:\n" + String.join("\n", sel);
         }
     }
 
@@ -242,6 +310,28 @@ public final class Servicio {
             decir(origen, quien, AYUDA);
             return;
         }
+        if (minimizar != null && n.matches(".*\\b(limpia|limpiar|despeja|despejar|minimiza|minimizar|quita|quitar|oculta|ocultar|esconde|esconder|recoge|recoger)\\b.*\\b(pantalla|escritorio|ventanas|todo)\\b.*|.*\\b(muestra|muestrame|enseña|ensename)\\b.*\\bescritorio\\b.*")) {
+            if (!almacen.en(Trabajo.EN_CURSO).isEmpty()) {
+                decir(origen, quien, "Ahora mismo estoy trabajando en algo en la pantalla; si minimizo todo me estorbo a mí mismo. Dímelo cuando acabe (o di «pausa»).");
+            } else {
+                try {
+                    minimizar.run();
+                    decir(origen, quien, "Hecho: he minimizado todas las ventanas (no he cerrado nada). Para volver a ponerlas, di «restaura las ventanas».");
+                } catch (RuntimeException ex) {
+                    decir(origen, quien, "No he podido despejar la pantalla: " + ex.getMessage());
+                }
+            }
+            return;
+        }
+        if (restaurar != null && n.matches(".*\\b(restaura|restaurar|recupera|recuperar|devuelve|devolver|vuelve|volver)\\b.*\\b(ventanas|pantalla|escritorio)\\b.*")) {
+            try {
+                restaurar.run();
+                decir(origen, quien, "Hecho: he vuelto a poner las ventanas.");
+            } catch (RuntimeException ex) {
+                decir(origen, quien, "No he podido restaurar las ventanas: " + ex.getMessage());
+            }
+            return;
+        }
         if (captura != null && pideCaptura(n)) {
             hacerCaptura(origen, quien);
             return;
@@ -325,7 +415,7 @@ public final class Servicio {
                 registro.accept("Trabajo " + t.id() + " apuntado: " + e.tarea());
             }
             case Entendido.OFICINA -> {
-                almacen.nuevo(origen, quien, texto, "oficina", Map.of("encargo", e.texto()), Trabajo.PENDIENTE);
+                almacen.nuevo(origen, quien, texto, "oficina", Map.of("encargo", e.texto(), "_contexto", contexto(quien)), Trabajo.PENDIENTE);
                 decir(origen, quien, "Me pongo con ello (documentos y ficheros, sin tocar ninguna ventana): " + e.texto() + " (" + pendientes() + " en cola)");
             }
             case Entendido.CORREO -> {
@@ -361,12 +451,13 @@ public final class Servicio {
                 }
             }
             case Entendido.CONSULTAR -> {
-                almacen.nuevo(origen, quien, texto, "consulta", Map.of("pregunta", e.texto()), Trabajo.PENDIENTE);
+                almacen.nuevo(origen, quien, texto, "consulta", Map.of("pregunta", e.texto(), "_contexto", contexto(quien)), Trabajo.PENDIENTE);
                 decir(origen, quien, "Voy a mirarlo (solo miro, no toco nada)…");
             }
             case Entendido.LIBRE -> {
                 Map<String, String> ps = new java.util.LinkedHashMap<>(e.params());
                 ps.put("encargo", e.texto());
+                ps.put("_contexto", contexto(quien));
                 if (!e.tarea().isBlank()) {
                     ps.put("_receta", e.tarea());
                 }

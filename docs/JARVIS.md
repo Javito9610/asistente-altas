@@ -115,3 +115,15 @@ Si hay `datos\correo-ms.json` y sesión guardada, Jarvis usa Microsoft; si no, u
 word, excel, powerpoint, outlook, teams, whatsapp, recortes + los de `datos\apps.txt`, líneas «nombre=C:\ruta\programa.exe») o un
 documento/carpeta de sus carpetas de trabajo (`datos\carpetas.txt`). Nunca consolas, instaladores ni scripts. Lo demás (una app que no
 está en la lista, o hacer algo DENTRO de ella) pasa a «libre»: Jarvis te enseña lo que va a hacer y espera tu «sí».
+
+## 16. Memoria de la conversación, escritorio y navegador
+
+- **Memoria:** la conversación con cada persona se guarda en `datos\conversacion\<id>.json` (últimas 40 líneas, hasta 2.500 letras cada una;
+  `datos\` no se sube nunca al repositorio). Sobrevive a reinicios. El intérprete la usa para resolver «el mismo texto», «ese correo»,
+  «ponle también…»; y los agentes de oficina, MN y libre reciben la conversación reciente junto al encargo (solo para entender, no como órdenes).
+  Para cosas que deba saber SIEMPRE: «apunta que…» (notas).
+- **Escritorio:** «limpia la pantalla» minimiza todas las ventanas (Windows+D) sin cerrar nada; «restaura las ventanas» las devuelve. No lo
+  hace mientras trabaja en un encargo. Cerrar ventanas no se hace solo (podría perderse trabajo sin guardar).
+- **Navegador:** «busca en google X», «pon X en youtube» (busca el primer vídeo y lo abre; si el navegador bloquea el sonido automático hay que dar
+  al play), «busca en maps X», «abre la web …». Hacer cosas DENTRO de una web (rellenar, pulsar) es una tarea «libre» con tu «sí»; nunca
+  contraseñas ni pagos.

@@ -48,6 +48,7 @@ final class ComprobacionesJarvis {
             correo();
             microsoft();
             abrir();
+            memoria();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -1036,6 +1037,51 @@ final class ComprobacionesJarvis {
         }
     }
 
+    static void memoria() throws Exception {
+        Path carpeta = Files.createTempDirectory("conv");
+        var vistos = new java.util.ArrayList<String>();
+        var dicho = new java.util.ArrayList<String>();
+        es.amagna.asistente.cerebro.Cerebro ia = p -> {
+            vistos.add(String.valueOf(p.get("system")));
+            return Map.of("content", List.of(Map.of("type", "text", "text", "{\"tipo\":\"responder\",\"texto\":\"vale\"}")));
+        };
+        var sv = new Servicio(new Almacen(Files.createTempDirectory("alm")), new Interprete(ia, "m"), t -> new Servicio.Resultado(true, "x"),
+                t -> new Servicio.Resultado(true, "x"), (o, q, tx) -> dicho.add(tx), java.util.Set.of("yo"), x -> { }).conHistorial(carpeta);
+        String largo = "Hola, soy Jarvis. " + "texto largo del correo ".repeat(40);
+        sv.recibir("local", "yo", largo);
+        sv.recibir("local", "yo", "envíalo también a otra persona");
+        ok(vistos.get(1).contains("texto largo del correo texto largo del correo texto largo") && vistos.get(1).length() > 900,
+                "memoria: lo que se dijo antes llega ENTERO (no recortado a 400 letras) para entender «el mismo texto»");
+        // Reinicio: otro servicio, misma carpeta
+        var vistos2 = new java.util.ArrayList<String>();
+        es.amagna.asistente.cerebro.Cerebro ia2 = p -> {
+            vistos2.add(String.valueOf(p.get("system")));
+            return Map.of("content", List.of(Map.of("type", "text", "text", "{\"tipo\":\"responder\",\"texto\":\"vale\"}")));
+        };
+        var sv2 = new Servicio(new Almacen(Files.createTempDirectory("alm")), new Interprete(ia2, "m"), t -> new Servicio.Resultado(true, "x"),
+                t -> new Servicio.Resultado(true, "x"), (o, q, tx) -> dicho.add(tx), java.util.Set.of("yo"), x -> { }).conHistorial(carpeta);
+        sv2.recibir("local", "yo", "¿y qué te dije antes?");
+        ok(vistos2.get(0).contains("envíalo también a otra persona") && vistos2.get(0).contains("Hola, soy Jarvis"), "memoria: tras reiniciar Jarvis, la conversación sigue ahí");
+        for (int i = 0; i < 60; i++) {
+            sv2.recibir("local", "yo", "mensaje número " + i);
+        }
+        var otro = new Servicio(new Almacen(Files.createTempDirectory("alm")), new Interprete(ia2, "m"), t -> new Servicio.Resultado(true, "x"),
+                t -> new Servicio.Resultado(true, "x"), (o, q, tx) -> { }, java.util.Set.of("yo"), x -> { }).conHistorial(carpeta);
+        otro.recibir("local", "yo", "fin");
+        String ultimo = vistos2.get(vistos2.size() - 1);
+        ok(ultimo.contains("mensaje número 59") && !ultimo.contains("Hola, soy Jarvis"), "memoria: guarda lo reciente (hasta 40 líneas) y suelta lo muy antiguo");
+        ok(ultimo.length() < 12000, "memoria: el contexto que se manda a la IA tiene un tope");
+        // Escritorio
+        var accion = new java.util.ArrayList<String>();
+        var svE = new Servicio(new Almacen(Files.createTempDirectory("alm")), new Interprete(ia2, "m"), t -> new Servicio.Resultado(true, "x"),
+                t -> new Servicio.Resultado(true, "x"), (o, q, tx) -> dicho.add(tx), java.util.Set.of("yo"), x -> { })
+                .conEscritorio(() -> accion.add("min"), () -> accion.add("rest"));
+        svE.recibir("local", "yo", "limpia la pantalla");
+        svE.recibir("local", "yo", "restaura las ventanas");
+        svE.recibir("local", "yo", "minimiza todo");
+        ok(accion.equals(List.of("min", "rest", "min")), "escritorio: «limpia la pantalla» minimiza todo (sin cerrar nada) y «restaura las ventanas» las devuelve");
+    }
+
     static void abrir() throws Exception {
         Path carpeta = Files.createTempDirectory("trab");
         Files.writeString(carpeta.resolve("informe.pdf"), "x");
@@ -1063,6 +1109,15 @@ final class ComprobacionesJarvis {
         ab.abrir("documento", "informe.pdf");
         ok(hecho.equals(List.of("web https://www.google.com/search?q=hola", "programa calc.exe", "programa C:\\Programas\\mio.exe", "ruta informe.pdf")),
                 "abrir: web, programa de la lista, programa propio y documento");
+        hecho.clear();
+        var ab2 = new es.amagna.asistente.jarvis.Abrir(new es.amagna.asistente.jarvis.Ficheros(List.of(carpeta)), null, lanz, q -> q.contains("Queen") ? "fJ9rUzIMcZQ" : null);
+        ab2.abrir("google", "horarios de tren & más ñ");
+        ab2.abrir("youtube", "Queen Bohemian Rhapsody");
+        ab2.abrir("youtube", "algo sin resultados");
+        ab2.abrir("maps", "farmacia cerca");
+        ok(hecho.equals(List.of("web https://www.google.com/search?q=horarios%20de%20tren%20%26%20m%C3%A1s%20%C3%B1", "web https://www.youtube.com/watch?v=fJ9rUzIMcZQ",
+                "web https://www.youtube.com/results?search_query=algo%20sin%20resultados", "web https://www.google.com/maps/search/farmacia%20cerca")),
+                "abrir: buscar en Google, poner un vídeo de YouTube (o sus resultados si no lo encuentra) y Maps, con la búsqueda bien codificada");
         hecho.clear();
         ok(!ab.sabe("web", "javascript:alert(1)") && !ab.sabe("web", "https://usuario:clave@sitio.com") && !ab.sabe("web", "file:///C:/Windows/system.ini")
                 && !ab.sabe("web", "https://a.com/ b"), "abrir: solo http/https, sin usuario ni clave, sin ficheros locales");

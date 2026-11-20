@@ -38,10 +38,17 @@ public final class Abrir {
     private final Ficheros ficheros;
     private final Map<String, String> propios = new LinkedHashMap<>();
     private final Lanzador lanzador;
+    private final java.util.function.Function<String, String> primerVideo;
 
     public Abrir(Ficheros ficheros, Path appsTxt, Lanzador lanzador) {
+        this(ficheros, appsTxt, lanzador, Abrir::primerVideoDeYoutube);
+    }
+
+    /** {@code primerVideo}: dada una búsqueda, el identificador del primer vídeo de YouTube (o null). Se cambia en las pruebas. */
+    public Abrir(Ficheros ficheros, Path appsTxt, Lanzador lanzador, java.util.function.Function<String, String> primerVideo) {
         this.ficheros = ficheros;
         this.lanzador = lanzador;
+        this.primerVideo = primerVideo;
         try {
             if (appsTxt != null && Files.isRegularFile(appsTxt)) {
                 for (String l : Files.readAllLines(appsTxt, StandardCharsets.UTF_8)) {
@@ -92,6 +99,7 @@ public final class Abrir {
         try {
             return switch (que) {
                 case "web" -> uriSegura(valor) != null;
+                case "google", "youtube", "maps" -> valor != null && !valor.isBlank() && valor.length() <= 200 && valor.chars().noneMatch(c -> c < 32);
                 case "programa" -> exeDe(valor) != null;
                 case "carpeta", "documento" -> ficheros.dentro(valor) != null;
                 default -> false;
@@ -111,6 +119,28 @@ public final class Abrir {
                     }
                     lanzador.direccion(u);
                     return "Abierta " + u.getHost() + " en el navegador.";
+                }
+                case "google" -> {
+                    lanzador.direccion(URI.create("https://www.google.com/search?q=" + codificar(valor)));
+                    return "Buscando «" + valor + "» en Google.";
+                }
+                case "maps" -> {
+                    lanzador.direccion(URI.create("https://www.google.com/maps/search/" + codificar(valor)));
+                    return "Buscando «" + valor + "» en Google Maps.";
+                }
+                case "youtube" -> {
+                    String id = null;
+                    try {
+                        id = primerVideo.apply(valor);
+                    } catch (RuntimeException e) {
+                        // se abre la búsqueda
+                    }
+                    if (id != null && id.matches("[A-Za-z0-9_-]{11}")) {
+                        lanzador.direccion(URI.create("https://www.youtube.com/watch?v=" + id));
+                        return "Poniendo «" + valor + "» en YouTube. (Si el navegador no empieza solo, dale al play: a veces bloquea el sonido automático.)";
+                    }
+                    lanzador.direccion(URI.create("https://www.youtube.com/results?search_query=" + codificar(valor)));
+                    return "No he podido elegir el vídeo; te he abierto los resultados de «" + valor + "» en YouTube.";
                 }
                 case "programa" -> {
                     String exe = exeDe(valor);
@@ -138,6 +168,28 @@ public final class Abrir {
             }
         } catch (IllegalArgumentException | IOException e) {
             return "No he podido abrirlo: " + e.getMessage();
+        }
+    }
+
+    private static String codificar(String v) {
+        return java.net.URLEncoder.encode(v.strip(), StandardCharsets.UTF_8).replace("+", "%20");
+    }
+
+    /** El primer vídeo (no anuncio ni lista) de los resultados de YouTube para una búsqueda; null si no se puede saber. */
+    static String primerVideoDeYoutube(String busqueda) {
+        try {
+            var http = java.net.http.HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(10)).build();
+            var req = java.net.http.HttpRequest.newBuilder(URI.create("https://www.youtube.com/results?search_query=" + codificar(busqueda)))
+                    .timeout(java.time.Duration.ofSeconds(15)).header("Accept-Language", "es-ES,es;q=0.9")
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36").GET().build();
+            String html = http.send(req, java.net.http.HttpResponse.BodyHandlers.ofString()).body();
+            var m = java.util.regex.Pattern.compile("\"videoRenderer\":\\{\"videoId\":\"([A-Za-z0-9_-]{11})\"").matcher(html);
+            return m.find() ? m.group(1) : null;
+        } catch (IOException | RuntimeException e) {
+            return null;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
         }
     }
 
