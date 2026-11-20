@@ -22,7 +22,7 @@ public final class GeminiApi implements Cerebro {
     public static final String MODELO_POR_DEFECTO = "gemini-flash-latest";
     public static final String BASE = "https://generativelanguage.googleapis.com";
 
-    /** Sin cuota (429): quien llama puede dejarlo descansar un rato. */
+    /** Sin cuota (429) o demasiado lento: quien llama puede dejarlo descansar un rato. */
     public static final class SinCuota extends IllegalStateException {
         public SinCuota(String m) {
             super(m);
@@ -110,7 +110,7 @@ public final class GeminiApi implements Cerebro {
         RuntimeException ultimo = null;
         for (int intento = 1; intento <= 2; intento++) {
             try {
-                HttpRequest req = HttpRequest.newBuilder(url).timeout(Duration.ofSeconds(90))
+                HttpRequest req = HttpRequest.newBuilder(url).timeout(Duration.ofSeconds(25))
                         .header("content-type", "application/json").header("x-goog-api-key", clave)
                         .POST(HttpRequest.BodyPublishers.ofString(json)).build();
                 HttpResponse<String> r = http.send(req, HttpResponse.BodyHandlers.ofString());
@@ -134,6 +134,9 @@ public final class GeminiApi implements Cerebro {
                 if (r.statusCode() < 500) {
                     throw ultimo;
                 }
+            } catch (java.net.http.HttpTimeoutException e) {
+                // Tardar tanto no se arregla reintentando: se pasa a otra IA y Gemini descansa un rato.
+                throw new SinCuota("Gemini tarda demasiado (más de 25 s)");
             } catch (IOException e) {
                 ultimo = new IllegalStateException("Sin respuesta de Gemini: " + e.getClass().getSimpleName());
             } catch (InterruptedException e) {

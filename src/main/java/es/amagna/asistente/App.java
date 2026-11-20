@@ -109,6 +109,7 @@ public final class App {
                 case "expediente-prueba" -> expedientePrueba(Arrays.asList(args).subList(1, args.length));
                 case "tarea" -> tarea(Arrays.asList(args).subList(1, args.length));
                 case "telegram" -> telegramAsistente();
+                case "probar-gemini" -> probarGemini();
                 case "jarvis" -> jarvis(Arrays.asList(args).subList(1, args.length));
                 case "receta" -> receta(Arrays.asList(args).subList(1, args.length));
                 case "agente" -> agente(Arrays.asList(args).subList(1, args.length));
@@ -798,15 +799,7 @@ public final class App {
                 es.amagna.asistente.jarvis.Consumo.topeDe(datos.resolve("limite-tokens.txt")));
         // Otras IA: Gemini (clave: asistente secreto gemini) y un modelo local (datos\\ollama.txt = nombre del modelo). Solo para
         // texto sin datos del despacho; el enrutador decide en código y, ante la duda, todo va a Claude.
-        es.amagna.asistente.cerebro.Cerebro gemini = null;
-        String claveGemini = System.getenv("GEMINI_API_KEY");
-        if ((claveGemini == null || claveGemini.isBlank()) && es.amagna.asistente.manos.Secreto.hay("gemini")) {
-            claveGemini = new String(es.amagna.asistente.manos.Secreto.leer("gemini"));
-        }
-        if (claveGemini != null && !claveGemini.isBlank()) {
-            Path fm = datos.resolve("gemini-modelo.txt");
-            gemini = new es.amagna.asistente.cerebro.GeminiApi(claveGemini, Files.isRegularFile(fm) ? Files.readString(fm).strip() : null, null);
-        }
+        es.amagna.asistente.cerebro.Cerebro gemini = geminiDe(datos);
         es.amagna.asistente.cerebro.Cerebro local = null;
         Path fo = datos.resolve("ollama.txt");
         if (Files.isRegularFile(fo) && !Files.readString(fo).isBlank()) {
@@ -1635,6 +1628,36 @@ public final class App {
      * Deja Telegram listo paso a paso: comprueba el token, espera tu primer mensaje al bot y, si TÚ confirmas en esta consola que el
      * número es el tuyo, lo añade a datos\\autorizados.txt. Nadie queda autorizado sin que una persona lo teclee aquí.
      */
+    /** Gemini si hay clave (variable GEMINI_API_KEY o «asistente secreto gemini»); si no, null. */
+    private static es.amagna.asistente.cerebro.Cerebro geminiDe(Path datos) throws IOException {
+        String clave = System.getenv("GEMINI_API_KEY");
+        if ((clave == null || clave.isBlank()) && es.amagna.asistente.manos.Secreto.hay("gemini")) {
+            clave = new String(es.amagna.asistente.manos.Secreto.leer("gemini"));
+        }
+        if (clave == null || clave.isBlank()) {
+            return null;
+        }
+        Path fm = datos.resolve("gemini-modelo.txt");
+        return new es.amagna.asistente.cerebro.GeminiApi(clave, Files.isRegularFile(fm) ? Files.readString(fm).strip() : null, null);
+    }
+
+    /** «asistente probar-gemini»: manda una frase corta a Gemini y dice cuánto tarda o qué falla (sin enseñar la clave). */
+    private static void probarGemini() throws IOException {
+        var g = geminiDe(Path.of("datos"));
+        if (g == null) {
+            System.out.println("No hay clave de Gemini. Guárdala con guardar-gemini.cmd.");
+            return;
+        }
+        long t0 = System.currentTimeMillis();
+        try {
+            var r = g.pensar(new java.util.LinkedHashMap<String, Object>(java.util.Map.of("model", "x", "max_tokens", 100,
+                    "messages", List.of(java.util.Map.of("role", "user", "content", "Responde solo con la palabra: listo")))));
+            System.out.println("Gemini contesta en " + (System.currentTimeMillis() - t0) + " ms: " + r.get("content"));
+        } catch (RuntimeException e) {
+            System.out.println("Gemini falla tras " + (System.currentTimeMillis() - t0) + " ms: " + e.getMessage());
+        }
+    }
+
     private static void telegramAsistente() throws IOException {
         if (!es.amagna.asistente.manos.Secreto.hay("telegram")) {
             System.out.println("Todavía no hay token de Telegram. 1) En Telegram abre @BotFather, escribe /newbot y sigue los pasos.\n"
