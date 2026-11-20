@@ -46,6 +46,8 @@ final class ComprobacionesJarvis {
             web();
             variasIA();
             correo();
+            microsoft();
+            abrir();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -939,5 +941,124 @@ final class ComprobacionesJarvis {
                 }, java.util.Set.of("yo"), x -> { }).conCaptura(() -> Path.of("captura-1.png"));
         svc.recibir("local", "yo", "captura");
         ok(fotos.equals(List.of("captura-1.png")), "captura: «captura» manda lo que se ve en pantalla, sin IA");
+    }
+
+    static void microsoft() throws Exception {
+        var visto = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        var intentos = new java.util.concurrent.atomic.AtomicInteger();
+        var srv = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        java.util.function.BiConsumer<com.sun.net.httpserver.HttpExchange, String> responde = (ex, cuerpo) -> {
+            try {
+                byte[] r = cuerpo.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                ex.sendResponseHeaders(200, r.length);
+                ex.getResponseBody().write(r);
+                ex.close();
+            } catch (java.io.IOException e) {
+                throw new RuntimeException(e);
+            }
+        };
+        srv.createContext("/common/oauth2/v2.0/devicecode", ex -> responde.accept(ex,
+                "{\"device_code\":\"DC\",\"user_code\":\"ABC123\",\"verification_uri\":\"https://microsoft.com/devicelogin\",\"expires_in\":60,\"interval\":0,\"message\":\"Abre la web y escribe ABC123\"}"));
+        srv.createContext("/common/oauth2/v2.0/token", ex -> {
+            String cuerpo = new String(ex.getRequestBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            visto.add("token " + cuerpo.replaceAll("refresh_token=[^&]*", "refresh_token=…"));
+            if (cuerpo.contains("device_code")) {
+                responde.accept(ex, intentos.incrementAndGet() == 1 ? "{\"error\":\"authorization_pending\"}"
+                        : "{\"access_token\":\"AT1\",\"refresh_token\":\"RT1\",\"expires_in\":3600}");
+            } else {
+                responde.accept(ex, "{\"access_token\":\"AT2\",\"refresh_token\":\"RT2\",\"expires_in\":3600}");
+            }
+        });
+        srv.createContext("/v1.0/me/sendMail", ex -> {
+            visto.add("sendMail " + ex.getRequestHeaders().getFirst("Authorization") + " " + new String(ex.getRequestBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+            ex.sendResponseHeaders(202, -1);
+            ex.close();
+        });
+        srv.createContext("/v1.0/me/mailFolders/inbox/messages", ex -> {
+            visto.add("leer " + ex.getRequestURI().getRawQuery() + " prefer=" + ex.getRequestHeaders().getFirst("Prefer"));
+            responde.accept(ex, "{\"value\":[{\"from\":{\"emailAddress\":{\"name\":\"Ana\",\"address\":\"ana@x.com\"}},\"subject\":\"Hola\",\"receivedDateTime\":\"2026-11-20T10:00:00Z\",\"body\":{\"content\":\"Texto del correo\"}}]}");
+        });
+        srv.createContext("/v1.0/me", ex -> responde.accept(ex, "{\"mail\":\"jarvis@empresa.onmicrosoft.com\"}"));
+        srv.start();
+        try {
+            String base = "http://127.0.0.1:" + srv.getAddress().getPort();
+            var mostrado = new java.util.ArrayList<String>();
+            var sesion = es.amagna.asistente.jarvis.CorreoMicrosoft.iniciarSesion("CLIENT", null, base, base, mostrado::add);
+            ok(mostrado.get(0).contains("ABC123") && sesion.refresco().equals("RT1") && sesion.direccion().equals("jarvis@empresa.onmicrosoft.com"),
+                    "microsoft: el inicio de sesión por código espera a que se use y devuelve la sesión y la dirección");
+            var guardado = new java.util.ArrayList<String>();
+            var ms = new es.amagna.asistente.jarvis.CorreoMicrosoft("CLIENT", null, "jarvis@empresa.onmicrosoft.com", base, base, () -> "RT1", guardado::add);
+            Path adj = Files.createTempFile("adj", ".txt");
+            Files.writeString(adj, "hola");
+            ms.enviar(List.of("ana@despacho.es"), "Asunto ñ", "Texto del correo", List.of(adj));
+            String envio = visto.stream().filter(v -> v.startsWith("sendMail")).findFirst().orElse("");
+            ok(envio.contains("Bearer AT2") && envio.contains("ana@despacho.es") && envio.contains("Asunto ñ") && envio.contains("fileAttachment"),
+                    "microsoft: envía por Graph con el token renovado, los destinatarios y el adjunto");
+            ok(guardado.equals(List.of("RT2")), "microsoft: guarda el token de sesión nuevo que le da Microsoft");
+            var l = ms.noLeidos(3);
+            ok(l.size() == 1 && l.get(0).de().contains("ana@x.com") && l.get(0).texto().equals("Texto del correo")
+                    && visto.stream().anyMatch(v -> v.startsWith("leer") && v.contains("isRead") && v.contains("prefer=outlook.body-content-type=\"text\"")),
+                    "microsoft: lee los no leídos (sin marcarlos) en texto plano");
+            Path grande = Files.createTempFile("grande", ".bin");
+            Files.write(grande, new byte[4 * 1024 * 1024]);
+            boolean rechaza = false;
+            try {
+                ms.enviar(List.of("ana@despacho.es"), "x", "y", List.of(grande));
+            } catch (IllegalArgumentException e) {
+                rechaza = true;
+            }
+            ok(rechaza, "microsoft: no manda adjuntos de más de 3 MB (límite de Outlook en un envío)");
+            ok(visto.stream().noneMatch(v -> v.contains("RT1") && v.startsWith("sendMail")), "microsoft: el token de sesión nunca va en el envío");
+        } finally {
+            srv.stop(0);
+        }
+    }
+
+    static void abrir() throws Exception {
+        Path carpeta = Files.createTempDirectory("trab");
+        Files.writeString(carpeta.resolve("informe.pdf"), "x");
+        Files.writeString(carpeta.resolve("virus.bat"), "x");
+        Path apps = Files.createTempFile("apps", ".txt");
+        Files.writeString(apps, "mi programa=C:\\Programas\\mio.exe\nmala=C:\\Windows\\System32\\cmd.exe\nsetup=C:\\x\\setup.exe\n");
+        var hecho = new java.util.ArrayList<String>();
+        var lanz = new es.amagna.asistente.jarvis.Abrir.Lanzador() {
+            public void programa(String exe) {
+                hecho.add("programa " + exe);
+            }
+
+            public void direccion(java.net.URI u) {
+                hecho.add("web " + u);
+            }
+
+            public void ruta(Path p) {
+                hecho.add("ruta " + p.getFileName());
+            }
+        };
+        var ab = new es.amagna.asistente.jarvis.Abrir(new es.amagna.asistente.jarvis.Ficheros(List.of(carpeta)), apps, lanz);
+        ab.abrir("web", "https://www.google.com/search?q=hola");
+        ab.abrir("programa", "Calculadora");
+        ab.abrir("programa", "mi programa");
+        ab.abrir("documento", "informe.pdf");
+        ok(hecho.equals(List.of("web https://www.google.com/search?q=hola", "programa calc.exe", "programa C:\\Programas\\mio.exe", "ruta informe.pdf")),
+                "abrir: web, programa de la lista, programa propio y documento");
+        hecho.clear();
+        ok(!ab.sabe("web", "javascript:alert(1)") && !ab.sabe("web", "https://usuario:clave@sitio.com") && !ab.sabe("web", "file:///C:/Windows/system.ini")
+                && !ab.sabe("web", "https://a.com/ b"), "abrir: solo http/https, sin usuario ni clave, sin ficheros locales");
+        ok(!ab.sabe("programa", "powershell") && !ab.sabe("programa", "mala") && !ab.sabe("programa", "setup") && !ab.sabe("programa", "algo raro"),
+                "abrir: ni consolas, ni instaladores, ni lo que no está en la lista (ni siquiera en apps.txt)");
+        ok(!ab.sabe("documento", "/etc/passwd") && ab.abrir("documento", "virus.bat").startsWith("NO PERMITIDO") && hecho.isEmpty(),
+                "abrir: nada fuera de las carpetas de trabajo y ningún script");
+        // Servicio: abrir directo, y lo que no sabe pasa a «libre» con confirmación
+        var dicho = new java.util.ArrayList<String>();
+        var alm = new Almacen(Files.createTempDirectory("alm"));
+        String[] resp = {"{\"tipo\":\"abrir\",\"params\":{\"que\":\"programa\",\"valor\":\"calculadora\"},\"texto\":\"la calculadora\"}"};
+        var sv = new Servicio(alm, new Interprete(p0 -> Map.of("content", List.of(Map.of("type", "text", "text", resp[0]))), "m"),
+                t -> new Servicio.Resultado(true, "x"), t -> new Servicio.Resultado(true, "x"), (o, q, tx) -> dicho.add(tx), java.util.Set.of("yo"), x -> { }).conAbrir(ab);
+        sv.recibir("local", "yo", "abre la calculadora");
+        ok(hecho.equals(List.of("programa calc.exe")) && dicho.get(dicho.size() - 1).startsWith("Abierto"), "servicio: abrir una app de la lista se hace al momento, sin IA ni preguntar");
+        hecho.clear();
+        resp[0] = "{\"tipo\":\"abrir\",\"params\":{\"que\":\"programa\",\"valor\":\"photoshop\"},\"texto\":\"Photoshop\"}";
+        sv.recibir("local", "yo", "abre photoshop");
+        ok(hecho.isEmpty() && alm.en(Trabajo.ESPERANDO).size() == 1 && dicho.get(dicho.size() - 1).contains("¿Lo hago?"), "servicio: una app que no está en la lista pide confirmación antes (vía libre)");
     }
 }

@@ -80,7 +80,7 @@ public final class Agente {
     private Expediente expediente;
     private es.amagna.asistente.jarvis.Ficheros ficheros;
     private es.amagna.asistente.jarvis.Oficina oficina;
-    private es.amagna.asistente.jarvis.Correo correo;
+    private es.amagna.asistente.jarvis.Buzon correo;
     private es.amagna.asistente.jarvis.Web web;
 
     /** Le da lectura de páginas web (solo https, nunca la red interna). */
@@ -91,7 +91,7 @@ public final class Agente {
 
     /** Le da manos para ficheros (solo dentro de las carpetas permitidas de {@code Ficheros}). */
     /** Le da el correo para LEER (nunca para enviar: enviar solo se hace tras la confirmación de la persona). */
-    public Agente conCorreo(es.amagna.asistente.jarvis.Correo c) {
+    public Agente conCorreo(es.amagna.asistente.jarvis.Buzon c) {
         this.correo = c;
         return this;
     }

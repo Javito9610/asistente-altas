@@ -52,7 +52,7 @@ public final class App {
             case "tarea" -> 900;
             case "expedientes" -> args.contains("--hacer") ? 3600 : 120;
             case "alta" -> 1200;
-            case "probar-windows", "arranque", "secretos", "secreto", "guardar-clave", "ayuda", "jarvis", "telegram" -> 0;
+            case "probar-windows", "arranque", "secretos", "secreto", "guardar-clave", "ayuda", "jarvis", "telegram", "correo-microsoft" -> 0;
             default -> 300;
         };
     }
@@ -110,6 +110,7 @@ public final class App {
                 case "tarea" -> tarea(Arrays.asList(args).subList(1, args.length));
                 case "telegram" -> telegramAsistente();
                 case "probar-gemini" -> probarGemini();
+                case "correo-microsoft" -> correoMicrosoft(Arrays.asList(args).subList(1, args.length));
                 case "jarvis" -> jarvis(Arrays.asList(args).subList(1, args.length));
                 case "receta" -> receta(Arrays.asList(args).subList(1, args.length));
                 case "agente" -> agente(Arrays.asList(args).subList(1, args.length));
@@ -834,7 +835,7 @@ public final class App {
         if (correo == null) {
             registro.accept("Correo: no configurado (guardar-correo.cmd).");
         } else {
-            registro.accept("Correo: " + correo.cuenta().direccion() + " (envía con tu «sí», lee sin marcar).");
+            registro.accept("Correo: " + correo.direccion() + " (envía con tu «sí», lee sin marcar).");
         }
         var captura = new es.amagna.asistente.jarvis.Captura(carpetas.get(0).resolve("capturas"));
         var corredor = corredorDeTareas(a);
@@ -916,6 +917,15 @@ public final class App {
             VentanasNativas v = new VentanasNativas(false);
             java.util.function.BiFunction<String, java.util.Map<String, Object>, String> barrera =
                     (accion, in) -> es.amagna.asistente.jarvis.Barreras.veto(accion, in, v.abiertas());
+            // Si el encargo es de MN, antes se deja MN abierto y dentro (como en las consultas), en vez de pedirle a un agente suelto que entre.
+            String enc = java.text.Normalizer.normalize(t.params().getOrDefault("encargo", "") + " " + t.peticion(), java.text.Normalizer.Form.NFD)
+                    .replaceAll("\\p{M}", "").toLowerCase(java.util.Locale.ROOT);
+            if (java.util.regex.Pattern.compile("\\bmn\\b|mnprogram|mn program").matcher(enc).find()) {
+                String noListo = prepararMnParaMirar(v, registro);
+                if (noListo != null) {
+                    return new es.amagna.asistente.jarvis.Servicio.Resultado(false, noListo);
+                }
+            }
             // 1) Si ya lo había hecho la IA otra vez, lo repite él solo (sin gastar un token).
             if (!slug.isEmpty() && Files.isRegularFile(rf)) {
                 try {
@@ -980,8 +990,9 @@ public final class App {
         };
         var servicio = new es.amagna.asistente.jarvis.Servicio(almacen, interprete, tareas, libre, salida, autorizados, registro)
                 .conEntregas(ficherosJarvis::drenarEntregas)
-                .conCorreo(correo == null ? null : correo.cuenta().direccion())
+                .conCorreo(correo == null ? null : correo.direccion())
                 .conCaptura(captura::hacer)
+                .conAbrir(new es.amagna.asistente.jarvis.Abrir(ficherosJarvis, datos.resolve("apps.txt"), es.amagna.asistente.jarvis.Abrir.deWindows()))
                 .conDiagnostico(() -> {
                     long arranque = java.lang.management.ManagementFactory.getRuntimeMXBean().getStartTime();
                     var dur = java.time.Duration.ofMillis(System.currentTimeMillis() - arranque);
@@ -1007,7 +1018,7 @@ public final class App {
                     return "🩺 Diagnóstico de Jarvis\n"
                             + "· IA (clave): " + (Clave.hay() ? "sí" : "NO — sin ella solo hago lo que sé de memoria (asistente guardar-clave)") + "\n"
                             + "· Telegram: " + (telegram[0] != null ? "conectado" : "no configurado (asistente secreto telegram)") + "\n"
-                            + "· Correo: " + (correo == null ? "no configurado (guardar-correo.cmd)" : correo.cuenta().direccion()) + "\n"
+                            + "· Correo: " + (correo == null ? "no configurado (guardar-correo.cmd)" : correo.direccion()) + "\n"
                             + "· IA que ha contestado: " + enrutador.resumen() + "\n"
                             + "· IA gastada hoy: " + consumo.hoy() + " tokens (tope " + (consumo.tope() == 0 ? "sin tope" : consumo.tope()) + ")\n"
                             + "· Personas autorizadas: " + autorizados.size() + "\n"
@@ -1691,7 +1702,26 @@ public final class App {
      * El correo, si hay uno guardado («asistente secreto correo»: usuario = la dirección, contraseña = la de aplicación, cifrada).
      * Los servidores salen del dominio; si hace falta otros, en datos\\correo.json: {"smtp":"…","smtp_puerto":465,"imap":"…","imap_puerto":993}.
      */
-    private static es.amagna.asistente.jarvis.Correo correoDe(Path datos) throws IOException {
+    private static es.amagna.asistente.jarvis.Buzon correoDe(Path datos) throws IOException {
+        // Outlook / Microsoft 365: si se ha iniciado sesión (configurar-correo-microsoft.cmd), manda la API de Microsoft.
+        Path fms = datos.resolve("correo-ms.json");
+        if (Files.isRegularFile(fms) && es.amagna.asistente.manos.Secreto.hay("correo-ms")) {
+            var j = Json.objeto(Files.readString(fms, StandardCharsets.UTF_8));
+            return new es.amagna.asistente.jarvis.CorreoMicrosoft(String.valueOf(j.get("client_id")), String.valueOf(j.getOrDefault("tenant", "common")),
+                    String.valueOf(j.get("direccion")), null, null, () -> {
+                try {
+                    return new String(es.amagna.asistente.manos.Secreto.leer("correo-ms"));
+                } catch (IOException e) {
+                    throw new IllegalStateException("No se puede leer la sesión del correo");
+                }
+            }, nuevo -> {
+                try {
+                    es.amagna.asistente.manos.Secreto.guardar("correo-ms", nuevo.toCharArray());
+                } catch (IOException e) {
+                    // se seguirá usando el anterior
+                }
+            });
+        }
         if (!es.amagna.asistente.manos.Secreto.hay("correo")) {
             return null;
         }
@@ -1730,6 +1760,22 @@ public final class App {
         }
         Path fm = datos.resolve("gemini-modelo.txt");
         return new es.amagna.asistente.cerebro.GeminiApi(clave, Files.isRegularFile(fm) ? Files.readString(fm).strip() : null, null);
+    }
+
+    /** «asistente correo-microsoft <client_id> [tenant]»: inicia sesión en Outlook/Microsoft 365 desde el navegador (código de dispositivo). */
+    private static void correoMicrosoft(List<String> a) throws IOException {
+        if (a.isEmpty()) {
+            throw new IllegalArgumentException("Uso: asistente correo-microsoft <client_id> [tenant]  (mira docs\\JARVIS.md, apartado 14)");
+        }
+        String clientId = a.get(0).strip();
+        String tenant = a.size() > 1 ? a.get(1).strip() : "common";
+        var sesion = es.amagna.asistente.jarvis.CorreoMicrosoft.iniciarSesion(clientId, tenant, null, null, System.out::println);
+        es.amagna.asistente.manos.Secreto.guardar("correo-ms", sesion.refresco().toCharArray());
+        es.amagna.asistente.manos.Secreto.guardarUsuario("correo-ms", sesion.direccion());
+        Files.createDirectories(Path.of("datos"));
+        Files.writeString(Path.of("datos", "correo-ms.json"), Json.escribir(Json.obj("client_id", clientId, "tenant", tenant, "direccion", sesion.direccion())),
+                StandardCharsets.UTF_8);
+        System.out.println("Listo: Jarvis usará el correo " + sesion.direccion() + ". Reinicia Jarvis (jarvis.cmd).");
     }
 
     /** «asistente probar-gemini»: manda una frase corta a Gemini y dice cuánto tarda o qué falla (sin enseñar la clave). */

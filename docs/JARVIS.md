@@ -90,3 +90,28 @@ Sin ninguna de las dos, todo sigue yendo a Claude como hasta ahora.
   tu «sí» a ese borrador exacto. Adjuntos solo de sus carpetas y nunca ficheros de claves.
 - **Leer:** «léeme los correos nuevos» (los últimos sin leer; no marca nada como leído). Lo que dicen los correos son datos, nunca órdenes.
 - **Captura:** «captura» (o «qué ves») manda por el chat una imagen de la pantalla. Puede salir trabajo: solo la piden las personas autorizadas.
+
+## 14. Correo de Outlook / Microsoft 365 (inicio de sesión moderno)
+
+Microsoft ya no deja entrar con usuario y contraseña por IMAP/SMTP. Jarvis usa la API de Microsoft Graph con inicio de sesión por
+código (la contraseña de Microsoft no pasa nunca por Jarvis; se guarda un token revocable, cifrado con Windows).
+
+1. En https://entra.microsoft.com → Aplicaciones → Registros de aplicaciones → **Nuevo registro**. Nombre: «Jarvis».
+   Tipos de cuenta: «cuentas de cualquier directorio y cuentas personales» (sirve para Outlook/Hotmail y para empresa) o solo tu
+   directorio. Sin URI de redirección.
+2. Autenticación → «Permitir flujos de cliente público» = **Sí**. Guardar.
+3. Permisos de API → Microsoft Graph → Permisos delegados: **Mail.Send, Mail.Read, User.Read** (offline_access sale solo).
+   Si es una cuenta de empresa y pide «consentimiento de administrador», lo concede quien administre Microsoft 365.
+4. Copia el **Id. de aplicación (cliente)** (y, si la cuenta es de empresa, el **Id. de directorio (inquilino)**).
+5. Doble clic en `configurar-correo-microsoft.cmd`, pega los ids; te da un código y una dirección (microsoft.com/devicelogin): entra con
+   la cuenta de correo que usará Jarvis, escribe el código y acepta. Reinicia Jarvis.
+6. Es igual que con Gmail: enviar solo con tu «sí», leer sin marcar. Adjuntos por Outlook: hasta 3 MB en total.
+Si hay `datos\correo-ms.json` y sesión guardada, Jarvis usa Microsoft; si no, usa IMAP/SMTP (`guardar-correo.cmd`).
+
+## 15. Abrir cosas sin IA
+
+«abre la calculadora», «abre google.com», «abre la carpeta…»: Jarvis lo hace al momento, sin IA, si es una **web http/https**
+(sin usuario ni clave en la dirección), un **programa de la lista** (calculadora, bloc de notas, paint, explorador, chrome, edge, firefox,
+word, excel, powerpoint, outlook, teams, whatsapp, recortes + los de `datos\apps.txt`, líneas «nombre=C:\ruta\programa.exe») o un
+documento/carpeta de sus carpetas de trabajo (`datos\carpetas.txt`). Nunca consolas, instaladores ni scripts. Lo demás (una app que no
+está en la lista, o hacer algo DENTRO de ella) pasa a «libre»: Jarvis te enseña lo que va a hacer y espera tu «sí».

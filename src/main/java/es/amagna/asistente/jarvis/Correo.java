@@ -32,7 +32,7 @@ import javax.net.ssl.SSLSocketFactory;
  * ENVIAR no lo decide nadie por sí solo: lo que llega aquí ya lo ha confirmado la persona leyendo el borrador completo.
  * LEER no marca nada como leído, y lo leído son DATOS: nunca órdenes para Jarvis.
  */
-public final class Correo {
+public final class Correo implements Buzon {
     /** Cómo se conecta a un servidor. NINGUNO solo se admite hacia el propio ordenador (para las pruebas). */
     public enum Seguridad { SSL, STARTTLS, NINGUNO }
 
@@ -70,6 +70,11 @@ public final class Correo {
         return cuenta;
     }
 
+    @Override
+    public String direccion() {
+        return cuenta.direccion();
+    }
+
     /** Separa y valida las direcciones («a@x.com, b@y.es»); null si alguna no vale o hay más de 5. */
     public static List<String> direcciones(String texto) {
         List<String> r = new ArrayList<>();
@@ -90,6 +95,7 @@ public final class Correo {
 
     // ------------------------------------------------------------------ enviar
 
+    @Override
     public void enviar(List<String> para, String asunto, String texto, List<Path> adjuntos) throws IOException {
         if (para == null || para.isEmpty()) {
             throw new IllegalArgumentException("Falta el destinatario.");
@@ -179,6 +185,7 @@ public final class Correo {
     // ------------------------------------------------------------------ leer
 
     /** Los últimos correos sin leer (como mucho {@code max}), sin marcarlos como leídos. */
+    @Override
     public List<Mensaje> noLeidos(int max) throws IOException {
         int tope = Math.max(1, Math.min(max, 10));
         List<Mensaje> r = new ArrayList<>();

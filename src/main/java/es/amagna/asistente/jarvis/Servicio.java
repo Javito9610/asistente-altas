@@ -64,6 +64,13 @@ public final class Servicio {
     private boolean correoListo;
     private String correoDe = "";
     private java.util.function.Supplier<java.nio.file.Path> captura;
+    private Abrir abridor;
+
+    /** Cómo abrir páginas, programas y carpetas sin IA (lo que no sepa abrir pasa a «libre», con confirmación). */
+    public Servicio conAbrir(Abrir a) {
+        this.abridor = a;
+        return this;
+    }
 
     /** Que hay un correo configurado (dirección desde la que se envía). Sin esto, «correo» pide configurarlo. */
     public Servicio conCorreo(String direccion) {
@@ -318,6 +325,19 @@ public final class Servicio {
                 decir(origen, quien, "Voy a enviar este correo, desde " + correoDe + ":\n\nPara: " + ps.get("para") + "\nAsunto: " + ps.get("asunto")
                         + (ps.getOrDefault("adjuntos", "").isBlank() ? "" : "\nAdjuntos: " + ps.get("adjuntos")) + "\n\n" + e.texto()
                         + "\n\n¿Lo envío? (sí / no)");
+            }
+            case Entendido.ABRIR -> {
+                String que = e.params().getOrDefault("que", "");
+                String valor = e.params().getOrDefault("valor", "");
+                if (abridor != null && abridor.sabe(que, valor)) {
+                    decir(origen, quien, abridor.abrir(que, valor));
+                } else {
+                    // No está en lo que abro sin preguntar: lo hace la vía «libre», pidiendo el sí.
+                    Map<String, String> ps = new java.util.LinkedHashMap<>();
+                    ps.put("encargo", "Abrir " + (e.texto().isBlank() ? valor : e.texto()) + " (" + que + ": " + valor + ")");
+                    almacen.nuevo(origen, quien, texto, "libre", ps, Trabajo.ESPERANDO);
+                    decir(origen, quien, "Eso no está en mi lista de cosas que abro sin preguntar. Lo haría en el ordenador a mano: " + ps.get("encargo") + "\n¿Lo hago? (sí / no)");
+                }
             }
             case Entendido.CONSULTAR -> {
                 almacen.nuevo(origen, quien, texto, "consulta", Map.of("pregunta", e.texto()), Trabajo.PENDIENTE);
