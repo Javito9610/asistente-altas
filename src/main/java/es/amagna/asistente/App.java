@@ -796,7 +796,24 @@ public final class App {
         };
         var consumo = new es.amagna.asistente.jarvis.Consumo(cerebro, datos.resolve("consumo.json"),
                 es.amagna.asistente.jarvis.Consumo.topeDe(datos.resolve("limite-tokens.txt")));
-        var interprete = new es.amagna.asistente.jarvis.Interprete(consumo, MODELO_POR_DEFECTO);
+        // Otras IA: Gemini (clave: asistente secreto gemini) y un modelo local (datos\\ollama.txt = nombre del modelo). Solo para
+        // texto sin datos del despacho; el enrutador decide en código y, ante la duda, todo va a Claude.
+        es.amagna.asistente.cerebro.Cerebro gemini = null;
+        String claveGemini = System.getenv("GEMINI_API_KEY");
+        if ((claveGemini == null || claveGemini.isBlank()) && es.amagna.asistente.manos.Secreto.hay("gemini")) {
+            claveGemini = new String(es.amagna.asistente.manos.Secreto.leer("gemini"));
+        }
+        if (claveGemini != null && !claveGemini.isBlank()) {
+            Path fm = datos.resolve("gemini-modelo.txt");
+            gemini = new es.amagna.asistente.cerebro.GeminiApi(claveGemini, Files.isRegularFile(fm) ? Files.readString(fm).strip() : null, null);
+        }
+        es.amagna.asistente.cerebro.Cerebro local = null;
+        Path fo = datos.resolve("ollama.txt");
+        if (Files.isRegularFile(fo) && !Files.readString(fo).isBlank()) {
+            local = new es.amagna.asistente.cerebro.OllamaApi(Files.readString(fo).strip(), null);
+        }
+        var enrutador = new es.amagna.asistente.cerebro.Enrutador(consumo, gemini, local, registro);
+        var interprete = new es.amagna.asistente.jarvis.Interprete(enrutador, MODELO_POR_DEFECTO);
         java.util.Set<String> autorizados = new java.util.HashSet<>(java.util.Set.of("local"));
         Path fa = datos.resolve("autorizados.txt");
         if (Files.isRegularFile(fa)) {
@@ -963,6 +980,7 @@ public final class App {
                     return "🩺 Diagnóstico de Jarvis\n"
                             + "· IA (clave): " + (Clave.hay() ? "sí" : "NO — sin ella solo hago lo que sé de memoria (asistente guardar-clave)") + "\n"
                             + "· Telegram: " + (telegram[0] != null ? "conectado" : "no configurado (asistente secreto telegram)") + "\n"
+                            + "· IA que ha contestado: " + enrutador.resumen() + "\n"
                             + "· IA gastada hoy: " + consumo.hoy() + " tokens (tope " + (consumo.tope() == 0 ? "sin tope" : consumo.tope()) + ")\n"
                             + "· Personas autorizadas: " + autorizados.size() + "\n"
                             + "· MN abierto: " + (mn ? "sí" : "no") + "\n"
@@ -1710,7 +1728,9 @@ public final class App {
         // El usuario no es secreto, pero sin él la contraseña no sirve: se piden los dos juntos.
         String yaHay = es.amagna.asistente.manos.Secreto.usuario(nombre);
         String usuario;
-        if (a.contains("--usuario")) {
+        if (java.util.Set.of("telegram", "gemini").contains(nombre)) {
+            usuario = nombre; // una clave de API no tiene usuario
+        } else if (a.contains("--usuario")) {
             usuario = a.get(a.indexOf("--usuario") + 1);
         } else {
             // La pregunta se escribe por la salida de siempre y se fuerza a que salga: así no depende de cómo trate

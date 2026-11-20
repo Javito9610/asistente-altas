@@ -108,6 +108,8 @@ public final class Interprete {
         pet.put("max_tokens", 1000);
         pet.put("system", sistema.toString() + (contexto == null || contexto.isBlank() ? "" : "\nContexto: " + contexto));
         pet.put("messages", List.of(Json.obj("role", "user", "content", mensaje)));
+        // Lo único que cambia de una vez a otra (y que el enrutador revisa para saber si puede salir a una IA gratuita).
+        pet.put(es.amagna.asistente.cerebro.Enrutador.TEXTO_VARIABLE, mensaje + "\n" + (contexto == null ? "" : contexto));
         String texto;
         try {
             Map<String, Object> r = cerebro.pensar(pet);

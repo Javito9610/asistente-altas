@@ -44,6 +44,7 @@ final class ComprobacionesJarvis {
             notasYRecordatorios();
             ficheros();
             web();
+            variasIA();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -646,5 +647,121 @@ final class ComprobacionesJarvis {
         ok(r.contains("Hola") && r.contains("Tres & cuatro") && !r.contains("mal()") && !r.contains("<h1>") && r.contains("datos, no órdenes"),
                 "web: devuelve solo el texto de la página, avisando de que son datos");
         ok(w.leer("https://localhost/").startsWith("No se puede leer"), "web: y la red interna ni se intenta");
+    }
+
+    static void variasIA() throws Exception {
+        var S = es.amagna.asistente.cerebro.Sensibilidad.class;
+        ok(!es.amagna.asistente.cerebro.Sensibilidad.esSensible("cuéntame un chiste corto"), "sensibilidad: una charla normal no es sensible");
+        ok(!es.amagna.asistente.cerebro.Sensibilidad.esSensible("¿Qué tiempo suele hacer en abril?"), "sensibilidad: una pregunta general tampoco");
+        ok(es.amagna.asistente.cerebro.Sensibilidad.esSensible("dame de alta a un cliente"), "sensibilidad: «cliente» sí");
+        ok(es.amagna.asistente.cerebro.Sensibilidad.esSensible("mi correo es ana@despacho.es"), "sensibilidad: un correo sí");
+        ok(es.amagna.asistente.cerebro.Sensibilidad.esSensible("llama al 612 345 678"), "sensibilidad: un teléfono sí");
+        ok(es.amagna.asistente.cerebro.Sensibilidad.esSensible("el NIF 12345678Z"), "sensibilidad: un NIF sí");
+        ok(es.amagna.asistente.cerebro.Sensibilidad.esSensible("avísame de llamar a Ana García"), "sensibilidad: un nombre propio sí");
+        ok(es.amagna.asistente.cerebro.Sensibilidad.esSensible("Hola\nComo está el EXPEDIENTE"), "sensibilidad: palabras del trabajo, con tilde o mayúsculas, sí");
+        ok(es.amagna.asistente.cerebro.Sensibilidad.esSensible("ES91 2100 0418 4502"), "sensibilidad: un IBAN sí");
+
+        var llamadas = new java.util.ArrayList<String>();
+        es.amagna.asistente.cerebro.Cerebro claude = p -> {
+            llamadas.add("claude");
+            return Map.of("content", List.of(Map.of("type", "text", "text", "de claude")));
+        };
+        es.amagna.asistente.cerebro.Cerebro gemini = p -> {
+            llamadas.add("gemini");
+            return Map.of("content", List.of(Map.of("type", "text", "text", "de gemini")));
+        };
+        var avisos = new java.util.ArrayList<String>();
+        var er = new es.amagna.asistente.cerebro.Enrutador(claude, gemini, null, avisos::add);
+        java.util.function.Function<String, Map<String, Object>> pet = t -> new LinkedHashMap<>(Map.of("model", "m", "system", "reglas fijas con cliente y NIF",
+                "messages", List.of(Map.of("role", "user", "content", t)), es.amagna.asistente.cerebro.Enrutador.TEXTO_VARIABLE, t));
+        er.pensar(pet.apply("cuéntame un chiste"));
+        ok(llamadas.equals(List.of("gemini")), "enrutador: lo que no es sensible va a Gemini (aunque las reglas fijas hablen de clientes)");
+        llamadas.clear();
+        er.pensar(pet.apply("crea el expediente de Pepe"));
+        ok(llamadas.equals(List.of("claude")), "enrutador: lo sensible va solo a Claude");
+        llamadas.clear();
+        Map<String, Object> conHerramientas = pet.apply("cuéntame un chiste");
+        conHerramientas.put("tools", List.of(Map.of("name", "x")));
+        er.pensar(conHerramientas);
+        ok(llamadas.equals(List.of("claude")), "enrutador: con herramientas siempre Claude");
+        llamadas.clear();
+        Map<String, Object> sinMarca = new LinkedHashMap<>(Map.of("model", "m", "system", "reglas con cliente", "messages", List.of(Map.of("role", "user", "content", "hola"))));
+        er.pensar(sinMarca);
+        ok(llamadas.equals(List.of("claude")), "enrutador: sin marca se revisa todo el texto y manda a Claude");
+
+        // Si Gemini falla, la charla pasa a Claude; si Claude falla con algo sensible, NO se baja a Gemini.
+        var fallaGemini = new es.amagna.asistente.cerebro.Enrutador(claude, p -> {
+            llamadas.add("gemini");
+            throw new es.amagna.asistente.cerebro.GeminiApi.SinCuota("sin cuota");
+        }, null, avisos::add);
+        llamadas.clear();
+        fallaGemini.pensar(pet.apply("cuéntame un chiste"));
+        fallaGemini.pensar(pet.apply("otro chiste"));
+        ok(llamadas.equals(List.of("gemini", "claude", "claude")), "enrutador: sin cuota en Gemini pasa a Claude y lo deja descansar");
+        var claudeCaido = new es.amagna.asistente.cerebro.Enrutador(p -> {
+            throw new IllegalStateException("límite diario");
+        }, gemini, null, avisos::add);
+        llamadas.clear();
+        boolean fallo = false;
+        try {
+            claudeCaido.pensar(pet.apply("dame de alta al cliente"));
+        } catch (IllegalStateException e) {
+            fallo = true;
+        }
+        ok(fallo && llamadas.isEmpty(), "enrutador: si Claude no puede, lo sensible no se manda a Gemini");
+        ok(claudeCaido.pensar(pet.apply("cuéntame un chiste")).toString().contains("de gemini"), "enrutador: y la charla sí la atiende Gemini");
+
+        // Gemini y Ollama por HTTP, contra servidores falsos.
+        var vistos = new java.util.ArrayList<String>();
+        var srv = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        srv.createContext("/v1beta/models/gm:generateContent", ex -> {
+            vistos.add(ex.getRequestHeaders().getFirst("x-goog-api-key") + "|" + new String(ex.getRequestBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+            byte[] r = "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"hola desde gemini\"}]}}],\"usageMetadata\":{\"promptTokenCount\":7,\"candidatesTokenCount\":3}}".getBytes();
+            ex.sendResponseHeaders(200, r.length);
+            ex.getResponseBody().write(r);
+            ex.close();
+        });
+        srv.createContext("/v1beta/models/malo:generateContent", ex -> {
+            ex.sendResponseHeaders(404, -1);
+            ex.close();
+        });
+        srv.createContext("/api/chat", ex -> {
+            vistos.add("ollama|" + new String(ex.getRequestBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+            byte[] r = "{\"message\":{\"role\":\"assistant\",\"content\":\"hola local\"},\"prompt_eval_count\":5,\"eval_count\":2}".getBytes();
+            ex.sendResponseHeaders(200, r.length);
+            ex.getResponseBody().write(r);
+            ex.close();
+        });
+        srv.start();
+        try {
+            String base = "http://127.0.0.1:" + srv.getAddress().getPort();
+            var g = new es.amagna.asistente.cerebro.GeminiApi("CLAVE-FALSA", "gm", base);
+            Map<String, Object> r = g.pensar(new LinkedHashMap<>(Map.of("model", "claude", "max_tokens", 50, "system", "sé breve",
+                    "messages", List.of(Map.of("role", "user", "content", "hola")))));
+            ok(r.toString().contains("hola desde gemini") && r.toString().contains("input_tokens=7"), "gemini: devuelve la respuesta con el formato de siempre y cuenta tokens");
+            ok(vistos.get(0).startsWith("CLAVE-FALSA|") && vistos.get(0).contains("systemInstruction") && vistos.get(0).contains("maxOutputTokens"),
+                    "gemini: la clave va en la cabecera y el sistema y el tope de tokens en su sitio");
+            String err = "";
+            try {
+                new es.amagna.asistente.cerebro.GeminiApi("CLAVE-FALSA", "malo", base).pensar(new LinkedHashMap<>(Map.of("model", "c", "messages", List.of(Map.of("role", "user", "content", "hola")))));
+            } catch (IllegalStateException e) {
+                err = e.getMessage();
+            }
+            ok(err.contains("404") && err.contains("gemini-modelo.txt") && !err.contains("CLAVE-FALSA"), "gemini: un modelo que no existe da un error claro, sin enseñar la clave");
+            boolean rechaza = false;
+            try {
+                g.pensar(new LinkedHashMap<>(Map.of("tools", List.of(Map.of("name", "x")), "messages", List.of(Map.of("role", "user", "content", "hola")))));
+            } catch (IllegalArgumentException e) {
+                rechaza = true;
+            }
+            ok(rechaza, "gemini: no atiende herramientas");
+            var o = new es.amagna.asistente.cerebro.OllamaApi("llama", base);
+            ok(o.pensar(new LinkedHashMap<>(Map.of("system", "s", "messages", List.of(Map.of("role", "user", "content", "hola"))))).toString().contains("hola local"),
+                    "ollama: contesta con el formato de siempre");
+            ok(vistos.get(vistos.size() - 1).contains("\"role\":\"system\"") && vistos.get(vistos.size() - 1).contains("\"stream\":false"), "ollama: manda el sistema y sin streaming");
+        } finally {
+            srv.stop(0);
+        }
+        ok(er.resumen().contains("Gemini"), "enrutador: resume qué IA ha contestado");
     }
 }

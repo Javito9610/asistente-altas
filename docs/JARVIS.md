@@ -63,3 +63,20 @@ Ejemplos: «dame de alta a ANA PRUEBA, NIF 12345678Z» · «estado» · «pausa�
 `prueba-jarvis.cmd` (por la cola): arranca Jarvis, le pide por el buzón un alta ficticia en la Empresa de prueba y lo apaga.
 `asistente.cmd` ejecuta además todas las comprobaciones (497).
 `prueba-pedido.cmd` (una orden de `pruebas\\pedido.txt` + «sí») y `prueba-charla.cmd` (varios mensajes de `pruebas\\charla\\*.txt`, uno cada 25 s).
+
+## 12. Varias IA (Gemini y modelo local)
+
+Claude sigue siendo el cerebro. Se pueden añadir dos más, y quien decide a cuál va cada cosa es el CÓDIGO (`Enrutador` +
+`Sensibilidad`), nunca una IA:
+
+- **Lo sensible va solo a Claude**: cualquier texto con palabras del despacho (cliente, expediente, contrario…), correos, cifras
+  largas, NIF/IBAN, claves o nombres propios, y todo lo que use herramientas, imágenes o documentos. Si Claude no puede, no se
+  contesta: nunca se baja a una IA gratuita (que puede aprender de lo que recibe).
+- **Lo que no es sensible** (charla, preguntas generales) va a Gemini → si falla, a Claude → como último recurso, al modelo local.
+- Sin cuota, una IA descansa 15 minutos. `diagnóstico` dice cuántas veces ha contestado cada una.
+
+Cómo activarlas:
+1. Gemini: clave gratis en aistudio.google.com y `asistente.cmd secreto gemini` (cifrada con tu cuenta de Windows, no se ve).
+   Modelo opcional en `datos\gemini-modelo.txt` (por defecto `gemini-flash-latest`).
+2. Local: instala Ollama, `ollama pull <modelo>` y escribe el nombre del modelo en `datos\ollama.txt`.
+Sin ninguna de las dos, todo sigue yendo a Claude como hasta ahora.
