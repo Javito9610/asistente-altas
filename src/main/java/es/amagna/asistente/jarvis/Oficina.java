@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
@@ -259,69 +260,97 @@ public final class Oficina {
         return s.toString();
     }
 
+    public record Hoja(String nombre, List<List<Object>> filas) { }
+
+    /** Un .xlsx de una sola hoja (ver {@link #xlsx(List)}). */
+    public static byte[] xlsx(String hoja, List<List<Object>> filas) throws IOException {
+        return xlsx(List.of(new Hoja(hoja, filas)));
+    }
+
+    private static String nombreHoja(String n, int i) {
+        String r = (n == null || n.isBlank() ? "Hoja" + (i + 1) : n.replaceAll("[\\\\/?*\\[\\]:]", " ").strip());
+        return r.length() > 31 ? r.substring(0, 31) : r;
+    }
+
     /**
-     * Un .xlsx válido. {@code filas}: cada fila es una lista de celdas (texto o número). La primera fila va en negrita.
+     * Un .xlsx válido con una o varias hojas (máximo 10). Cada hoja: filas de celdas (texto o número); la primera fila va en negrita.
      * El texto es siempre texto (nunca una fórmula): un «=…» se queda como texto.
      */
-    public static byte[] xlsx(String hoja, List<List<Object>> filas) throws IOException {
-        if (filas.size() > MAX_FILAS) {
-            throw new IllegalArgumentException("Demasiadas filas (máximo " + MAX_FILAS + ").");
+    public static byte[] xlsx(List<Hoja> hojas) throws IOException {
+        if (hojas.isEmpty() || hojas.size() > 10) {
+            throw new IllegalArgumentException("Tiene que haber entre 1 y 10 hojas.");
         }
-        String nombre = (hoja == null || hoja.isBlank() ? "Hoja1" : hoja.replaceAll("[\\\\/?*\\[\\]:]", " ").strip());
-        if (nombre.length() > 31) {
-            nombre = nombre.substring(0, 31);
-        }
-        int cols = 0;
-        for (List<Object> f : filas) {
-            cols = Math.max(cols, f.size());
-        }
-        int[] anchos = new int[Math.max(cols, 1)];
-        StringBuilder datos = new StringBuilder();
-        for (int r = 0; r < filas.size(); r++) {
-            datos.append("<row r=\"").append(r + 1).append("\">");
-            List<Object> f = filas.get(r);
-            for (int c = 0; c < f.size(); c++) {
-                Object v = f.get(c);
-                if (v == null || (v instanceof String s0 && s0.isEmpty())) {
-                    continue;
-                }
-                String ref = columna(c) + (r + 1);
-                String estilo = r == 0 ? " s=\"1\"" : "";
-                if (v instanceof Number n) {
-                    datos.append("<c r=\"").append(ref).append('"').append(estilo).append("><v>").append(n.toString()).append("</v></c>");
-                    anchos[c] = Math.max(anchos[c], n.toString().length());
-                } else {
-                    String s = String.valueOf(v);
-                    datos.append("<c r=\"").append(ref).append("\" t=\"inlineStr\"").append(estilo).append("><is><t xml:space=\"preserve\">")
-                            .append(xml(s)).append("</t></is></c>");
-                    anchos[c] = Math.max(anchos[c], s.length());
-                }
-            }
-            datos.append("</row>");
-        }
-        StringBuilder cs = new StringBuilder("<cols>");
-        for (int c = 0; c < anchos.length; c++) {
-            cs.append("<col min=\"").append(c + 1).append("\" max=\"").append(c + 1).append("\" width=\"").append(Math.min(60, Math.max(8, anchos[c] + 2)))
-                    .append("\" customWidth=\"1\"/>");
-        }
-        cs.append("</cols>");
         String cab = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>";
-        String sheet = cab + "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">" + cs + "<sheetData>" + datos + "</sheetData></worksheet>";
-        return zip(new String[][] {
-            {"[Content_Types].xml", cab + "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>"
+        List<String[]> entradas = new ArrayList<>();
+        StringBuilder tipos = new StringBuilder(cab + "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>"
                 + "<Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/>"
-                + "<Override PartName=\"/xl/worksheets/sheet1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/>"
-                + "<Override PartName=\"/xl/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml\"/></Types>"},
-            {"_rels/.rels", cab + "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/></Relationships>"},
-            {"xl/workbook.xml", cab + "<workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><sheets><sheet name=\""
-                + xml(nombre) + "\" sheetId=\"1\" r:id=\"rId1\"/></sheets></workbook>"},
-            {"xl/_rels/workbook.xml.rels", cab + "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet1.xml\"/>"
-                + "<Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/></Relationships>"},
-            {"xl/styles.xml", cab + "<styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><fonts count=\"2\"><font><sz val=\"11\"/><name val=\"Calibri\"/></font>"
+                + "<Override PartName=\"/xl/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml\"/>");
+        StringBuilder libro = new StringBuilder(cab + "<workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><sheets>");
+        StringBuilder rels = new StringBuilder(cab + "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">");
+        java.util.Set<String> usados = new java.util.HashSet<>();
+        for (int h = 0; h < hojas.size(); h++) {
+            List<List<Object>> filas = hojas.get(h).filas();
+            if (filas.size() > MAX_FILAS) {
+                throw new IllegalArgumentException("Demasiadas filas (máximo " + MAX_FILAS + ").");
+            }
+            String nombre = nombreHoja(hojas.get(h).nombre(), h);
+            while (!usados.add(nombre.toLowerCase(Locale.ROOT))) {
+                nombre = nombre.length() > 28 ? nombre.substring(0, 28) + "-" + (h + 1) : nombre + "-" + (h + 1);
+            }
+            int cols = 0;
+            for (List<Object> f : filas) {
+                cols = Math.max(cols, f.size());
+            }
+            int[] anchos = new int[Math.max(cols, 1)];
+            StringBuilder datos = new StringBuilder();
+            for (int r = 0; r < filas.size(); r++) {
+                datos.append("<row r=\"").append(r + 1).append("\">");
+                List<Object> f = filas.get(r);
+                for (int c = 0; c < f.size(); c++) {
+                    Object v = f.get(c);
+                    if (v == null || (v instanceof String s0 && s0.isEmpty())) {
+                        continue;
+                    }
+                    String ref = columna(c) + (r + 1);
+                    String estilo = r == 0 ? " s=\"1\"" : "";
+                    if (v instanceof Number n) {
+                        datos.append("<c r=\"").append(ref).append('"').append(estilo).append("><v>").append(n.toString()).append("</v></c>");
+                        anchos[c] = Math.max(anchos[c], n.toString().length());
+                    } else {
+                        String s = String.valueOf(v);
+                        datos.append("<c r=\"").append(ref).append("\" t=\"inlineStr\"").append(estilo).append("><is><t xml:space=\"preserve\">")
+                                .append(xml(s)).append("</t></is></c>");
+                        anchos[c] = Math.max(anchos[c], s.length());
+                    }
+                }
+                datos.append("</row>");
+            }
+            StringBuilder cs = new StringBuilder("<cols>");
+            for (int c = 0; c < anchos.length; c++) {
+                cs.append("<col min=\"").append(c + 1).append("\" max=\"").append(c + 1).append("\" width=\"").append(Math.min(60, Math.max(8, anchos[c] + 2)))
+                        .append("\" customWidth=\"1\"/>");
+            }
+            cs.append("</cols>");
+            entradas.add(new String[] {"xl/worksheets/sheet" + (h + 1) + ".xml", cab + "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">" + cs + "<sheetData>" + datos + "</sheetData></worksheet>"});
+            tipos.append("<Override PartName=\"/xl/worksheets/sheet").append(h + 1).append(".xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/>");
+            libro.append("<sheet name=\"").append(xml(nombre)).append("\" sheetId=\"").append(h + 1).append("\" r:id=\"rId").append(h + 1).append("\"/>");
+            rels.append("<Relationship Id=\"rId").append(h + 1).append("\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet").append(h + 1).append(".xml\"/>");
+        }
+        tipos.append("</Types>");
+        libro.append("</sheets></workbook>");
+        rels.append("<Relationship Id=\"rId").append(hojas.size() + 1).append("\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/></Relationships>");
+        List<String[]> todo = new ArrayList<>();
+        todo.add(new String[] {"[Content_Types].xml", tipos.toString()});
+        todo.add(new String[] {"_rels/.rels", cab + "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/></Relationships>"});
+        todo.add(new String[] {"xl/workbook.xml", libro.toString()});
+        todo.add(new String[] {"xl/_rels/workbook.xml.rels", rels.toString()});
+        todo.add(new String[] {"xl/styles.xml", cab + "<styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><fonts count=\"2\"><font><sz val=\"11\"/><name val=\"Calibri\"/></font>"
                 + "<font><b/><sz val=\"11\"/><name val=\"Calibri\"/></font></fonts><fills count=\"2\"><fill><patternFill patternType=\"none\"/></fill><fill><patternFill patternType=\"gray125\"/></fill></fills>"
                 + "<borders count=\"1\"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count=\"1\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/></cellStyleXfs>"
-                + "<cellXfs count=\"2\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\"/><xf numFmtId=\"0\" fontId=\"1\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyFont=\"1\"/></cellXfs></styleSheet>"},
-            {"xl/worksheets/sheet1.xml", sheet}});
+                + "<cellXfs count=\"2\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\"/><xf numFmtId=\"0\" fontId=\"1\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyFont=\"1\"/></cellXfs>"
+                + "<cellStyles count=\"1\"><cellStyle name=\"Normal\" xfId=\"0\" builtinId=\"0\"/></cellStyles></styleSheet>"});
+        todo.addAll(entradas);
+        return zip(todo.toArray(new String[0][]));
     }
 
     // ───────────────────────────── Calendario y correo ─────────────────────────────
@@ -411,13 +440,17 @@ public final class Oficina {
             case "pdf" -> b = pdf(String.valueOf(in.getOrDefault("titulo", "")), lista(in.get("parrafos")));
             case "docx" -> b = docx(String.valueOf(in.getOrDefault("titulo", "")), lista(in.get("parrafos")));
             case "xlsx" -> {
-                List<List<Object>> filas = new ArrayList<>();
-                if (in.get("filas") instanceof List<?> fs) {
-                    for (Object f : fs) {
-                        filas.add(f instanceof List<?> c ? new ArrayList<Object>(c) : new ArrayList<>(List.of(String.valueOf(f))));
+                List<Hoja> hojas = new ArrayList<>();
+                if (in.get("hojas") instanceof List<?> hs) {
+                    for (Object h : hs) {
+                        if (h instanceof Map<?, ?> hm) {
+                            hojas.add(new Hoja(hm.get("nombre") == null ? null : String.valueOf(hm.get("nombre")), filasDe(hm.get("filas"))));
+                        }
                     }
+                } else {
+                    hojas.add(new Hoja(in.get("hoja") == null ? null : String.valueOf(in.get("hoja")), filasDe(in.get("filas"))));
                 }
-                b = xlsx(in.get("hoja") == null ? null : String.valueOf(in.get("hoja")), filas);
+                b = xlsx(hojas);
             }
             case "cita" -> b = cita(String.valueOf(in.getOrDefault("titulo", "")), String.valueOf(in.getOrDefault("inicio", "")),
                     in.get("minutos") instanceof Number n ? n.intValue() : 60, (String) in.get("lugar"), (String) in.get("descripcion"));
@@ -427,6 +460,16 @@ public final class Oficina {
         }
         String r = ficheros.escribirBytes(ruta, b, sobre);
         return "eml".equals(ext.substring(1)) ? r + " Es un BORRADOR: no se ha enviado nada; hay que abrirlo y enviarlo." : r;
+    }
+
+    private static List<List<Object>> filasDe(Object o) {
+        List<List<Object>> filas = new ArrayList<>();
+        if (o instanceof List<?> fs) {
+            for (Object f : fs) {
+                filas.add(f instanceof List<?> c ? new ArrayList<Object>(c) : new ArrayList<>(List.of(String.valueOf(f))));
+            }
+        }
+        return filas;
     }
 
     private static List<String> lista(Object o) {
@@ -597,25 +640,52 @@ public final class Oficina {
                     comp.add(desxml(ms.group(1).replaceAll("<[^>]+>", "")));
                 }
                 StringBuilder s = new StringBuilder();
-                Matcher mr = Pattern.compile("<row[^>]*>(.*?)</row>", Pattern.DOTALL).matcher(entrada(z, "xl/worksheets/sheet1.xml"));
-                while (mr.find()) {
-                    List<String> cel = new ArrayList<>();
-                    Matcher mc = Pattern.compile("<c([^>]*?)(?:/>|>(.*?)</c>)", Pattern.DOTALL).matcher(mr.group(1));
-                    while (mc.find()) {
-                        String attrs = mc.group(1);
-                        String cuerpo = mc.group(2) == null ? "" : mc.group(2);
-                        Matcher v = Pattern.compile("<v>(.*?)</v>", Pattern.DOTALL).matcher(cuerpo);
-                        String val;
-                        if (attrs.contains("t=\"inlineStr\"")) {
-                            val = desxml(cuerpo.replaceAll("<[^>]+>", ""));
-                        } else if (v.find()) {
-                            val = attrs.contains("t=\"s\"") ? comp.get(Integer.parseInt(v.group(1).strip())) : desxml(v.group(1));
-                        } else {
-                            val = "";
-                        }
-                        cel.add(val);
+                List<String> hojasNombre = new ArrayList<>();
+                Matcher mn = Pattern.compile("<sheet [^>]*name=\"([^\"]*)\"").matcher(entrada(z, "xl/workbook.xml"));
+                while (mn.find()) {
+                    hojasNombre.add(desxml(mn.group(1)));
+                }
+                int totalHojas = 0;
+                var en = z.entries();
+                while (en.hasMoreElements()) {
+                    if (en.nextElement().getName().matches("xl/worksheets/sheet\\d+\\.xml")) {
+                        totalHojas++;
                     }
-                    s.append(String.join("\t", cel)).append('\n');
+                }
+                for (int h = 1; h <= totalHojas && h <= 10; h++) {
+                    if (totalHojas > 1) {
+                        s.append("== Hoja: ").append(h - 1 < hojasNombre.size() ? hojasNombre.get(h - 1) : "Hoja" + h).append(" ==\n");
+                    }
+                    Matcher mr = Pattern.compile("<row[^>]*>(.*?)</row>", Pattern.DOTALL).matcher(entrada(z, "xl/worksheets/sheet" + h + ".xml"));
+                    while (mr.find()) {
+                        List<String> cel = new ArrayList<>();
+                        Matcher mc = Pattern.compile("<c([^>]*?)(?:/>|>(.*?)</c>)", Pattern.DOTALL).matcher(mr.group(1));
+                        while (mc.find()) {
+                            String attrs = mc.group(1);
+                            String cuerpo = mc.group(2) == null ? "" : mc.group(2);
+                            Matcher pos = Pattern.compile("\\br=\"([A-Z]+)\\d+\"").matcher(attrs);
+                            if (pos.find()) {
+                                int col = 0;
+                                for (char ch : pos.group(1).toCharArray()) {
+                                    col = col * 26 + (ch - 'A' + 1);
+                                }
+                                while (cel.size() < col - 1 && cel.size() < 200) {
+                                    cel.add("");
+                                }
+                            }
+                            Matcher v = Pattern.compile("<v>(.*?)</v>", Pattern.DOTALL).matcher(cuerpo);
+                            String val;
+                            if (attrs.contains("t=\"inlineStr\"")) {
+                                val = desxml(cuerpo.replaceAll("<[^>]+>", ""));
+                            } else if (v.find()) {
+                                val = attrs.contains("t=\"s\"") ? comp.get(Integer.parseInt(v.group(1).strip())) : desxml(v.group(1));
+                            } else {
+                                val = "";
+                            }
+                            cel.add(val);
+                        }
+                        s.append(String.join("\t", cel)).append('\n');
+                    }
                 }
                 t = s.toString();
             } else {

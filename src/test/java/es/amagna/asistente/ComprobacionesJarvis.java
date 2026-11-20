@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -393,6 +394,21 @@ final class ComprobacionesJarvis {
             noDocx = true;
         }
         ok(noDocx, "oficina: solo rellena plantillas .docx");
+        // Varias hojas, y celdas vacías en medio que no descolocan las columnas.
+        java.util.Map<String, Object> mh = new java.util.HashMap<>();
+        mh.put("hojas", List.of(java.util.Map.of("nombre", "Enero", "filas", List.of(List.of("a", "b"), List.of("x", 1L))),
+                java.util.Map.of("nombre", "Enero", "filas", List.of(Arrays.asList("c", null, "e")))));
+        o.crear("xlsx", d + "/multi", mh);
+        String mx = o.leerDocumento(d + "/multi.xlsx");
+        ok(mx.contains("== Hoja: Enero ==") && mx.contains("== Hoja: Enero-2 ==") && mx.contains("a\tb\nx\t1") && mx.contains("c\t\te"),
+                "oficina: Excel de varias hojas (nombres repetidos se distinguen) y se lee entero");
+        var zg = new java.io.ByteArrayOutputStream();
+        try (var z = new java.util.zip.ZipOutputStream(zg)) {
+            z.putNextEntry(new java.util.zip.ZipEntry("xl/worksheets/sheet1.xml"));
+            z.write("<worksheet><sheetData><row r=\"1\"><c r=\"A1\" t=\"inlineStr\"><is><t>N</t></is></c><c r=\"C1\"><v>5</v></c></row><row r=\"2\"><c r=\"B2\" t=\"inlineStr\"><is><t>solo B</t></is></c></row></sheetData></worksheet>".getBytes());
+        }
+        Files.write(d.resolve("huecos.xlsx"), zg.toByteArray());
+        ok(o.leerDocumento(d + "/huecos.xlsx").equals("N\t\t5\n\tsolo B\n"), "oficina: al leer un Excel, las celdas vacías no descolocan las columnas");
         java.util.Map<String, Object> c = new java.util.HashMap<>();
         c.put("titulo", "Reunión; con, Ana");
         c.put("inicio", "2026-11-25T10:30");

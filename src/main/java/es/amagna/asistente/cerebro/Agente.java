@@ -301,13 +301,13 @@ public final class Agente {
                             "destino", Json.obj("type", "string"), "copiar", Json.obj("type", "boolean")), "required", List.of("origen", "destino"))));
             h.add(Json.obj("name", "crear_documento", "description", "Crea un documento de oficina SIN pantalla, en las carpetas permitidas. "
                     + "tipo=pdf|docx: 'titulo' y 'parrafos' (lista de líneas; «# » título, «## » subtítulo, «- » viñeta, línea vacía = espacio). "
-                    + "tipo=xlsx: 'hoja' y 'filas' (lista de filas; cada fila, lista de celdas texto o número; la primera fila es la cabecera). "
+                    + "tipo=xlsx: 'hoja' y 'filas' (lista de filas; cada fila, lista de celdas texto o número; la primera fila es la cabecera), o varias hojas con 'hojas' (lista de {nombre, filas}). "
                     + "tipo=cita: 'titulo', 'inicio' (AAAA-MM-DDTHH:mm), 'minutos', 'lugar', 'descripcion' → fichero .ics para añadir al calendario. "
                     + "tipo=correo: 'para' (lista de direcciones), 'asunto', 'texto' → BORRADOR .eml que NO se envía. "
                     + "No sobrescribe salvo sobrescribir=true.",
                     "input_schema", Json.obj("type", "object", "properties", Json.obj("tipo", Json.obj("type", "string", "enum", List.of("pdf", "docx", "xlsx", "cita", "correo")),
                             "ruta", Json.obj("type", "string"), "titulo", Json.obj("type", "string"), "parrafos", Json.obj("type", "array", "items", Json.obj("type", "string")),
-                            "hoja", Json.obj("type", "string"), "filas", Json.obj("type", "array", "items", Json.obj("type", "array")),
+                            "hoja", Json.obj("type", "string"), "hojas", Json.obj("type", "array", "items", Json.obj("type", "object")), "filas", Json.obj("type", "array", "items", Json.obj("type", "array")),
                             "inicio", Json.obj("type", "string"), "minutos", Json.obj("type", "integer"), "lugar", Json.obj("type", "string"),
                             "descripcion", Json.obj("type", "string"), "para", Json.obj("type", "array", "items", Json.obj("type", "string")),
                             "asunto", Json.obj("type", "string"), "texto", Json.obj("type", "string"), "sobrescribir", Json.obj("type", "boolean")),
