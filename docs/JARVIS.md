@@ -8,7 +8,7 @@ expedientes), la **IA** (entiende lo que se le pide, rescata al asistente cuando
 | Canal | Cómo |
 |---|---|
 | Ventana | `jarvis.cmd` abre una ventana: escribes y contesta. Cerrarla no lo apaga (botón «Salir»). |
-| Telegram | Crea un bot con @BotFather, guarda su token con `asistente secreto telegram`, y pon tu número de usuario (Jarvis te lo dice la primera vez que le escribas) en `datos\autorizados.txt`, una línea por persona. |
+| Telegram | 1) En Telegram abre @BotFather → `/newbot`. 2) `asistente secreto telegram` (pega el token). 3) `configurar-telegram.cmd`: comprueba el token, espera tu primer mensaje al bot y, **si tú confirmas en la consola**, te autoriza (`datos\autorizados.txt`, una línea por persona). Nadie queda autorizado sin que una persona lo teclee ahí. |
 | Buzón | Un `.txt` en `datos\buzon\entrada\` es un mensaje; las respuestas van a `datos\buzon\salida\respuestas.txt`. Sirve para scripts y para puentes (WhatsApp, Power Automate…). |
 
 Ejemplos: «dame de alta a ANA PRUEBA, NIF 12345678Z» · «estado» · «pausa» / «sigue» · «cada día laborable a las 9 dime cómo vas» ·

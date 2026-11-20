@@ -223,6 +223,23 @@ public final class CanalTelegram {
         }
     }
 
+    /** El nombre del bot (@usuario) si el token vale; si no, lanza con el motivo (sin el token). */
+    @SuppressWarnings("unchecked")
+    public String quienSoy() throws IOException {
+        try {
+            Map<String, Object> r = Json.objeto(red.get(api("getMe", "")));
+            if (!Boolean.TRUE.equals(r.get("ok"))) {
+                throw new IOException("Telegram no acepta ese token.");
+            }
+            Map<String, Object> res = (Map<String, Object>) r.get("result");
+            return "@" + res.get("username") + " (" + res.get("first_name") + ")";
+        } catch (IOException e) {
+            throw new IOException(sinToken(String.valueOf(e.getMessage())));
+        } catch (RuntimeException e) {
+            throw new IOException("Respuesta rara de Telegram.");
+        }
+    }
+
     /** Manda un fichero como documento (hasta 45 MB). */
     public void enviarFichero(String usuario, java.nio.file.Path fichero) {
         try {

@@ -282,6 +282,8 @@ final class ComprobacionesJarvis {
                         + "{\"update_id\":2,\"message\":{\"caption\":\"resúmelo\",\"document\":{\"file_id\":\"F1\",\"file_name\":\"../../contrato final.pdf\",\"file_size\":14},\"from\":{\"id\":42},\"chat\":{\"id\":42,\"type\":\"private\"}}},"
                         + "{\"update_id\":3,\"message\":{\"document\":{\"file_id\":\"F2\",\"file_name\":\"x.pdf\",\"file_size\":5},\"from\":{\"id\":99},\"chat\":{\"id\":99,\"type\":\"private\"}}}]}")
                         .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            } else if (ruta.endsWith("getMe")) {
+                r = "{\"ok\":true,\"result\":{\"username\":\"jarvis_bot\",\"first_name\":\"Jarvis\"}}".getBytes();
             } else if (ruta.endsWith("getFile")) {
                 r = "{\"ok\":true,\"result\":{\"file_path\":\"docs/f.pdf\"}}".getBytes();
             } else if (ruta.startsWith("/file/botT0KEN/")) {
@@ -307,6 +309,7 @@ final class ComprobacionesJarvis {
                     });
             List<String> recibidos = new ArrayList<>();
             canal.sondear(0, (q, t) -> recibidos.add(q + ":" + t));
+            ok(canal.quienSoy().equals("@jarvis_bot (Jarvis)"), "telegram por HTTP: «getMe» dice cómo se llama el bot");
             ok(recibidos.size() == 2 && recibidos.get(0).equals("42:hola"), "telegram por HTTP: el sondeo real recibe el mensaje");
             ok(recibidos.get(1).startsWith("42:He recibido el fichero «") && recibidos.get(1).contains("recibidos") && recibidos.get(1).endsWith("resúmelo"),
                     "telegram por HTTP: un documento de una persona autorizada se baja y se avisa a Jarvis con su pie de foto");

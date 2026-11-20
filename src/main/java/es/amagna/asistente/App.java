@@ -52,7 +52,7 @@ public final class App {
             case "tarea" -> 900;
             case "expedientes" -> args.contains("--hacer") ? 3600 : 120;
             case "alta" -> 1200;
-            case "probar-windows", "arranque", "secretos", "secreto", "guardar-clave", "ayuda", "jarvis" -> 0;
+            case "probar-windows", "arranque", "secretos", "secreto", "guardar-clave", "ayuda", "jarvis", "telegram" -> 0;
             default -> 300;
         };
     }
@@ -108,6 +108,7 @@ public final class App {
                 case "probar-windows" -> PruebasWindows.main(new String[0]);
                 case "expediente-prueba" -> expedientePrueba(Arrays.asList(args).subList(1, args.length));
                 case "tarea" -> tarea(Arrays.asList(args).subList(1, args.length));
+                case "telegram" -> telegramAsistente();
                 case "jarvis" -> jarvis(Arrays.asList(args).subList(1, args.length));
                 case "receta" -> receta(Arrays.asList(args).subList(1, args.length));
                 case "agente" -> agente(Arrays.asList(args).subList(1, args.length));
@@ -1612,6 +1613,67 @@ public final class App {
     }
 
     /** Guarda una contraseña para que el asistente pueda volver a entrar él solo de noche. */
+    /**
+     * Deja Telegram listo paso a paso: comprueba el token, espera tu primer mensaje al bot y, si TÚ confirmas en esta consola que el
+     * número es el tuyo, lo añade a datos\\autorizados.txt. Nadie queda autorizado sin que una persona lo teclee aquí.
+     */
+    private static void telegramAsistente() throws IOException {
+        if (!es.amagna.asistente.manos.Secreto.hay("telegram")) {
+            System.out.println("Todavía no hay token de Telegram. 1) En Telegram abre @BotFather, escribe /newbot y sigue los pasos.\n"
+                    + "2) Ejecuta:  asistente secreto telegram   (pega el token que te dé; no se ve al escribir).\n3) Vuelve a ejecutar este comando.");
+            return;
+        }
+        var canal = new es.amagna.asistente.jarvis.CanalTelegram(new String(es.amagna.asistente.manos.Secreto.leer("telegram")),
+                es.amagna.asistente.jarvis.CanalTelegram.redReal(), x -> System.out.println("  " + x));
+        String yo;
+        try {
+            yo = canal.quienSoy();
+        } catch (IOException e) {
+            System.out.println("El token no funciona: " + e.getMessage() + "\nVuelve a guardarlo con:  asistente secreto telegram");
+            return;
+        }
+        System.out.println("Token correcto: tu bot es " + yo + ".\nAhora, desde tu móvil, ábrelo en Telegram y escríbele cualquier cosa (por ejemplo «hola»). Espero hasta 3 minutos…");
+        Path fa = Path.of("datos", "autorizados.txt");
+        Files.createDirectories(fa.getParent());
+        java.util.Set<String> ya = new java.util.HashSet<>(Files.isRegularFile(fa) ? Files.readAllLines(fa, StandardCharsets.UTF_8) : List.of());
+        var sc = new java.util.Scanner(System.in, StandardCharsets.UTF_8);
+        long limite = System.currentTimeMillis() + 180_000;
+        boolean[] listo = {false};
+        while (System.currentTimeMillis() < limite && !listo[0]) {
+            canal.sondear(10, (quien, texto) -> {
+                if (listo[0]) {
+                    return;
+                }
+                if (ya.contains(quien)) {
+                    System.out.println("El usuario " + quien + " ya estaba autorizado. Todo listo: arranca Jarvis (jarvis.cmd).");
+                    canal.enviar(quien, "Ya estabas autorizado. Escríbeme «ayuda» para ver qué sé hacer.");
+                    listo[0] = true;
+                    return;
+                }
+                String corto = texto.length() > 60 ? texto.substring(0, 60) + "…" : texto;
+                System.out.print("Ha escrito el usuario número " + quien + " diciendo «" + corto + "». ¿Eres tú y quieres autorizarlo? (s/n): ");
+                String r = sc.hasNextLine() ? sc.nextLine().strip().toLowerCase(java.util.Locale.ROOT) : "n";
+                if (r.equals("s") || r.equals("si") || r.equals("sí")) {
+                    try {
+                        Files.writeString(fa, (Files.isRegularFile(fa) && !Files.readString(fa, StandardCharsets.UTF_8).endsWith("\n") ? "\n" : "") + quien + "\n",
+                                StandardCharsets.UTF_8, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
+                        canal.enviar(quien, "✅ Autorizado. Soy Jarvis: escríbeme «ayuda» para ver qué sé hacer. (Para que me atienda, tiene que estar arrancado: jarvis.cmd.)");
+                        System.out.println("Autorizado y guardado en datos\\autorizados.txt. Ahora arranca Jarvis (jarvis.cmd).");
+                        listo[0] = true;
+                    } catch (IOException e) {
+                        System.out.println("No pude guardar: " + e.getMessage());
+                    }
+                } else {
+                    canal.enviar(quien, "Todavía no estás autorizado.");
+                    System.out.println("Vale, no lo autorizo. Sigo esperando otro mensaje…");
+                }
+            });
+        }
+        if (!listo[0]) {
+            System.out.println("No llegó ningún mensaje autorizable. Vuelve a ejecutar este comando cuando quieras.");
+        }
+    }
+
     private static void guardarSecreto(List<String> a) throws IOException {
         if (a.isEmpty()) {
             throw new IllegalArgumentException("Falta el nombre. Ejemplo: asistente secreto mn");
