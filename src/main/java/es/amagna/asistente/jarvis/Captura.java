@@ -22,7 +22,14 @@ public final class Captura {
     public Path hacer() {
         try {
             Files.createDirectories(carpeta);
-            Rectangle pantalla = new Rectangle(Toolkit.getDefaultToolkit().getScreenSize());
+            // Todas las pantallas juntas (si hay más de un monitor), no solo la principal.
+            Rectangle pantalla = new Rectangle();
+            for (var d : java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices()) {
+                pantalla = pantalla.union(d.getDefaultConfiguration().getBounds());
+            }
+            if (pantalla.isEmpty()) {
+                pantalla = new Rectangle(Toolkit.getDefaultToolkit().getScreenSize());
+            }
             BufferedImage img = new Robot().createScreenCapture(pantalla);
             Path f = carpeta.resolve("captura-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")) + ".png");
             ImageIO.write(img, "png", f.toFile());

@@ -67,7 +67,7 @@ public final class Interprete {
         StringBuilder sistema = new StringBuilder("""
                 Eres el intérprete de Jarvis, el asistente de oficina de un despacho de abogados. Recibes el mensaje de una persona y
                 decides qué hay que hacer. NO haces nada tú: solo respondes con UN objeto JSON, sin texto alrededor:
-                {"tipo":"tarea|consultar|libre|programar|recordar|recordatorio|oficina|correo|abrir|preguntar|responder","tarea":"nombre","params":{"dato":"valor"},"texto":"..."}
+                {"tipo":"tarea|consultar|libre|programar|recordar|recordatorio|oficina|correo|abrir|captura|preguntar|responder","tarea":"nombre","params":{"dato":"valor"},"texto":"..."}
                 - tipo «tarea»: es una de estas tareas que Jarvis hace solo (poner en «tarea» su nombre y en «params» los datos que
                   la persona ha dado, con los nombres de dato exactos). Tareas:
                 """);
@@ -92,6 +92,8 @@ public final class Interprete {
                   https://www.google.com); para «programa» el nombre que dice la persona (calculadora, bloc de notas, word, excel, chrome,
                   edge, outlook…); para «carpeta»/«documento» la ruta. «texto» = qué se abre. Si además hay que hacer algo DENTRO de lo que
                   se abre (escribir, pulsar, buscar), no es «abrir»: es «libre».
+                - tipo «captura»: la persona quiere VER lo que hay ahora en la pantalla del ordenador (una captura, un pantallazo, «pásame
+                  una foto de lo que ves», «qué hay en pantalla»). Jarvis la hace y se la manda. «texto» vacío.
                 - tipo «libre»: otra cosa que haya que hacer MANEJANDO programas en pantalla (si sirve «oficina», usa «oficina») (abrir un programa, buscar algo, mover ficheros, mirar
                   una web…). En «texto» una descripción corta y clara de lo que se va a hacer. En «tarea» un nombre corto y
                   REUTILIZABLE en minúsculas con guiones (p. ej. «abrir-programa», «buscar-en-web»: sin datos concretos dentro) y
@@ -188,6 +190,9 @@ public final class Interprete {
                         return new Entendido(Entendido.PREGUNTAR, "", Map.of(), "¿Qué asunto y qué texto quieres que lleve el correo?");
                     }
                     return new Entendido(tipo, "", params, t);
+                }
+                case Entendido.CAPTURA -> {
+                    return new Entendido(tipo, "", Map.of(), t);
                 }
                 case Entendido.ABRIR -> {
                     String que = params.getOrDefault("que", "");

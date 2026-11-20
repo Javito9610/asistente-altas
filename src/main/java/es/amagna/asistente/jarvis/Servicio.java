@@ -242,14 +242,8 @@ public final class Servicio {
             decir(origen, quien, AYUDA);
             return;
         }
-        if (captura != null && Set.of("captura", "captura de pantalla", "pantallazo", "que ves", "que se ve", "que hay en pantalla", "foto de la pantalla").contains(n)) {
-            try {
-                var f = captura.get();
-                decir(origen, quien, "Esto es lo que se ve ahora en el ordenador (cuidado: puede salir algo del trabajo).");
-                salida.fichero(origen, quien, f);
-            } catch (RuntimeException ex) {
-                decir(origen, quien, "No he podido hacer la captura: " + ex.getMessage());
-            }
+        if (captura != null && pideCaptura(n)) {
+            hacerCaptura(origen, quien);
             return;
         }
         if (diagnostico != null && Set.of("diagnostico", "como estas", "revisate", "autodiagnostico", "salud").contains(n)) {
@@ -283,6 +277,26 @@ public final class Servicio {
         List<Entendido> varios = interprete.entenderVarios(texto, (saber.isBlank() ? "" : saber + "\n") + (notas == null ? "" : notas.comoContexto()) + contexto(quien));
         for (Entendido e : varios) {
             atender(origen, quien, texto, e);
+        }
+    }
+
+    /** «captura», «pásame una captura de lo que ves en el pc», «pantallazo»…: sin IA, por las palabras clave. */
+    static boolean pideCaptura(String n) {
+        boolean palabra = n.matches(".*\\b(captura|capturas|pantallazo|screenshot)\\b.*");
+        boolean pantalla = n.matches(".*\\b(pantalla|pc|ordenador|escritorio|viendo|ves|ver|foto)\\b.*");
+        boolean corto = n.split("\\s+").length <= 3;
+        boolean otraCosa = n.matches(".*\\b(cada|programa|programar|guarda|guardar|crea|crear|documento|word|pdf|excel)\\b.*");
+        boolean foto = n.matches(".*\\b(foto|imagen)\\b.*") && n.matches(".*\\b(pantalla|pc|ordenador|escritorio)\\b.*");
+        return !otraCosa && (palabra && (pantalla || corto) || foto || n.matches("(que ves|que se ve|que hay en pantalla)"));
+    }
+
+    private void hacerCaptura(String origen, String quien) {
+        try {
+            var f = captura.get();
+            decir(origen, quien, "Esto es lo que se ve ahora en el ordenador (cuidado: puede salir algo del trabajo).");
+            salida.fichero(origen, quien, f);
+        } catch (RuntimeException ex) {
+            decir(origen, quien, "No he podido hacer la captura: " + ex.getMessage());
         }
     }
 
@@ -325,6 +339,13 @@ public final class Servicio {
                 decir(origen, quien, "Voy a enviar este correo, desde " + correoDe + ":\n\nPara: " + ps.get("para") + "\nAsunto: " + ps.get("asunto")
                         + (ps.getOrDefault("adjuntos", "").isBlank() ? "" : "\nAdjuntos: " + ps.get("adjuntos")) + "\n\n" + e.texto()
                         + "\n\n¿Lo envío? (sí / no)");
+            }
+            case Entendido.CAPTURA -> {
+                if (captura == null) {
+                    decir(origen, quien, "No puedo hacer capturas en este momento.");
+                } else {
+                    hacerCaptura(origen, quien);
+                }
             }
             case Entendido.ABRIR -> {
                 String que = e.params().getOrDefault("que", "");

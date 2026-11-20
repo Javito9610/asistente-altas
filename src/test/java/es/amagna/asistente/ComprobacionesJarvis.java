@@ -941,6 +941,28 @@ final class ComprobacionesJarvis {
                 }, java.util.Set.of("yo"), x -> { }).conCaptura(() -> Path.of("captura-1.png"));
         svc.recibir("local", "yo", "captura");
         ok(fotos.equals(List.of("captura-1.png")), "captura: «captura» manda lo que se ve en pantalla, sin IA");
+        for (String frase : List.of("Pásame una captura de lo que estás viendo ahora en el pc", "pantallazo", "hazme una captura de pantalla", "manda foto de la pantalla", "¿qué ves?")) {
+            fotos.clear();
+            svc.recibir("local", "yo", frase);
+            ok(fotos.size() == 1, "captura: entiende «" + frase + "» sin gastar IA");
+        }
+        for (String frase : List.of("crea un pdf con una captura de la reunión", "cada día a las 9 haz una captura")) {
+            fotos.clear();
+            svc.recibir("local", "yo", frase);
+            ok(fotos.isEmpty(), "captura: «" + frase + "» no es pedir una captura ahora");
+        }
+        fotos.clear();
+        var svc2 = new Servicio(new Almacen(Files.createTempDirectory("alm")), new Interprete(p0 -> Map.of("content", List.of(Map.of("type", "text", "text", "{\"tipo\":\"captura\"}"))), "m"),
+                t -> new Servicio.Resultado(true, "x"), t -> new Servicio.Resultado(true, "x"), new Servicio.Salida() {
+                    public void enviar(String o, String q, String tx) {
+                    }
+
+                    public void fichero(String o, String q, Path f) {
+                        fotos.add("ia");
+                    }
+                }, java.util.Set.of("yo"), x -> { }).conCaptura(() -> Path.of("c.png"));
+        svc2.recibir("local", "yo", "enséñame cómo está el despacho ahora mismo en la pantalla grande");
+        ok(fotos.equals(List.of("ia")), "captura: si lo dice de otra forma, la IA lo reconoce como «captura»");
     }
 
     static void microsoft() throws Exception {
