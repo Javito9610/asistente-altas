@@ -77,9 +77,12 @@ public final class Recuperador {
                 }
             }
         }
-        if (delante != null && !esMn(delanteProg) && destino != null) {
+        if (destino != null && (delante == null || !esMn(delanteProg))) {
             if (m.activar(destino)) {
-                hecho.add("el teclado lo tenía «" + delante + "» (" + delanteProg + "): devuelto a «" + destino + "»");
+                // Sin ninguna ventana con el foco en la lista, lo tiene algo que no es una ventana normal (un panel de Windows
+                // como «Configuración rápida», una notificación…): también se le devuelve a MN.
+                hecho.add(delante == null ? "ninguna ventana normal tenía el foco (un panel de Windows, quizá): devuelto a «" + destino + "»"
+                        : "el teclado lo tenía «" + delante + "» (" + delanteProg + "): devuelto a «" + destino + "»");
             }
         }
         return hecho;

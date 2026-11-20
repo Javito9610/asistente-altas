@@ -1369,6 +1369,14 @@ public final class Comprobaciones {
             hechos.clear();
             ok(es.amagna.asistente.estados.Recuperador.revisar("- «Alta Cliente» (GestorConsultas) [delante, con el foco]\n", params, mundo).isEmpty() && hechos.isEmpty(),
                     "recuperador: con MN delante y nada raro, no hace nada");
+            hechos.clear();
+            var r3 = es.amagna.asistente.estados.Recuperador.revisar("- «QA OSD» (pid 1) [pos 848,21 tam 222x160]\n- «Claude» (claude) [pos -9,-9 tam 1938x1038]\n"
+                    + "- «Clientes» (GestorConsultas) [pos 0,0 tam 1500x939]\n- «MNprogram - Abogados» (MNprogram) [pos -10,-10 tam 1940x1040]\n", params, mundo);
+            ok(r3.size() == 1 && hechos.equals(java.util.List.of("activar:Clientes")),
+                    "recuperador: si ninguna ventana normal tiene el foco (un panel de Windows) y hay MN, se le devuelve a MN (fallo real de la regresión nocturna)");
+            hechos.clear();
+            ok(es.amagna.asistente.estados.Recuperador.revisar("- «Claude» (claude) [pos 0,0 tam 5x5]\n", params, mundo).isEmpty() && hechos.isEmpty(),
+                    "recuperador: sin ventanas de MN no se inventa a quién devolver el foco");
         }
         {
             String pila = "- «Atención» (GestorConsultas) [delante, con el foco]\n- «Alta Cliente» (GestorConsultas) [pos 1,1 tam 5x5] — diálogos abiertos dentro: «Direcciones de Correo Electrónico» «Dirección Correo Electrónico» [BLOQUEADA]\n" + mnc;
