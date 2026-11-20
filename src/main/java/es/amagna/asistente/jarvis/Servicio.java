@@ -40,13 +40,15 @@ public final class Servicio {
     static final String AYUDA = """
             Esto es lo que sé hacer (dímelo con tus palabras):
             📋 MN (por ahora solo en la Empresa de prueba): «da de alta al cliente…», «crea un expediente…», «cuántos expedientes hay» (solo mirar).
-            📄 Documentos: «hazme un PDF / Word / Excel de…», «rellena la plantilla…», «lee este PDF» (también puedes MANDARME un fichero por Telegram con lo que quieres que haga), «prepárame un borrador de correo para…» (no lo envío), «una cita para el lunes a las 10».
+            ✉️ Correo: «mándale un correo a… diciendo…» (te enseño el borrador y solo sale con tu «sí»), «léeme los correos nuevos» (solo leo, no marco nada).
+            🖥️ Ordenador: «captura» (te mando lo que se ve en pantalla); «abre…», «busca en el navegador…» y otras cosas de escritorio (te pido el sí antes; nunca consolas, instaladores ni claves).
+            📄 Documentos: «hazme un PDF / Word / Excel de…», «rellena la plantilla…», «lee este PDF» (también puedes MANDARME un fichero por Telegram con lo que quieres que haga), «prepárame un borrador de correo para…» (guardado, sin enviar), «una cita para el lunes a las 10».
             🌐 Internet: «busca en internet…» (solo leer).
             🗂️ Ficheros: «lista / busca / mueve / copia…» dentro de mis carpetas (nada se borra: va a una papelera).
             ⏰ Tiempo: «cada día laborable a las 9, mira…», «recuérdame mañana a las 9 llamar a Ana», «programadas», «quita p123».
             🧠 Memoria: «apunta que…», «notas», «olvida 2».
             🛠️ Control: «estado», «diagnóstico», «pausa» / «sigue».
-            Lo que toque dinero, claves o mandar mensajes en tu nombre, no lo hago solo.""";
+            Lo que toque dinero o claves, no lo hago; y un correo o mensaje en tu nombre nunca sale sin tu «sí».""";
 
     private final Almacen almacen;
     private final Interprete interprete;
@@ -59,6 +61,22 @@ public final class Servicio {
     private Programadas programadas;
     private Notas notas;
     private java.util.function.Supplier<String> diagnostico;
+    private boolean correoListo;
+    private String correoDe = "";
+    private java.util.function.Supplier<java.nio.file.Path> captura;
+
+    /** Que hay un correo configurado (dirección desde la que se envía). Sin esto, «correo» pide configurarlo. */
+    public Servicio conCorreo(String direccion) {
+        this.correoListo = direccion != null && !direccion.isBlank();
+        this.correoDe = direccion == null ? "" : direccion;
+        return this;
+    }
+
+    /** Cómo hacer una captura de la pantalla del ordenador (se manda por el chat al pedirla). */
+    public Servicio conCaptura(java.util.function.Supplier<java.nio.file.Path> c) {
+        this.captura = c;
+        return this;
+    }
     private java.util.function.Supplier<String> conocimiento = () -> "";
 
     /** Lo que Jarvis ya sabe hacer solo (tareas libres aprendidas): se le cuenta al intérprete para que las reutilice con los mismos nombres. */
@@ -217,6 +235,16 @@ public final class Servicio {
             decir(origen, quien, AYUDA);
             return;
         }
+        if (captura != null && Set.of("captura", "captura de pantalla", "pantallazo", "que ves", "que se ve", "que hay en pantalla", "foto de la pantalla").contains(n)) {
+            try {
+                var f = captura.get();
+                decir(origen, quien, "Esto es lo que se ve ahora en el ordenador (cuidado: puede salir algo del trabajo).");
+                salida.fichero(origen, quien, f);
+            } catch (RuntimeException ex) {
+                decir(origen, quien, "No he podido hacer la captura: " + ex.getMessage());
+            }
+            return;
+        }
         if (diagnostico != null && Set.of("diagnostico", "como estas", "revisate", "autodiagnostico", "salud").contains(n)) {
             String d;
             try {
@@ -278,6 +306,18 @@ public final class Servicio {
             case Entendido.OFICINA -> {
                 almacen.nuevo(origen, quien, texto, "oficina", Map.of("encargo", e.texto()), Trabajo.PENDIENTE);
                 decir(origen, quien, "Me pongo con ello (documentos y ficheros, sin tocar ninguna ventana): " + e.texto() + " (" + pendientes() + " en cola)");
+            }
+            case Entendido.CORREO -> {
+                if (!correoListo) {
+                    decir(origen, quien, "Todavía no tengo ningún correo configurado. Ejecuta guardar-correo.cmd en el ordenador (te pide la dirección y la contraseña de aplicación, cifradas) y reinicia Jarvis.");
+                    break;
+                }
+                Map<String, String> ps = new java.util.LinkedHashMap<>(e.params());
+                ps.put("cuerpo", e.texto());
+                almacen.nuevo(origen, quien, texto, "correo", ps, Trabajo.ESPERANDO);
+                decir(origen, quien, "Voy a enviar este correo, desde " + correoDe + ":\n\nPara: " + ps.get("para") + "\nAsunto: " + ps.get("asunto")
+                        + (ps.getOrDefault("adjuntos", "").isBlank() ? "" : "\nAdjuntos: " + ps.get("adjuntos")) + "\n\n" + e.texto()
+                        + "\n\n¿Lo envío? (sí / no)");
             }
             case Entendido.CONSULTAR -> {
                 almacen.nuevo(origen, quien, texto, "consulta", Map.of("pregunta", e.texto()), Trabajo.PENDIENTE);

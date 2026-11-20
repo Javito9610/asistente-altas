@@ -142,8 +142,8 @@ public final class Ficheros {
         return "Creado «" + ruta + "» (" + tam(p) + ").";
     }
 
-    /** Pide que un fichero (existente, dentro de las carpetas permitidas) se le entregue a la persona al terminar. */
-    public String entregar(String ruta) throws IOException {
+    /** Comprueba que un fichero se puede sacar del ordenador (mandarlo por el chat o adjuntarlo a un correo) y devuelve su ruta. */
+    public Path comprobarSalida(String ruta) throws IOException {
         Path p = dentro(ruta);
         if (!Files.isRegularFile(p)) {
             throw new IllegalArgumentException("No es un fichero: " + ruta);
@@ -156,8 +156,14 @@ public final class Ficheros {
         String nom = p.getFileName().toString().toLowerCase(Locale.ROOT);
         if (bajo.contains("/secretos/") || bajo.contains("/.ssh/") || bajo.contains("/.git/") || List.of("clave.txt", "mn.dat", "autorizados.txt").contains(nom)
                 || List.of(".dat", ".key", ".pem", ".pfx", ".p12", ".kdbx", ".env").stream().anyMatch(nom::endsWith)) {
-            throw new IllegalArgumentException("NO PERMITIDO: ese fichero guarda claves o secretos y no se manda por el chat.");
+            throw new IllegalArgumentException("NO PERMITIDO: ese fichero guarda claves o secretos y no sale del ordenador.");
         }
+        return p;
+    }
+
+    /** Pide que un fichero (existente, dentro de las carpetas permitidas) se le entregue a la persona al terminar. */
+    public String entregar(String ruta) throws IOException {
+        Path p = comprobarSalida(ruta);
         if (!aEntregar.contains(p)) {
             aEntregar.add(p);
         }

@@ -13,4 +13,5 @@ public record Entendido(String tipo, String tarea, Map<String, String> params, S
     public static final String RECORDAR = "recordar";
     public static final String OFICINA = "oficina";
     public static final String RECORDATORIO = "recordatorio";
+    public static final String CORREO = "correo";
 }

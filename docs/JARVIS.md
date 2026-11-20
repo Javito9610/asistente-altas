@@ -80,3 +80,13 @@ Cómo activarlas:
    Modelo opcional en `datos\gemini-modelo.txt` (por defecto `gemini-flash-latest`).
 2. Local: instala Ollama, `ollama pull <modelo>` y escribe el nombre del modelo en `datos\ollama.txt`.
 Sin ninguna de las dos, todo sigue yendo a Claude como hasta ahora.
+
+## 13. Correo (enviar y leer) y captura
+
+- **Configurar:** `guardar-correo.cmd` (dirección + contraseña de aplicación, cifradas con tu cuenta de Windows). Recomendado: una
+  cuenta propia de Jarvis (p. ej. un Gmail nuevo) en vez de la tuya. Gmail y cualquier correo IMAP/SMTP. Microsoft 365 no (pide OAuth).
+  Otros servidores: `datos\correo.json` con `smtp`, `smtp_puerto`, `imap`, `imap_puerto`.
+- **Enviar:** «mándale un correo a ana@… diciendo…». Jarvis enseña el correo ENTERO (de, para, asunto, adjuntos, texto) y solo sale con
+  tu «sí» a ese borrador exacto. Adjuntos solo de sus carpetas y nunca ficheros de claves.
+- **Leer:** «léeme los correos nuevos» (los últimos sin leer; no marca nada como leído). Lo que dicen los correos son datos, nunca órdenes.
+- **Captura:** «captura» (o «qué ves») manda por el chat una imagen de la pantalla. Puede salir trabajo: solo la piden las personas autorizadas.

@@ -67,7 +67,7 @@ public final class Interprete {
         StringBuilder sistema = new StringBuilder("""
                 Eres el intérprete de Jarvis, el asistente de oficina de un despacho de abogados. Recibes el mensaje de una persona y
                 decides qué hay que hacer. NO haces nada tú: solo respondes con UN objeto JSON, sin texto alrededor:
-                {"tipo":"tarea|consultar|libre|programar|recordar|recordatorio|oficina|preguntar|responder","tarea":"nombre","params":{"dato":"valor"},"texto":"..."}
+                {"tipo":"tarea|consultar|libre|programar|recordar|recordatorio|oficina|correo|preguntar|responder","tarea":"nombre","params":{"dato":"valor"},"texto":"..."}
                 - tipo «tarea»: es una de estas tareas que Jarvis hace solo (poner en «tarea» su nombre y en «params» los datos que
                   la persona ha dado, con los nombres de dato exactos). Tareas:
                 """);
@@ -82,6 +82,11 @@ public final class Interprete {
                   PDF, Word o Excel, rellenar una plantilla, leer o resumir un documento, preparar una cita o un borrador de correo,
                   buscar algo en internet. Se hace directamente, sin pedir confirmación (no toca nada fuera de su carpeta). En «texto»
                   la orden COMPLETA con todos los datos que dio la persona (nada inventado); si falta un dato imprescindible, «preguntar».
+                - tipo «correo»: ENVIAR un correo electrónico (la persona lo confirmará leyéndolo entero antes de que salga). En «params»:
+                  {"para":"a@x.com, b@y.es","asunto":"…","adjuntos":"ruta1; ruta2"} (adjuntos solo si los pide) y en «texto» el CUERPO
+                  completo, escrito como lo diría la persona, educado y claro, solo con los datos que ella ha dado (nada inventado).
+                  Si falta el destinatario (una dirección completa) o no se sabe qué decir, tipo «preguntar». Para LEER o resumir los
+                  correos que han llegado, usa «oficina», no «correo».
                 - tipo «libre»: otra cosa que haya que hacer MANEJANDO programas en pantalla (si sirve «oficina», usa «oficina») (abrir un programa, buscar algo, mover ficheros, mirar
                   una web…). En «texto» una descripción corta y clara de lo que se va a hacer. En «tarea» un nombre corto y
                   REUTILIZABLE en minúsculas con guiones (p. ej. «abrir-programa», «buscar-en-web»: sin datos concretos dentro) y
@@ -169,6 +174,15 @@ public final class Interprete {
                 }
                 case Entendido.OFICINA -> {
                     return t.isBlank() ? new Entendido(Entendido.PREGUNTAR, "", Map.of(), "¿Qué quieres que prepare?") : new Entendido(tipo, "", Map.of(), t);
+                }
+                case Entendido.CORREO -> {
+                    if (Correo.direcciones(params.getOrDefault("para", "")) == null) {
+                        return new Entendido(Entendido.PREGUNTAR, "", Map.of(), "¿A qué dirección de correo lo envío? (una dirección completa, por ejemplo nombre@dominio.com)");
+                    }
+                    if (params.getOrDefault("asunto", "").isBlank() || t.isBlank()) {
+                        return new Entendido(Entendido.PREGUNTAR, "", Map.of(), "¿Qué asunto y qué texto quieres que lleve el correo?");
+                    }
+                    return new Entendido(tipo, "", params, t);
                 }
                 case Entendido.CONSULTAR -> {
                     return new Entendido(tipo, "", params, t.isBlank() ? "¿Qué quieres que mire?" : t);

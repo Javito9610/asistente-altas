@@ -830,6 +830,13 @@ public final class App {
             carpetas.add(Path.of("trabajo", "jarvis"));
         }
         var ficherosJarvis = new es.amagna.asistente.jarvis.Ficheros(carpetas);
+        var correo = correoDe(datos);
+        if (correo == null) {
+            registro.accept("Correo: no configurado (guardar-correo.cmd).");
+        } else {
+            registro.accept("Correo: " + correo.cuenta().direccion() + " (envía con tu «sí», lee sin marcar).");
+        }
+        var captura = new es.amagna.asistente.jarvis.Captura(carpetas.get(0).resolve("capturas"));
         var corredor = corredorDeTareas(a);
         es.amagna.asistente.jarvis.Servicio.Hace tareas = t -> {
             if ("oficina".equals(t.tarea())) {
@@ -841,11 +848,31 @@ public final class App {
                     var esp = es.amagna.asistente.cerebro.Especialista.cargar("oficina", MODELO_POR_DEFECTO, 250_000);
                     Agente ag = new Agente(consumo, new ManosRobot(false), new VentanasNativas(false), esp.modelo(), esp.instrucciones(), esp.pasos(),
                             esp.topeTokens(), registro).conExpediente(false).conFicheros(ficherosJarvis).conWeb(new es.amagna.asistente.jarvis.Web())
-                            .soloPuede(esp.puede());
+                            .conCorreo(correo).soloPuede(esp.puede());
                     var r = ag.ejecutar(t.params().getOrDefault("encargo", t.peticion()));
                     return new es.amagna.asistente.jarvis.Servicio.Resultado(r.terminado(), r.mensaje().replaceFirst("^(TERMINADO|PARADO):\\s*", ""));
                 } catch (IOException e) {
                     return new es.amagna.asistente.jarvis.Servicio.Resultado(false, "No pude preparar al especialista: " + e.getMessage());
+                }
+            }
+            if ("correo".equals(t.tarea())) {
+                // Solo llega aquí tras el «sí» de la persona a este borrador exacto.
+                if (correo == null) {
+                    return new es.amagna.asistente.jarvis.Servicio.Resultado(false, "No hay correo configurado (guardar-correo.cmd).");
+                }
+                try {
+                    var para = es.amagna.asistente.jarvis.Correo.direcciones(t.params().get("para"));
+                    var adj = new java.util.ArrayList<Path>();
+                    for (String r : t.params().getOrDefault("adjuntos", "").split(";")) {
+                        if (!r.isBlank()) {
+                            adj.add(ficherosJarvis.comprobarSalida(r.strip()));
+                        }
+                    }
+                    correo.enviar(para, t.params().get("asunto"), t.params().getOrDefault("cuerpo", ""), adj);
+                    return new es.amagna.asistente.jarvis.Servicio.Resultado(true, "Correo enviado a " + String.join(", ", para)
+                            + (adj.isEmpty() ? "." : " con " + adj.size() + " adjunto(s)."));
+                } catch (IllegalArgumentException | IOException e) {
+                    return new es.amagna.asistente.jarvis.Servicio.Resultado(false, "No se ha enviado: " + e.getMessage());
                 }
             }
             if ("consulta".equals(t.tarea())) {
@@ -953,6 +980,8 @@ public final class App {
         };
         var servicio = new es.amagna.asistente.jarvis.Servicio(almacen, interprete, tareas, libre, salida, autorizados, registro)
                 .conEntregas(ficherosJarvis::drenarEntregas)
+                .conCorreo(correo == null ? null : correo.cuenta().direccion())
+                .conCaptura(captura::hacer)
                 .conDiagnostico(() -> {
                     long arranque = java.lang.management.ManagementFactory.getRuntimeMXBean().getStartTime();
                     var dur = java.time.Duration.ofMillis(System.currentTimeMillis() - arranque);
@@ -978,6 +1007,7 @@ public final class App {
                     return "🩺 Diagnóstico de Jarvis\n"
                             + "· IA (clave): " + (Clave.hay() ? "sí" : "NO — sin ella solo hago lo que sé de memoria (asistente guardar-clave)") + "\n"
                             + "· Telegram: " + (telegram[0] != null ? "conectado" : "no configurado (asistente secreto telegram)") + "\n"
+                            + "· Correo: " + (correo == null ? "no configurado (guardar-correo.cmd)" : correo.cuenta().direccion()) + "\n"
                             + "· IA que ha contestado: " + enrutador.resumen() + "\n"
                             + "· IA gastada hoy: " + consumo.hoy() + " tokens (tope " + (consumo.tope() == 0 ? "sin tope" : consumo.tope()) + ")\n"
                             + "· Personas autorizadas: " + autorizados.size() + "\n"
@@ -1657,6 +1687,38 @@ public final class App {
      * Deja Telegram listo paso a paso: comprueba el token, espera tu primer mensaje al bot y, si TÚ confirmas en esta consola que el
      * número es el tuyo, lo añade a datos\\autorizados.txt. Nadie queda autorizado sin que una persona lo teclee aquí.
      */
+    /**
+     * El correo, si hay uno guardado («asistente secreto correo»: usuario = la dirección, contraseña = la de aplicación, cifrada).
+     * Los servidores salen del dominio; si hace falta otros, en datos\\correo.json: {"smtp":"…","smtp_puerto":465,"imap":"…","imap_puerto":993}.
+     */
+    private static es.amagna.asistente.jarvis.Correo correoDe(Path datos) throws IOException {
+        if (!es.amagna.asistente.manos.Secreto.hay("correo")) {
+            return null;
+        }
+        String dir = es.amagna.asistente.manos.Secreto.usuario("correo");
+        if (dir == null || es.amagna.asistente.jarvis.Correo.direcciones(dir) == null) {
+            return null;
+        }
+        var c = es.amagna.asistente.jarvis.Correo.Cuenta.de(dir);
+        Path f = datos.resolve("correo.json");
+        if (Files.isRegularFile(f)) {
+            var j = Json.objeto(Files.readString(f, StandardCharsets.UTF_8));
+            var seg = (java.util.function.Function<Integer, es.amagna.asistente.jarvis.Correo.Seguridad>) p -> p == 587 ? es.amagna.asistente.jarvis.Correo.Seguridad.STARTTLS : es.amagna.asistente.jarvis.Correo.Seguridad.SSL;
+            String smtp = j.get("smtp") == null ? c.smtp() : String.valueOf(j.get("smtp"));
+            int sp = j.get("smtp_puerto") instanceof Number n ? n.intValue() : c.smtpPuerto();
+            String imap = j.get("imap") == null ? c.imap() : String.valueOf(j.get("imap"));
+            int ip = j.get("imap_puerto") instanceof Number n ? n.intValue() : c.imapPuerto();
+            c = new es.amagna.asistente.jarvis.Correo.Cuenta(dir, dir, smtp, sp, seg.apply(sp), imap, ip, es.amagna.asistente.jarvis.Correo.Seguridad.SSL);
+        }
+        return new es.amagna.asistente.jarvis.Correo(c, () -> {
+            try {
+                return new String(es.amagna.asistente.manos.Secreto.leer("correo"));
+            } catch (IOException e) {
+                throw new IllegalStateException("No se puede leer la contraseña del correo");
+            }
+        });
+    }
+
     /** Gemini si hay clave (variable GEMINI_API_KEY o «asistente secreto gemini»); si no, null. */
     private static es.amagna.asistente.cerebro.Cerebro geminiDe(Path datos) throws IOException {
         String clave = System.getenv("GEMINI_API_KEY");
