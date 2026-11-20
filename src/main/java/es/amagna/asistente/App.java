@@ -855,6 +855,11 @@ public final class App {
                 }
                 try {
                     VentanasNativas v = new VentanasNativas(false);
+                    // Antes de mirar, que MN esté abierto y dentro (si estaba cerrado o pidiendo la contraseña, entra él solo).
+                    String noListo = prepararMnParaMirar(v, registro);
+                    if (noListo != null) {
+                        return new es.amagna.asistente.jarvis.Servicio.Resultado(false, noListo);
+                    }
                     var esp = es.amagna.asistente.cerebro.Especialista.cargar("consulta", MODELO_POR_DEFECTO, 120_000);
                     Agente ag = new Agente(consumo, new ManosRobot(false), v, esp.modelo(), esp.instrucciones(), esp.pasos(),
                             esp.topeTokens(), registro).conControles(new Controles(v)).conExpediente(false).soloPuede(esp.puede());
@@ -1410,6 +1415,30 @@ public final class App {
                     cosa tuya o hay que decidir algo que no te corresponde, termina con PARADO explicándolo.
                     """.formatted(vent, queSeQueria, porQue, extra)).mensaje();
         };
+    }
+
+    /**
+     * Para mirar en MN: si el programa está cerrado, pidiendo usuario y contraseña o sin la empresa de prueba, lo deja listo con el
+     * mapa de estados (abre, entra con la contraseña cifrada, elige la empresa de prueba). Si ya hay una empresa abierta que no es
+     * la de prueba NO se toca nada: mirar se puede, cambiar de empresa no. Devuelve null si se puede mirar, o por qué no.
+     */
+    private static String prepararMnParaMirar(VentanasNativas ventanas, java.util.function.Consumer<String> registro) {
+        try {
+            var mapa = es.amagna.asistente.guion.Mapa.leer(Path.of("mapas", "mn.json"));
+            var sesion = new es.amagna.asistente.guion.Sesion(new Controles(ventanas), ventanas, mapa, "", registro).conEntradaDelMapa();
+            var estado = sesion.mirar();
+            if (estado.lista() || String.valueOf(estado.comoEsta()).contains("sitio equivocado")) {
+                return null;
+            }
+            registro.accept("MN no está listo para mirar (" + estado.comoEsta() + "): lo preparo.");
+            estado = sesion.asegurar();
+            if (estado.lista() || String.valueOf(estado.comoEsta()).contains("sitio equivocado")) {
+                return null;
+            }
+            return "No he podido dejar MN listo para mirar: " + estado.comoEsta();
+        } catch (IOException | RuntimeException e) {
+            return "No he podido preparar MN para mirar: " + e.getMessage();
+        }
     }
 
     /** Que MN esté abierto, dentro de la empresa y el ejercicio de prueba, y sin diálogos de entrada. Si no, para. */

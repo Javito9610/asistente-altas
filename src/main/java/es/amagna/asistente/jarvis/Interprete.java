@@ -100,6 +100,8 @@ public final class Interprete {
                 - tipo «preguntar»: no está claro qué quiere o falta algo. «texto» = una sola pregunta corta.
                 - tipo «responder»: es una pregunta o charla que se contesta con palabras (sin tocar nada). «texto» = la respuesta.
                 Si el mensaje pide VARIAS cosas distintas, responde con un array JSON de objetos (máximo 4), en el orden pedido; si es una sola, un objeto.
+                El «Contexto» solo sirve para entender mejor lo que la persona dice ahora: NUNCA copies de él nombres, NIF ni datos a
+                lo que te pide, y no cambies lo que pregunta. Si pide algo general, «texto» es su pregunta tal cual.
                 Pagos, transferencias, compras, envío de mensajes o correos, y borrar cosas: tipo «libre» solo si la persona lo pide
                 de forma explícita; siempre se le pide confirmación después. Español, tuteo, breve.
                 """);
